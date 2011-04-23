@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<queueApp checkInterval="check">
+  <loader name="main" callStack="true" delegate="false">
+  </loader>
+<!-- for test start -->
+  <terminal name="unitResponseQueue" threadCount="0"/>
+  <terminal name="unitRequestQueue" threadCount="1">
+    <queuelet loaderName="main" className="${unitTestClass}">
+    </queuelet>
+  </terminal>
+<!-- for test end -->
+
+  <terminal name="timer" threadCount="32">
+    <queuelet loaderName="main" className="naru.async.timer.TimerManager">
+      <param name="timerInterval" value="10"/>
+    </queuelet>
+  </terminal>
+
+  <terminal name="storeFileWriter" threadCount="4">
+    <queuelet loaderName="main" factoryClassName="naru.async.store.StoreManager" factoryMethodName="getBufferFileWriter">
+      <param name="compressInterval" value="10"/>
+      <param name="persistenceStore.file" value="${storeDir}/persistenceStore.sar"/>
+      <param name="page.file" value="${storeDir}/page.stp"/>
+      <param name="page.readerCount" value="8"/>
+      <param name="buffer.0.file" value="${storeDir}/buffer.st0"/>
+      <param name="buffer.1.file" value="${storeDir}/buffer.st1"/>
+      <param name="buffer.2.file" value="${storeDir}/buffer.st2"/>
+      <param name="buffer.3.file" value="${storeDir}/buffer.st3"/>
+      <param name="buffer.readerCount" value="4"/>
+    </queuelet>
+  </terminal>
+  <terminal name="storeFileReader" threadCount="8">
+    <queuelet loaderName="main" factoryClassName="naru.async.store.StoreManager" factoryMethodName="getBufferFileReader"/>
+  </terminal>
+  <terminal name="storeDispatcher" threadCount="1"><!--ここを複数にすると追い越しが発生する-->
+    <queuelet loaderName="main" factoryClassName="naru.async.store.StoreManager" factoryMethodName="getStoreDispatcher"/>
+  </terminal>
+
+  <terminal name="pool" threadCount="1">
+    <queuelet loaderName="main" className="naru.async.pool.PoolManager">
+      <param name="recycleInterval" value="100"/>
+      <param name="watchIntervalCount" value="60"/><!--何回に１回監視するか？-->
+      <!--param name="delayRecycleClasses" value="naru.async.core.ChannelContext,naru.async.ChannelHandler"/-->
+      <param name="poolNames" value="p1"/>
+      <param name="p1.className" value="naru.async.core.ChannelContext"/>
+      <!-- param name="p1.className" value="java.lang.String"/-->
+      <param name="p1.initial" value="128"/>
+      <param name="p1.limit" value="128"/>
+      <param name="p1.increment" value="16"/>
+      <param name="poolBuffers" value="default"/>
+      <param name="default.bufferSize" value="1024"/>
+      <!--param name="default.bufferSize" value="128"/-->
+      <param name="default.initial" value="81920"/>
+      <param name="default.limit" value="81920"/>
+      <param name="default.increment" value="128"/>
+    </queuelet>
+  </terminal>
+</queueApp>
