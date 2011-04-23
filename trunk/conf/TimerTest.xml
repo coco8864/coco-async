@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<queueApp checkInterval="check">
+<!-- for test start -->
+<loader name="main" callStack="true" delegate="false" resouceLoader="parent">
+</loader>
+<terminal name="queuelet.test" threadCount="1">
+  <queuelet loaderName="main" className="${queuelet.test.class}">
+ </queuelet>
+</terminal>
+<!-- for test end -->
+  <terminal name="timer" threadCount="2">
+    <queuelet loaderName="main" className="naru.async.timer.TimerManager">
+      <param name="timerInterval" value="100"/>
+    </queuelet>
+  </terminal>
+
+  <!--terminal name="pool" threadCount="1">
+    <queuelet loaderName="main" className="naru.async.pool.PoolManager">
+    </queuelet>
+　</terminal-->
+  
+  <terminal name="testQueue" threadCount="0"/>
+
+</queueApp>
