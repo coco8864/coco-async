@@ -23,7 +23,7 @@ public class WriteBuffer implements BufferGetter {
 	private long onBufferLength;
 //	private MessageDigest messageDigest;
 
-	private void setStore(Store store){
+	private synchronized void setStore(Store store){
 		if(store!=null){
 			context.ref();
 			store.ref();
