@@ -801,6 +801,16 @@ public class Store extends PoolBase {
 		return onBufferFailureCount;
 	}
 	
+	@Override
+	public void ref() {
+		// TODO Auto-generated method stub
+		super.ref();
+	}
+	@Override
+	public boolean unref() {
+		// TODO Auto-generated method stub
+		return super.unref();
+	}
 	public boolean checkRef(){
 		if( getRef()>0 ){
 			return true;

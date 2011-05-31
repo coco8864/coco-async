@@ -24,7 +24,7 @@ public class ReadBuffer implements BufferGetter {
 	 * ‚»‚ÌŸ‚ÌasyncRead‚ğonClose‚Å•œ‹A‚³‚¹‚éB*/
 	private boolean isDisconnect=false;//‰ñü‚ªØ‚ê‚½ê‡
 	
-	private void setStore(Store store){
+	private synchronized void setStore(Store store){
 		if(store!=null){
 			context.ref();
 			store.ref();
