@@ -75,11 +75,12 @@ public class Page extends PoolBase{
 			return;
 		}
 		logger.debug("saveFreePage freePage.size:"+freePages.size());
+		int limit=128;//ˆê‰ñ‚ÌŒÄ‚Ño‚µ‚Åfreepage‚·‚éŒÀŠE”
 		synchronized(pageFile){
 			Iterator<Page> itr=freePages.values().iterator();
 			int count=freePages.size();
 			while(itr.hasNext()){
-				if(leftPageCount>=count){
+				if(leftPageCount>=count || limit==0){
 					break;
 				}
 				Page freePage=itr.next();
@@ -89,6 +90,7 @@ public class Page extends PoolBase{
 				persistenceStore.setTopFreePageId(freePage.getPageId());
 				freePage.unref(true);
 				count--;
+				limit--;
 			}
 		}
 	}
