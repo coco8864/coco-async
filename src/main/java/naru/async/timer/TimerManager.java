@@ -152,7 +152,7 @@ public class TimerManager implements Queuelet,Runnable{
 	 */
 	public static synchronized long setTimeout(long interval,Timer timer,Object userContext) {
 //		System.out.println("setTimeout timerManager.run:"+timerManager.run);
-		if(!timerManager.run){
+		if(timerManager==null || !timerManager.run){
 			return -1;
 		}
 		long timoutTime=System.currentTimeMillis()+interval;
