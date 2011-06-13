@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 
 import naru.async.ChannelHandler;
 import naru.queuelet.test.TestBase;
@@ -77,21 +78,27 @@ public class CoreConnectTest extends TestBase{
 	public static class TestClientHandler extends ChannelHandler{
 		boolean isTimeout=false;
 		boolean isFinished=false;
+		boolean isConnect=false;
 		private Object cUserContext;
+		private long connectTime;
 		@Override
 		public void onConnected(Object userContext) {
 			cUserContext=userContext;
-			System.out.println("TestClientHandler onConnected.userContext:"+userContext);
+			connectTime=System.currentTimeMillis();
+//			System.out.println("TestClientHandler onConnected.userContext:"+userContext);
+			asyncWrite(userContext,new ByteBuffer[]{ByteBuffer.wrap("GET".getBytes())});
 //			asyncClose(userContext);//Ç¢Ç´Ç»ÇËÉNÉçÅ[ÉY
 			synchronized(userContext){
 				userContext.notify();
+				isConnect=true;
 			}
 		}
 		@Override
 		public void onFinished() {
-			System.out.println("TestClientHandler onFinished.cUserContext:"+cUserContext);
+			System.out.println("TestClientHandler onFinished.cUserContext:"+cUserContext +":" +(System.currentTimeMillis()-connectTime));
 			synchronized(this){
 				isFinished=true;
+				isConnect=false;
 				notify();
 			}
 		}
@@ -148,4 +155,32 @@ public class CoreConnectTest extends TestBase{
 		}
 		System.out.println("===time:"+(System.currentTimeMillis()-start));
 		handlers.disconnects();
-	}}
+	}
+	
+	@Test
+	public void test3() throws Throwable{
+		callTest("qtest3",Long.MAX_VALUE);
+	}
+	public void qtest3() throws Throwable{
+		System.out.println("i am qtest3");
+		TestClientHandler[] tchs=new TestClientHandler[10240];
+		for(int i=0;i<tchs.length;i++){
+			tchs[i]=new TestClientHandler();
+		}
+		for(int i=0;i<tchs.length;i++){
+//			tchs[i].asyncConnect("test", "judus.soft.fujitsu.com", 1280, 100000);
+			tchs[i].asyncConnect("test", "localhost", 1280, 100000);
+//			Thread.sleep(1);
+		}
+		int count=0;
+		for(int i=0;i<tchs.length;i++){
+			if( tchs[i].isConnect ){
+				count++;
+			}
+			tchs[i].asyncClose("test");
+		}
+		System.out.println("count:" +count + "/" +tchs.length);
+		
+	}
+	
+}

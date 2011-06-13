@@ -58,15 +58,33 @@ public class WriteScheduler extends PoolBase implements Timer{
 		}
 		this.handler=handler;
 	}
+	public void cancel(){
+		if(timerId==-1 || !TimerManager.clearTimeout(timerId)){
+			return;
+		}
+		if(prevSceduler!=null){
+			prevSceduler.cancel();
+			prevSceduler=null;
+		}
+		setHandler(null);
+		PoolManager.poolBufferInstance(buffer);
+		userContext=null;
+		synchronized(this){
+			isDoneWrite=true;
+			notifyAll();
+		}
+		unref();//仕事が終わったので自分を回収
+	}
+	
 	
 	/* 単に遅延して書き込む場合 */
 	public long scheduleWrite(long writeTime,ChannelHandler handler,Object userContext,ByteBuffer[] buffer){
-		return scheduleWrite(writeTime,handler,userContext,buffer,null,0);
+		return scheduleWrite(handler,userContext,buffer,writeTime,0,null);
 	}
 	
 	/* 先行scedulerの次に遅延して書き込む場合 */
 	public long scheduleWrite(long writeTime,ChannelHandler handler,Object userContext,ByteBuffer[] buffer,WriteScheduler prevSceduler){
-		return scheduleWrite(writeTime,handler,userContext,buffer,prevSceduler,0);
+		return scheduleWrite(handler,userContext,buffer,writeTime,0,prevSceduler);
 	}
 	
 	/**
@@ -74,12 +92,12 @@ public class WriteScheduler extends PoolBase implements Timer{
 	 * +値の場合、その長さ分送信、全bufferに満たない場合は、その後closeする
 	 * -値の場合、buffer長からその長さ分を引いてその後closeする
 	 * (Long.MIN_VALUEを設定した場合、1バイトも書き込まずにcloseする)
-	 * @param writeTime
 	 * @param handler
 	 * @param buffer
+	 * @param writeTime
 	 * @param writeLength
 	 */
-	public long scheduleWrite(long writeTime,ChannelHandler handler,Object userContext,ByteBuffer[] buffer,WriteScheduler prevSceduler,long writeLength){
+	public long scheduleWrite(ChannelHandler handler,Object userContext,ByteBuffer[] buffer,long writeTime,long writeLength,WriteScheduler prevSceduler){
 		setHandler(handler);
 		this.buffer=buffer;
 		this.userContext=userContext;
@@ -126,8 +144,8 @@ public class WriteScheduler extends PoolBase implements Timer{
 					}
 				}
 			}
+			setPrevSceduler(null);
 		}
-		setPrevSceduler(null);
 		handler.asyncWrite(userContext, buffer);
 		if(isCloseEnd){
 			logger.debug("WriteScheduler asyncClose");
