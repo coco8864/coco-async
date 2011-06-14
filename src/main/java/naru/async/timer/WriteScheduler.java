@@ -20,6 +20,7 @@ public class WriteScheduler extends PoolBase implements Timer{
 	private ChannelHandler handler;
 	private ByteBuffer[] buffer;
 	private Object userContext;
+	boolean isCloseEndBeforeWrite;
 	boolean isCloseEnd;
 	boolean isDoneWrite;
 	private WriteScheduler prevSceduler;//Ç±ÇÃäÆóπÇë“Ç¡ÇƒwriteÇé¿çsÇ∑ÇÈ
@@ -32,7 +33,7 @@ public class WriteScheduler extends PoolBase implements Timer{
 			PoolManager.poolBufferInstance(buffer);
 			buffer=null;
 		}
-		isCloseEnd=false;
+		isCloseEndBeforeWrite=isCloseEnd=false;
 		isDoneWrite=false;
 		userContext=null;
 		timerId=-1;
@@ -68,6 +69,7 @@ public class WriteScheduler extends PoolBase implements Timer{
 		}
 		setHandler(null);
 		PoolManager.poolBufferInstance(buffer);
+		buffer=null;
 		userContext=null;
 		synchronized(this){
 			isDoneWrite=true;
@@ -103,15 +105,16 @@ public class WriteScheduler extends PoolBase implements Timer{
 		this.userContext=userContext;
 		setPrevSceduler(prevSceduler);
 		long length=BuffersUtil.remaining(buffer);
-		if(writeLength<0){
+		if(writeLength==Long.MIN_VALUE){
+			isCloseEndBeforeWrite=true;			
+		}else if(writeLength<0){
 			length+=writeLength;
 			if(length<0){
 				length=0;
 			}
 			BuffersUtil.cut(buffer,length);
 			isCloseEnd=true;
-		}
-		if(writeLength>0){
+		}else if(writeLength>0){
 			if(writeLength<length){
 				length=writeLength;
 				isCloseEnd=true;
@@ -147,9 +150,13 @@ public class WriteScheduler extends PoolBase implements Timer{
 			setPrevSceduler(null);
 		}
 		handler.asyncWrite(userContext, buffer);
-		if(isCloseEnd){
-			logger.debug("WriteScheduler asyncClose");
+		if(isCloseEndBeforeWrite){
 			handler.asyncClose(userContext);
+		}else{
+			if(isCloseEnd){
+				logger.debug("WriteScheduler asyncClose");
+				handler.asyncClose(userContext);
+			}
 		}
 		setHandler(null);
 		buffer=null;
