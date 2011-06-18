@@ -184,4 +184,8 @@ public class ReadBuffer implements BufferGetter {
 		context.failure(falure);
 		setStore(null);
 	}
+
+	public long getOnBufferLength() {
+		return onBufferLength;
+	}
 }

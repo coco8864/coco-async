@@ -989,4 +989,15 @@ public class ChannelContext extends PoolBase{
 			selector.wakeup();
 		}
 	}
+	
+	//アプリケーションに通知した通算read長
+	public long getTotalReadLength(){
+		return readBuffer.getOnBufferLength();
+	}
+	
+	//アプリケーションから受け取った通算write長,実writeとは若干差異がある
+	public long getTotalWriteLength(){
+		return writeBuffer.getOnBufferLength();
+	}
+	
 }

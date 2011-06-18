@@ -12,7 +12,6 @@ import naru.async.pool.PoolManager;
 
 /**
  * スケジュールにしたがってbufferをasyncWriteするためのクラス
- * 仕事が終わったら、自分で回収する
  * @author Naru
  */
 public class WriteScheduler extends PoolBase implements Timer{
@@ -25,6 +24,15 @@ public class WriteScheduler extends PoolBase implements Timer{
 	boolean isDoneWrite;
 	private WriteScheduler prevSceduler;//この完了を待ってwriteを実行する
 	private long timerId;
+	private long scheduleWriteTime;//目標書き込み時刻
+	private long actualWriteTime;//実際の書き込み時刻
+	
+	
+	public static WriteScheduler create(ChannelHandler handler,Object userContext,ByteBuffer[] buffer,long writeTime,long writeLength,WriteScheduler prevSceduler){
+		WriteScheduler scheduler=(WriteScheduler) PoolManager.getInstance(WriteScheduler.class);
+		scheduler.scheduleWrite(handler, userContext, buffer, writeTime, writeLength, prevSceduler);
+		return scheduler;
+	}
 
 	public void recycle() {
 		setHandler(null);
@@ -121,15 +129,17 @@ public class WriteScheduler extends PoolBase implements Timer{
 			}
 			BuffersUtil.cut(buffer,length);
 		}
-		
-		long now=System.currentTimeMillis();
-		logger.debug("writeTime-now="+(writeTime-now));
+		this.scheduleWriteTime=writeTime+System.currentTimeMillis();
+//		long now=System.currentTimeMillis();
 		logger.debug("writeTime="+(writeTime));
-		if(now>=writeTime){
-			onTimer(null);
-		}else{
-			timerId=TimerManager.setTimeout(writeTime-now,this,null);
+		if(writeTime<=0){
+			if(prevSceduler==null){
+				onTimer(null);
+				return length;
+			}
+			writeTime=prevSceduler.scheduleWriteTime-System.currentTimeMillis();
 		}
+		timerId=TimerManager.setTimeout(writeTime,this,null);
 		return length;
 	}
 
@@ -149,10 +159,11 @@ public class WriteScheduler extends PoolBase implements Timer{
 			}
 			setPrevSceduler(null);
 		}
-		handler.asyncWrite(userContext, buffer);
 		if(isCloseEndBeforeWrite){
 			handler.asyncClose(userContext);
 		}else{
+			handler.asyncWrite(userContext, buffer);
+			actualWriteTime=System.currentTimeMillis();
 			if(isCloseEnd){
 				logger.debug("WriteScheduler asyncClose");
 				handler.asyncClose(userContext);
@@ -165,6 +176,12 @@ public class WriteScheduler extends PoolBase implements Timer{
 			isDoneWrite=true;
 			notifyAll();
 		}
-		unref();//仕事が終わったので自分を回収
+	}
+
+	public long getActualWriteTime() {
+		return actualWriteTime;
+	}
+	public long getScheduleWriteTime() {
+		return scheduleWriteTime;
 	}
 }
