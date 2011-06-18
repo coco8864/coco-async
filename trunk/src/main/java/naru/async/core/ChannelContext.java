@@ -92,8 +92,6 @@ public class ChannelContext extends PoolBase{
 	private SelectorContext selector;
 	private SelectionKey selectionKey;//IO_SELECT‚Ìê‡—LŒø
 	private ChannelHandler handler;
-//	private long readLength;
-//	private long writeLength;
 //	private long writeOrderLength;
 	private boolean isFinished;
 	
