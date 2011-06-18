@@ -659,4 +659,21 @@ public abstract class ChannelHandler extends PoolBase{
 	public void onCancelCanceled(Object userContext){
 		onCanceled(userContext);
 	}
+	
+	//contextがアプリケーションに通知した通算read長
+	public long getTotalReadLength(){
+		if(context==null){
+			return -1;
+		}
+		return context.getTotalReadLength();
+	}
+	
+	//contextがアプリケーションから受け取った通算write長
+	public long getTotalWriteLength(){
+		if(context==null){
+			return -1;
+		}
+		return context.getTotalWriteLength();
+	}
+	
 }
