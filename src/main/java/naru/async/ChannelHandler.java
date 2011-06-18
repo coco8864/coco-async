@@ -41,6 +41,9 @@ public abstract class ChannelHandler extends PoolBase{
 	public static int ORDER_CANCEL=6;
 	
 	private ChannelContext context;
+	private long totalReadLength=-1;//contextが無くなった後,context情報を保持
+	private long totalWriteLength=-1;//contextが無くなった後,context情報を保持
+	
 //	private ChannelHandlerStastices stastics=new ChannelHandlerStastices();
 	private boolean isClosed=false;//クローズを受け付けた後、次の要求を受けないため
 	private Map attribute=new HashMap();//handlerに付随する属性
@@ -77,6 +80,7 @@ public abstract class ChannelHandler extends PoolBase{
 		attribute.clear();
 		setContext(null);
 		isClosed=false;
+		totalReadLength=totalWriteLength=-1;
 		super.recycle();
 	}
 
@@ -119,6 +123,8 @@ public abstract class ChannelHandler extends PoolBase{
 			context.ref();
 		}
 		if(this.context!=null){
+			totalReadLength=context.getTotalReadLength();			
+			totalWriteLength=context.getTotalWriteLength();			
 			logger.debug("setContext endHandler.cid:"+this.context.getPoolId()+":this:"+this+":newContext:"+context);
 			this.context.unref();
 		}
@@ -663,7 +669,7 @@ public abstract class ChannelHandler extends PoolBase{
 	//contextがアプリケーションに通知した通算read長
 	public long getTotalReadLength(){
 		if(context==null){
-			return -1;
+			return totalReadLength;
 		}
 		return context.getTotalReadLength();
 	}
@@ -671,7 +677,7 @@ public abstract class ChannelHandler extends PoolBase{
 	//contextがアプリケーションから受け取った通算write長
 	public long getTotalWriteLength(){
 		if(context==null){
-			return -1;
+			return totalWriteLength;
 		}
 		return context.getTotalWriteLength();
 	}
