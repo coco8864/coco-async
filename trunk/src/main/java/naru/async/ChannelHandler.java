@@ -123,8 +123,8 @@ public abstract class ChannelHandler extends PoolBase{
 			context.ref();
 		}
 		if(this.context!=null){
-			totalReadLength=context.getTotalReadLength();			
-			totalWriteLength=context.getTotalWriteLength();			
+			totalReadLength=this.context.getTotalReadLength();			
+			totalWriteLength=this.context.getTotalWriteLength();			
 			logger.debug("setContext endHandler.cid:"+this.context.getPoolId()+":this:"+this+":newContext:"+context);
 			this.context.unref();
 		}
