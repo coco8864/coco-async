@@ -191,7 +191,14 @@ public class WriteBuffer implements BufferGetter {
 		setStore(null);
 	}
 
-	public long getOnBufferLength() {
+	/**
+	 * asyncWrite‚É“n‚³‚ê‚½buffer‚Ì’·‚³
+	 * @return
+	 */
+	public long getPutLength() {
+		if(store!=null){
+			return store.getPutLength();
+		}
 		return onBufferLength;
 	}
 }
