@@ -995,7 +995,7 @@ public class ChannelContext extends PoolBase{
 	
 	//アプリケーションから受け取った通算write長,実writeとは若干差異がある
 	public long getTotalWriteLength(){
-		return writeBuffer.getOnBufferLength();
+		return writeBuffer.getPutLength();
 	}
 	
 }
