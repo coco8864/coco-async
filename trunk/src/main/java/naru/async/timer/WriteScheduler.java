@@ -83,9 +83,7 @@ public class WriteScheduler extends PoolBase implements Timer{
 			isDoneWrite=true;
 			notifyAll();
 		}
-		unref();//d–‚ªI‚í‚Á‚½‚Ì‚Å©•ª‚ğ‰ñû
 	}
-	
 	
 	/* ’P‚É’x‰„‚µ‚Ä‘‚«‚Şê‡ */
 	public long scheduleWrite(long writeTime,ChannelHandler handler,Object userContext,ByteBuffer[] buffer){
