@@ -131,11 +131,13 @@ public class WriteScheduler extends PoolBase implements Timer{
 //		long now=System.currentTimeMillis();
 		logger.debug("writeTime="+(writeTime));
 		if(writeTime<=0){
-			if(prevSceduler==null){
+			if(prevSceduler!=null){
+				writeTime=prevSceduler.scheduleWriteTime-System.currentTimeMillis();
+			}
+			if(writeTime<=0){
 				onTimer(null);
 				return length;
 			}
-			writeTime=prevSceduler.scheduleWriteTime-System.currentTimeMillis();
 		}
 		timerId=TimerManager.setTimeout(writeTime,this,null);
 		return length;
