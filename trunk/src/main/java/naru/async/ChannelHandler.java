@@ -41,8 +41,8 @@ public abstract class ChannelHandler extends PoolBase{
 	public static int ORDER_CANCEL=6;
 	
 	private ChannelContext context;
-	private long totalReadLength=-1;//contextが無くなった後,context情報を保持
-	private long totalWriteLength=-1;//contextが無くなった後,context情報を保持
+	private long totalReadLength=0;//contextが無くなった後,context情報を保持
+	private long totalWriteLength=0;//contextが無くなった後,context情報を保持
 	
 //	private ChannelHandlerStastices stastics=new ChannelHandlerStastices();
 	private boolean isClosed=false;//クローズを受け付けた後、次の要求を受けないため
@@ -80,7 +80,7 @@ public abstract class ChannelHandler extends PoolBase{
 		attribute.clear();
 		setContext(null);
 		isClosed=false;
-		totalReadLength=totalWriteLength=-1;
+		totalReadLength=totalWriteLength=0;
 		super.recycle();
 	}
 
