@@ -519,6 +519,7 @@ public class ChannelContext extends PoolBase{
 				if(readBuffer.callback()==false){
 					//read orderがあるのに、callbackしていない -> データが到着していない
 					if( readTimeout!=0 ){
+						//TODO readTimeoutTimeを設定するのではなく、判定時にtimeout時刻を計算する
 						readTimeoutTime=System.currentTimeMillis()+readTimeout;
 					}
 					queueuSelect();

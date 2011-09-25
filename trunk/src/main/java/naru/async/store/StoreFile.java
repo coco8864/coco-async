@@ -69,7 +69,7 @@ public class StoreFile {
 	
 	public void read(ByteBuffer buffer,long offset){
 		long bufferLength=buffer.remaining();
-		logger.debug("read:offset:"+offset +":length:"+bufferLength);
+//		logger.debug("read:offset:"+offset +":length:"+bufferLength);
 		FileChannel readChannel=null;
 		try {
 			readChannel=popReadChannel();
