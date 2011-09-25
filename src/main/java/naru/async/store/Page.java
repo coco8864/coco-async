@@ -184,7 +184,7 @@ public class Page extends PoolBase{
 	}
 	
 	public void setStore(Store store){
-		logger.debug("setStore.store:"+store +":this.store:"+this.store);
+//		logger.debug("setStore.store:"+store +":this.store:"+this.store);
 		if(store!=null){
 			store.ref();
 		}
@@ -203,7 +203,7 @@ public class Page extends PoolBase{
 	 * @return
 	 */
 	public static Page loadPage(Store store,long pageId){
-		logger.debug("loadPage.pageId:"+pageId);
+//		logger.debug("loadPage.pageId:"+pageId);
 		if(pageFile==null){
 			throw new IllegalStateException("aleardy stoped StoreSystem.");
 		}
@@ -315,7 +315,7 @@ public class Page extends PoolBase{
 	 * 
 	 */
 	public synchronized void free(boolean isPageFile,boolean isSaveFree){
-		logger.debug("free."+this);
+//		logger.debug("free."+this);
 		//ファイルに実態がない場合、物理位置(pageId)を再利用する必要がある。
 		setStore(null);
 		removePlainPage(this);//plainPageに有る場合は削除
