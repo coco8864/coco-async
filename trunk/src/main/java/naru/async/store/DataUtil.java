@@ -83,6 +83,19 @@ public class DataUtil {
 		return byteToString(digestByte);
 	}
 	
+	public static String digestBase64Sha1(byte[] data){
+		if( data==null ){
+			return null;
+		}
+		byte[] digestByte;
+		synchronized(messageDigestSHA1){
+			messageDigestSHA1.reset();
+			digestByte=messageDigestSHA1.digest(data);
+		}
+		return encodeBase64(digestByte);
+	}
+	
+	
     private static final char[] hexmap = {
     	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
     	'a', 'b', 'c', 'd', 'e', 'f'};
