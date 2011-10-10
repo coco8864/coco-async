@@ -106,7 +106,8 @@ public class WriteBuffer implements BufferGetter {
 		if(buffer==null){
 			//２重になるかもしれないが、次のBufferを要求する
 			if(store==null || store.getPutLength()==onBufferLength){
-				logger.error("there is writeOrder but no buffer?cid:"+context.getPoolId()+ ":onBufferLength:"+onBufferLength);
+				//同時にprepareWriteが呼び出された場合
+				logger.debug("there is writeOrder but no buffer?cid:"+context.getPoolId()+ ":onBufferLength:"+onBufferLength);
 			}
 			if(store!=null){
 				store.asyncBuffer(this, store);
