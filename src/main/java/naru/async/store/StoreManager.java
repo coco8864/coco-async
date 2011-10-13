@@ -4,11 +4,7 @@ package naru.async.store;
 //TODO freePageのプール化、onlinecompressの延長で保存
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.util.HashMap;
@@ -21,7 +17,6 @@ import org.apache.log4j.Logger;
 
 import naru.async.BufferGetter;
 import naru.async.Timer;
-import naru.async.store.Store.Kind;
 import naru.async.timer.TimerManager;
 import naru.queuelet.Queuelet;
 import naru.queuelet.QueueletContext;
@@ -489,8 +484,18 @@ public class StoreManager {
 			sb.append(stasticsCsv);
 			logger.info(sb.toString());
 		}
+		long lastCallbackCount=0;
 		//Storeをコンプレス、メンテするためのイベント
 		public void onTimer(Object userContext) {
+			long callbackCount=storeStastics.getCallbackCount();
+			logger.debug("callbackCount:"+callbackCount);
+			//timer間隔の間のcallback数で負荷量を推測、暇なときにcompressやpersistenceStore.saveする
+			if(callbackCount==lastCallbackCount){
+				logger.debug("persistenceStore.save() lastCallbackCount:"+lastCallbackCount);
+				persistenceStore.save();
+				logger.debug("persistenceStore.save() return");
+			}
+			lastCallbackCount=callbackCount;
 //			infoStastics();
 			Page.saveFreePage();
 			synchronized(compressLock){
@@ -566,21 +571,14 @@ public class StoreManager {
 
 				persistenceStoreFile=new File((String)param.get("persistenceStore.file"));
 				dumpFile=new File(persistenceStoreFile.getParent(),DUMP_FILE_NAME);
-				
-				InputStream is=null;
 				if(persistenceStoreFile.exists()){
 					if(isCleanup){
 						persistenceStoreFile.delete();
-					}else{
-						is=new FileInputStream(persistenceStoreFile);
 					}
 				}else{
 					isCleanup=true;//persistenceStore.fileが無い場合、その他のファイルも初期化要
 				}
-				persistenceStore=PersistenceStore.load(is);
-				if(is!=null){
-					is.close();
-				}
+				persistenceStore=PersistenceStore.load(persistenceStoreFile);
 				//Storeの初期化
 				Store.init(persistenceStore);
 				
@@ -636,20 +634,7 @@ public class StoreManager {
 			}
 			Page.term();
 			Store.term();
-			OutputStream os=null;
-			try {
-				os=new FileOutputStream(persistenceStoreFile);
-				persistenceStore.save(os);
-			}catch (IOException e) {
-				logger.error("persistenceStore save eroor",e);
-			}finally{
-				if(os!=null){
-					try {
-						os.close();
-					}catch(IOException ignore){
-					}
-				}
-			}
+			persistenceStore.save();
 		}
 		
 		public boolean service(Object req) {

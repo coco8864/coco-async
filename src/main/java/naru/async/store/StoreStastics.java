@@ -249,4 +249,24 @@ public class StoreStastics {
 	public void setCompressFileId(int compressFileId) {
 		this.compressFileId = compressFileId;
 	}
+
+	public int getCallbackCount() {
+		return callbackCount;
+	}
+
+	public int getPageInCount() {
+		return pageInCount;
+	}
+
+	public int getPageOutCount() {
+		return pageOutCount;
+	}
+
+	public long getPageInSize() {
+		return pageInSize;
+	}
+
+	public long getPageOutSize() {
+		return pageOutSize;
+	}
 }

@@ -1,5 +1,8 @@
 package naru.async.store;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
@@ -16,8 +19,25 @@ import org.apache.log4j.Logger;
 public class PersistenceStore implements Serializable {
 	private static Logger logger=Logger.getLogger(StoreManager.class);
 	private static final long serialVersionUID = -2006116447875471224L;
+	
+	private File persistenceStoreFile;
+	
+	public static PersistenceStore load(File persistenceStoreFile) throws IOException{
+		InputStream is=null;
+		if(persistenceStoreFile.exists()){
+			is=new FileInputStream(persistenceStoreFile);
+		}
+		PersistenceStore instance=PersistenceStore.load(is);
+		instance.persistenceStoreFile=persistenceStoreFile;
+		instance.isUpdate=false;
+		if(is!=null){
+			is.close();
+		}
+		return instance;
+	}
+	
 
-	public static PersistenceStore load(InputStream is) throws IOException{
+	private static PersistenceStore load(InputStream is) throws IOException{
 		if(is==null){
 			PersistenceStore p=new PersistenceStore();
 			p.topFreePageId=Page.FREE_ID;
@@ -42,10 +62,37 @@ public class PersistenceStore implements Serializable {
 		}
 	}
 	
-	public synchronized void save(OutputStream os) throws IOException{
-		ObjectOutputStream oos=new ObjectOutputStream(os);
-		oos.writeObject(this);
+	public void save(){
+		synchronized(this){
+			if(isUpdate==false){
+				return;
+			}
+			isUpdate=false;
+		}
+		logger.debug("save() start");
+		OutputStream os=null;
+		try {
+			os=new FileOutputStream(persistenceStoreFile);
+			ObjectOutputStream oos=new ObjectOutputStream(os);
+			synchronized(this){
+				oos.writeObject(this);
+			}
+		}catch (IOException e) {
+			logger.error("persistenceStore save eroor",e);
+		}finally{
+			logger.debug("save() end");
+			if(os!=null){
+				try {
+					os.close();
+				}catch(IOException ignore){
+				}
+			}
+		}
 	}
+	
+	/* saveしてからの更新の有無 */
+	private boolean isUpdate=false;
+
 	
 	//Page管理用の保存値
 	private long pageIdSequence;
@@ -105,7 +152,8 @@ public class PersistenceStore implements Serializable {
 	int getPersistenceStoresCount(){
 		return storeIdMap.size();
 	}
-	Set<Long> listPersistenceStoreId(){
+	synchronized Set<Long> listPersistenceStoreId(){
+		//cloneしてこのsnapshotを返却
 		return new HashSet<Long>(storeIdMap.keySet());
 	}
 	
@@ -233,6 +281,7 @@ public class PersistenceStore implements Serializable {
 	 * @param digest
 	 */
 	public synchronized long add(long storeId,long topPageId,long length,String digest){
+		isUpdate=true;
 		StoreEntry storeEntry=digestMap.get(digest);
 		if(storeEntry!=null){
 			storeEntry.refCount++;
@@ -246,6 +295,7 @@ public class PersistenceStore implements Serializable {
 	}
 	
 	public synchronized void remove(long storeId){
+		isUpdate=true;
 		StoreEntry storeEntry=storeIdMap.remove(storeId);
 		if(storeEntry==null){
 			return;

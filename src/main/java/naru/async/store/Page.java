@@ -49,7 +49,7 @@ public class Page extends PoolBase{
 			Page plainPage=itr.next();
 			itr.remove();
 			plainPage.save();
-//			plainPage.unref(true);Bufferは返却しない、
+//			plainPage.unref(true);Bufferは返却しない、...なぜ？term時だから再利用を考えないからか?
 		}
 		
 		pageFile.close();
