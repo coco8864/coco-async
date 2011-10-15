@@ -124,8 +124,8 @@ public class SslAdapter extends PoolBase {
 			if (sslEngine == null) {
 				return;
 			}
-			sslEngine.closeOutbound();
 			try {
+				sslEngine.closeOutbound();
 				asyncWrite(SSLCTX_PLAIN_DATA, dmmyBuffers);
 			} catch (SSLException ignore) {
 				logger.warn("SslContext closeOutbound error.", ignore);
@@ -335,8 +335,21 @@ public class SslAdapter extends PoolBase {
 
 	/* SSL通信を考慮してclose要求をおこなう */
 	public boolean asyncClose(Object userContext) {
+		logger.debug("asyncClose cid:"+handler.getChannelId() +":userContext:"+userContext);
 		closeOutbound();
-		if (handler != null) {// TODO 本当にいいの？
+		if (handler != null) {
+			//closeOutbound()でwriteして,そのresponseをreadすべき
+			//asyncRead(終了プロトコル)して、それを受け取れば実クローズ...がよいが
+			//アプリからasyncReadが既に発行されていたら困る
+			//アプリは、asyncReadのcallbackを待たず,asyncCloseを呼んだ...ありえる
+			//asyncRead未なら、asyncRead(終了プロトコル)
+			//asyncRead済みならasyncClose();
+			//TODO userContextをアプリに通知したい
+			if(handler.asyncRead(SSLCTX_CLOSE_NETWORK)){
+				logger.debug("asyncClose -> asyncRead OK cid:"+handler.getChannelId());
+			}else{
+				logger.debug("asyncClose -> asyncRead NG cid:"+handler.getChannelId());
+			}
 			return handler.asyncClose(SSLCTX_CLOSE_NETWORK);
 		}
 		return false;

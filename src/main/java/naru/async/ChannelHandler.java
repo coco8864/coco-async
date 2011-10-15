@@ -412,9 +412,13 @@ public abstract class ChannelHandler extends PoolBase{
 			return false;
 		}
 		logger.debug("asyncClose.cid:"+getChannelId()+":this:"+this);
+		if(context==null){
+			logger.error("asyncClose context is null.this:"+this);
+			return false;
+		}
 		Order order=Order.create(this, Order.TYPE_CLOSE, userContext);
-		if(order(order)==false){
-			logger.warn("fail to asyncClose order error.id:"+getPoolId());
+		if(context.closeOrder(order)==false){
+			logger.error("asyncClose closeOrder error.this:"+this);
 			return false;
 		}
 		handlerClosed();

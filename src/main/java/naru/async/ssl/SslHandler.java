@@ -169,6 +169,10 @@ public abstract class SslHandler extends ChannelHandler {
 		if(userContext==SslAdapter.SSLCTX_PLAIN_DATA){
 			callbackReadPlain(userContext,buffers);
 			return;
+		}else if(userContext==SslAdapter.SSLCTX_CLOSE_NETWORK){
+			PoolManager.poolBufferInstance(buffers);//“Ç‚İÌ‚Ä
+//			asyncClose(SslAdapter.SSLCTX_CLOSE_NETWORK);
+			return;
 		}
 		try {
 			/* ‚±‚Ì‰„’·‚Å‚à‚¤ˆê“xonRead‚ªŒÄ‚Ño‚³‚ê‚é */
