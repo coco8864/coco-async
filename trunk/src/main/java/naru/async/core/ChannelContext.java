@@ -448,6 +448,21 @@ public class ChannelContext extends PoolBase{
 		}
 	}
 	
+	public boolean closeOrder(Order order){
+		synchronized(ioLock){
+			if(order(order)==false){
+				return false;
+			}
+			//回線が切断されていて、かつreadBufferにデータが残っていた場合、callbackされる契機がなくなる
+			//readBufferがない場合は、finishが呼び出される
+			if(isFinished==false && ioStatus==IO.CLOSED){
+				finishChannel();
+			}
+		}
+		return true;
+	}
+	
+	
 	public boolean acceptOrder(Order order){
 		if(order(order)){
 			stastics.asyncAccept();
