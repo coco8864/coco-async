@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<queueApp checkInterval="check">
+<!-- for test start -->
+<loader name="main" callStack="true" delegate="false" resouceLoader="parent">
+</loader>
+<terminal name="queuelet.test" threadCount="1">
+  <queuelet loaderName="main" className="${queuelet.test.class}">
+ </queuelet>
+</terminal>
+<!-- for test end -->
+  
+  <terminal name="timer" threadCount="2">
+    <queuelet loaderName="main" className="naru.async.timer.TimerManager">
+      <param name="timerInterval" value="100"/>
+    </queuelet>
+  </terminal>
+
+  <terminal name="pool" threadCount="1">
+    <queuelet loaderName="main" className="naru.async.pool.PoolManager">
+      <param name="recycleInterval" value="100"/>
+      <param name="watchIntervalCount" value="60"/><!--何回に１回監視するか？-->
+      <!--param name="delayRecycleClasses" value="naru.async.core.ChannelContext"/-->
+      <param name="poolNames" value="p1,p2"/>
+      <param name="p1.className" value="naru.async.core.ChannelContext"/>
+      <param name="p1.initial" value="16"/>
+      <param name="p2.className" value="java.util.HashMap"/>
+      <param name="p2.initial" value="16"/>
+      <param name="poolBuffers" value="default,b1"/>
+      <param name="default.bufferSize" value="1234"/>
+      <!--param name="default.bufferSize" value="128"/-->
+      <param name="default.initial" value="1"/>
+      <param name="default.limit" value="16"/>
+      <param name="default.increment" value="1"/>
+      <param name="b1.bufferSize" value="123"/>
+      <param name="b1.initial" value="1"/>
+      <param name="b1.limit" value="16"/>
+      <param name="b1.increment" value="1"/>
+    </queuelet>
+  </terminal>
+
+</queueApp>
