@@ -169,7 +169,7 @@ public class ReadBuffer implements BufferGetter {
 				logger.debug("isDisconnect but not doneDisconnect.cid:"+context.getPoolId()+ ":store.getPutLength():"+store.getPutLength() +":onBufferLength:" +onBufferLength);
 			}
 		}
-		if(doneDisconnect){
+		if(doneDisconnect){//store‚ªnull‚Ìê‡A•K‚¸‚±‚±doneDisconnect=true
 			context.doneClosed(false);
 			return true;
 		}

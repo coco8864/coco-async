@@ -524,6 +524,12 @@ public class Store extends PoolBase {
 		return;
 	}
 	
+	/**
+	 * 
+	 * @param bufferGetter
+	 * @param userContext
+	 * @return method‚Ì’†‚Åcallback‚µ‚½ê‡
+	 */
 	public synchronized boolean asyncBuffer(BufferGetter bufferGetter,Object userContext){
 		if(isCloseReceived()){
 			logger.debug("asyncBuffer aleady close");//‚Æ‚«‚Ç‚«”­¶‚·‚é
