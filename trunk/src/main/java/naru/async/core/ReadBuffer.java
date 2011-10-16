@@ -125,18 +125,14 @@ public class ReadBuffer implements BufferGetter {
 			}else if(isDisconnect){
 				//回線は切断されているが、Storeにまだデータが残っている
 				logger.debug("isDisconnect but not doneDisconnect.cid:"+context.getPoolId()+ ":store.getPutLength():"+store.getPutLength() +":onBufferLength:" +onBufferLength);
-				return store.asyncBuffer(this, store);
+//				return store.asyncBuffer(this, store);
 			}
 		}
 		if(doneDisconnect){
 			context.doneClosed(false);
 			return true;
 		}
-		if(store!=null){
-			return store.asyncBuffer(this, store);
-		}else{
-			return false;
-		}
+		return store.asyncBuffer(this, store);
 	}
 	
 	public boolean onBuffer(Object userContext, ByteBuffer[] buffer) {
@@ -144,6 +140,7 @@ public class ReadBuffer implements BufferGetter {
 			return false;
 		}
 //		ContextOrders orders=(ContextOrders)userContext;
+		boolean	doneDisconnect=false;
 		synchronized(workBuffer){//workBufferを守る
 			onBufferLength+=BuffersUtil.remaining(buffer);
 			for(int i=0;i<buffer.length;i++){
@@ -156,13 +153,27 @@ public class ReadBuffer implements BufferGetter {
 			long bufSize=BuffersUtil.remaining(readBuffer);
 			if(context.ordersDoneRead(readBuffer)){
 				workBuffer.clear();
-				logger.debug("onBuffer return true cid:"+ context.getPoolId()+ ":store:"+store+":bufSize:"+bufSize+":size:"+workBuffer.size());
-				return true;
+				logger.debug("onBuffer ordersDoneRead return true cid:"+ context.getPoolId()+ ":store:"+store+":bufSize:"+bufSize+":size:"+workBuffer.size());
+			}else{
+				PoolManager.poolArrayInstance(readBuffer);//配列を返却
+				logger.debug("onBuffer return false cid:"+ context.getPoolId()+ ":store:"+store+":buffer:"+BuffersUtil.remaining(buffer)+":size:"+workBuffer.size());
+				return false;
 			}
-			PoolManager.poolArrayInstance(readBuffer);//配列を返却
+			/* callbackしたが回線が切れていた場合、doneClosedも実施する必要がある */
+			if(store==null||(store.getPutLength()==onBufferLength && isDisconnect)){
+				//回線が切れている、かつ受信したすべてのデータを通知した
+				logger.debug("doneDisconnect.cid:"+context.getPoolId());
+				doneDisconnect=true;
+			}else if(isDisconnect){
+				//回線は切断されているが、Storeにまだデータが残っている
+				logger.debug("isDisconnect but not doneDisconnect.cid:"+context.getPoolId()+ ":store.getPutLength():"+store.getPutLength() +":onBufferLength:" +onBufferLength);
+			}
 		}
-		logger.debug("onBuffer return false cid:"+ context.getPoolId()+ ":store:"+store+":buffer:"+BuffersUtil.remaining(buffer)+":size:"+workBuffer.size());
-		return false;
+		if(doneDisconnect){
+			context.doneClosed(false);
+			return true;
+		}
+		return store.asyncBuffer(this, store);
 	}
 	
 	public void onBufferEnd(Object userContext) {
