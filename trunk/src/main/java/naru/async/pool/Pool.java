@@ -391,6 +391,10 @@ public class Pool {
 			ByteArrayLife byteArrayLife = byteArrayLifes
 					.get(byteBuffer.array());
 			obj = byteArrayLife.getOnlyByteBuffer();
+			if(byteBuffer!=obj){//‚ ‚è‚¦‚È‚¢‚Í‚¸‚¾‚ª
+				logger.error("byteBuffer:"+byteBuffer+":obj:"+obj);
+				return getInstance();
+			}
 			break;
 		case TYPE_ARRAY:
 			referenceLife = poolLifesMap.get(obj);
