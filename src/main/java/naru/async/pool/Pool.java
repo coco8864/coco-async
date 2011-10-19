@@ -392,7 +392,7 @@ public class Pool {
 					.get(byteBuffer.array());
 			obj = byteArrayLife.getOnlyByteBuffer();
 			if(byteBuffer!=obj){//Ç†ÇËÇ¶Ç»Ç¢ÇÕÇ∏ÇæÇ™
-				logger.error("byteBuffer:"+byteBuffer+":obj:"+obj);
+				logger.error("TYPE_BYTE_BUFFERÅ@getInstance error.byteBuffer:"+byteBuffer+":obj:"+obj);
 				return getInstance();
 			}
 			break;
