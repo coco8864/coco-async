@@ -199,11 +199,13 @@ public class SslAdapter extends PoolBase {
 	private ByteBuffer unwrap(ByteBuffer src) throws SSLException {
 		logger.debug("unwrap");
 		ByteBuffer dst = PoolManager.getBufferInstance(packetSize);
+		int srcremain=src.remaining();
 		try {
 			sslResult = sslEngine.unwrap(src, dst);
 		} catch (SSLException e) {
+			logger.warn("unwrap error.sslResult:"+sslResult + " srcremain:"+srcremain +" packetSize:"+packetSize);
 			PoolManager.poolBufferInstance(dst);
-			throw e;//TODO dstの漏れを防ぐ処理だが、エレガントではない。
+			throw e;//dstの漏れを防ぐ処理
 		}
 		if (src.remaining() == 0) {// srcバッファを使い切ったらnetworkBuffersより削除
 			networkBuffers.remove(src);
