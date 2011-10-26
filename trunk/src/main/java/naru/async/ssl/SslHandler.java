@@ -136,11 +136,19 @@ public abstract class SslHandler extends ChannelHandler {
 	}
 	
 	public boolean sslOpen(boolean isClientMode){
+		if(sslAdapter!=null){
+			logger.error("sslOpen aleady set sslAdapter");
+			sslAdapter.unref();
+		}
 		sslAdapter=(SslAdapter) PoolManager.getInstance(SslAdapter.class);
 		return sslAdapter.open(isClientMode, this);
 	}
 	
 	public boolean sslOpenWithBuffer(boolean isClientMode,ByteBuffer[] buffers){
+		if(sslAdapter!=null){
+			logger.error("sslOpenWithBuffer aleady set sslAdapter");
+			sslAdapter.unref();
+		}
 		sslAdapter=(SslAdapter) PoolManager.getInstance(SslAdapter.class);
 		return sslAdapter.openWithBuffer(isClientMode, this, buffers);
 	}
