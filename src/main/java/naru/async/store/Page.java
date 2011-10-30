@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
@@ -254,8 +255,11 @@ public class Page extends PoolBase{
 		synchronized(pageFile){
 			Page freePage=null;
 			long topFreePageId=persistenceStore.getTopFreePageId();
-			if(freePages.size()>0){
-				freePage=freePages.remove(0);
+			Iterator<Entry<Long,Page>> itr=freePages.entrySet().iterator();
+			if(itr.hasNext()){
+				Entry<Long,Page> entry=itr.next();
+				itr.remove();
+				freePage=entry.getValue();
 			}else if(topFreePageId!=FREE_ID){
 				freePage=getSafeFreePage(topFreePageId);
 				if(freePage!=null){
@@ -326,7 +330,8 @@ public class Page extends PoolBase{
 			buffer=null;
 		}
 		if(isPageFile){
-			synchronized(pageFile){	
+			synchronized(pageFile){
+				//‚±‚±‚ÅPage‚ª‚½‚Ü‚è‚·‚¬‚é
 				freePages.put(pageId,this);
 			}
 			//TODO

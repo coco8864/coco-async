@@ -329,7 +329,7 @@ public abstract class ChannelHandler extends PoolBase{
 		try {
 			inetAddress = InetAddress.getByName(remoteHost);
 		} catch (UnknownHostException e) {
-			logger.error("fail to getByName",e);
+			logger.warn("asyncConnect unknownHost.remoteHost:"+remoteHost);
 			return false;
 		}
 		InetSocketAddress inetSocketAddress=new InetSocketAddress(inetAddress,remotePort);
