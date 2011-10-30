@@ -198,6 +198,11 @@ public class SslAdapter extends PoolBase {
 
 	private ByteBuffer unwrap(ByteBuffer src) throws SSLException {
 		logger.debug("unwrap");
+		if(sslEngine==null){
+			RuntimeException re=new IllegalStateException("unwrap sslEngine is null");
+			logger.error("unwrap sslEngine is null",re);
+			throw re;
+		}
 		ByteBuffer dst = PoolManager.getBufferInstance(packetSize);
 		int srcremain=src.remaining();
 		try {
