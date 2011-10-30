@@ -58,7 +58,7 @@ public class TimerEntry {
 	
 	public void setup(long timoutTime,Timer timer,Object userContext){
 //		System.out.println("timoutTime:"+timoutTime);
-		logger.debug("timoutTime:"+timoutTime);
+//		logger.debug("timoutTime:"+timoutTime);
 		this.timoutTime=timoutTime;
 		this.timer=timer;
 		this.userContext=userContext;

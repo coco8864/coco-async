@@ -542,7 +542,7 @@ public class Store extends PoolBase {
 				this.userContext=userContext;
 				isOnAsyncBufferRequest=true;
 			}else if(this.bufferGetter!=bufferGetter){
-				logger.error("not same bufferGetter.");
+				logger.error("not same bufferGetter.",new Throwable());
 			}
 			logger.debug("callbackGetter return false isOnAsyncBuffer:true");
 			return false;

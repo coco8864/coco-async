@@ -58,7 +58,6 @@ public class ByteArrayLife extends ReferenceLife {
 		}
 	}
 	
-	
 	/*　duplicateの延長で呼び出される事を想定 */
 	ByteBuffer getByteBuffer(){
 		ByteBuffer byteBuffer=ByteBuffer.wrap(array);
@@ -82,7 +81,18 @@ public class ByteArrayLife extends ReferenceLife {
 				}
 				Iterator<ByteBufferLife> itr=byteBufferLifes.iterator();
 				ByteBufferLife byteBufferLife=itr.next();
-				byteBufferLife.unref();
+				//poolされる順番の関係で,byteBufferLife.get()=bufferとならない可能性がある;
+				//byteBufferLifesには順番の関係なくByteBufferLifeが格納されるので上記はない.
+				//2重開放された場合,arrayから計算するのでカウンタが狂う
+				if(byteBufferLife.get()!=buffer){
+					logger.error("poolByteBuffer counter error.buffer:"+buffer+":byteBufferLife.get():"+byteBufferLife.get());
+					itr.remove();
+					return;//怪しいのでpoolには戻さない
+					//byteBufferLife.get()のbyteBufferLifeは、GCされるはず
+					//byteBufferLife=new ByteBufferLife(buffer,this);
+					//byteBufferLife.ref();
+					//byteBufferLifes.add(byteBufferLife);
+				}
 				pool.poolInstance(buffer);
 				return;
 			}

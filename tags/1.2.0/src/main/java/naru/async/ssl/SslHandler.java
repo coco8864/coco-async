@@ -42,9 +42,9 @@ public abstract class SslHandler extends ChannelHandler {
 
 	public abstract SSLEngine getSSLEngine();
 	
-	public void setSslAdapter(SslAdapter sslAdapter){
-		this.sslAdapter=sslAdapter;
-	}
+//	public void setSslAdapter(SslAdapter sslAdapter){
+//		this.sslAdapter=sslAdapter;
+//	}
 	
 	public ChannelHandler forwardHandler(SslHandler handler){
 		SslAdapter sslAdapter=this.sslAdapter;
@@ -71,8 +71,11 @@ public abstract class SslHandler extends ChannelHandler {
 		this.sslAdapter=null;
 		this.readPeekStore=null;
 		this.writePeekStore=null;
+		
+		long cid=getChannelId();
 		SslHandler handler= (SslHandler)super.forwardHandler(handlerClass);
 		if(handler==null){//Šù‚Éclose‚³‚ê‚Ä‚¢‚é“™‚Åforward‚ÉŽ¸”s
+			logger.debug("forwardHandler ng.cid:"+cid);
 			this.sslAdapter=sslAdapter;
 			this.readPeekStore=readPeekStore;
 			this.writePeekStore=writePeekStore;
@@ -82,6 +85,7 @@ public abstract class SslHandler extends ChannelHandler {
 		handler.readPeekStore=readPeekStore;
 		handler.writePeekStore=writePeekStore;
 		if(sslAdapter!=null){
+			logger.debug("forwardHandler ok.cid:"+cid);
 //			sslAdapter.setHandler(handler);
 			sslAdapter.forwardHandler(handler);
 		}
@@ -132,14 +136,20 @@ public abstract class SslHandler extends ChannelHandler {
 	}
 	
 	public boolean sslOpen(boolean isClientMode){
+		if(sslAdapter!=null){
+			logger.error("sslOpen aleady set sslAdapter");
+			sslAdapter.unref();
+		}
 		sslAdapter=(SslAdapter) PoolManager.getInstance(SslAdapter.class);
-//		setAttribute(WebHandler.ATTRIBUTE_SSL_ADAPTER, sslAdapter);
 		return sslAdapter.open(isClientMode, this);
 	}
 	
 	public boolean sslOpenWithBuffer(boolean isClientMode,ByteBuffer[] buffers){
+		if(sslAdapter!=null){
+			logger.error("sslOpenWithBuffer aleady set sslAdapter");
+			sslAdapter.unref();
+		}
 		sslAdapter=(SslAdapter) PoolManager.getInstance(SslAdapter.class);
-//		setAttribute(WebHandler.ATTRIBUTE_SSL_ADAPTER, sslAdapter);
 		return sslAdapter.openWithBuffer(isClientMode, this, buffers);
 	}
 	
@@ -196,7 +206,7 @@ public abstract class SslHandler extends ChannelHandler {
 	}
 
 	public void onFinished() {
-		logger.debug("#finished.cid:" + getChannelId());
+		logger.debug("#finished.cid:" + getChannelId() +":sslAdapter:" +sslAdapter);
 		synchronized(closeLock){
 			if(sslAdapter!=null){
 				sslAdapter.unref(true);
