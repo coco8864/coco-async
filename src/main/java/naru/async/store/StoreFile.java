@@ -46,6 +46,12 @@ public class StoreFile {
 	}
 	
 	public StoreFile(File storeFile,int readerCount) throws IOException{
+		if(!storeFile.exists()){
+			File parent=storeFile.getParentFile();
+			if(!parent.exists()){
+				parent.mkdirs();
+			}
+		}
 		this.readerCount=readerCount;
 		length=storeFile.length();
 		readChannelsQueue=new ArrayBlockingQueue<FileChannel>(readerCount);
