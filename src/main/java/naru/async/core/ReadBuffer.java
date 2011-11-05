@@ -17,6 +17,7 @@ public class ReadBuffer implements BufferGetter {
 	
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private ChannelContext context;
+	//setupで設定されrecycleされるまで保持する
 	private Store store;
 	private long onBufferLength;
 	
@@ -60,13 +61,20 @@ public class ReadBuffer implements BufferGetter {
 			PoolManager.poolBufferInstance(buf);
 			itr.remove();
 		}
+		if(store!=null){
+			store.unref();
+			store=null;
+		}
 	}
 	
 	public void setup(){
 		onBufferLength=0;
 		isDisconnect=false;
 		logger.debug("setup().cid:"+context.getPoolId()+":workBuffer:"+workBuffer);
-		setStore(Store.open(false));
+		store=Store.open(false);//storeはここでしか設定しない
+		store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
+		context.ref();//storeが生きている間contextを確保する
+//		setStore(Store.open(false));
 	}
 	
 	public void cleanup(){
@@ -182,7 +190,8 @@ public class ReadBuffer implements BufferGetter {
 		}
 //		ContextOrders orders=(ContextOrders)userContext;
 		logger.debug("onBufferEnd.cid:"+context.getPoolId());//こないと思う
-		setStore(null);
+//		setStore(null);
+		context.unref();//storeが終了したのでcontextは開放してもよい
 	}
 	
 	public void onBufferFailure(Object userContext, Throwable falure) {
@@ -193,7 +202,8 @@ public class ReadBuffer implements BufferGetter {
 		logger.warn("onBufferFailure falure",falure);//こないと思う
 		logger.warn("onBufferFailure now",new Exception());
 		context.failure(falure);
-		setStore(null);
+		context.unref();//storeが終了したのでcontextは開放してもよい
+//		setStore(null);
 	}
 
 	public long getOnBufferLength() {
