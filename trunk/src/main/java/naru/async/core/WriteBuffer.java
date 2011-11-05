@@ -19,6 +19,7 @@ public class WriteBuffer implements BufferGetter {
 	
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private ChannelContext context;
+	//setupで設定されrecycleされるまで保持する
 	private Store store;
 	private long onBufferLength;
 //	private MessageDigest messageDigest;
@@ -59,13 +60,20 @@ public class WriteBuffer implements BufferGetter {
 			PoolManager.poolBufferInstance(buf);
 			itr.remove();
 		}
+		if(store!=null){
+			store.unref();
+			store=null;
+		}
 		prepareWriteReturnNull=false;
 	}
 	
 	public void setup(){
 		logger.debug("setup().cid:"+context.getPoolId()+":workBuffer:"+workBuffer);
 		onBufferLength=0;
-		setStore(Store.open(false));
+//		setStore(Store.open(false));
+		store=Store.open(false);//storeはここでしか設定しない
+		store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
+		context.ref();//storeが生きている間contextを確保する
 		store.asyncBuffer(this, store);
 	}
 	
@@ -179,7 +187,8 @@ public class WriteBuffer implements BufferGetter {
 			return;
 		}
 		logger.debug("onBufferEnd.cid:"+context.getPoolId());//こないと思う
-		setStore(null);
+//		setStore(null);
+		context.unref();//storeが終了したのでcontextは開放してもよい
 	}
 	
 	public void onBufferFailure(Object userContext, Throwable falure) {
@@ -189,7 +198,8 @@ public class WriteBuffer implements BufferGetter {
 		logger.warn("onBufferFailure falure.cid:"+context.getPoolId(),falure);//こないと思う
 		logger.warn("onBufferFailure now",new Exception());
 		context.failure(falure);
-		setStore(null);
+//		setStore(null);
+		context.unref();//storeが終了したのでcontextは開放してもよい
 	}
 
 	/**
