@@ -20,4 +20,10 @@ public class ByteBufferLife extends ReferenceLife {
 	void gcInstance() {
 		arrayLife.gcByteBufferLife(this);
 	}
+	
+	@Override
+	public String toString(){
+		return "$$$ByteBufferLife." +arrayLife;
+	}
+	
 }

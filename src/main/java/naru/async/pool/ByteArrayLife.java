@@ -169,4 +169,9 @@ public class ByteArrayLife extends ReferenceLife {
 			}
 		}
 	}
+	
+	@Override
+	public String toString(){
+		return "$$ByteArrayLife." +array.length;
+	}
 }

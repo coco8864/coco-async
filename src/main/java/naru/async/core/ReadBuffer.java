@@ -18,6 +18,8 @@ public class ReadBuffer implements BufferGetter {
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private ChannelContext context;
 	//setupで設定されrecycleされるまで保持する
+	private boolean isContextUnref=false;
+	
 	private Store store;
 	private long onBufferLength;
 	
@@ -74,6 +76,7 @@ public class ReadBuffer implements BufferGetter {
 		store=Store.open(false);//storeはここでしか設定しない
 		store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
 		context.ref();//storeが生きている間contextを確保する
+		isContextUnref=false;
 //		setStore(Store.open(false));
 	}
 	
@@ -188,22 +191,34 @@ public class ReadBuffer implements BufferGetter {
 		if(store!=userContext){//callbackされる前にcloseされた場合
 			return;
 		}
-//		ContextOrders orders=(ContextOrders)userContext;
-		logger.debug("onBufferEnd.cid:"+context.getPoolId());//こないと思う
-//		setStore(null);
-		context.unref();//storeが終了したのでcontextは開放してもよい
+		synchronized(this){
+			if(isContextUnref){
+				logger.error("duplicate ReadBuffer#onBufferEnd",new Throwable());
+			}
+			isContextUnref=true;
+//			ContextOrders orders=(ContextOrders)userContext;
+			logger.debug("onBufferEnd.cid:"+context.getPoolId());//こないと思う
+//			setStore(null);
+			context.unref();//storeが終了したのでcontextは開放してもよい
+		}
 	}
 	
 	public void onBufferFailure(Object userContext, Throwable falure) {
 		if(store!=userContext){//callbackされる前にcloseされた場合
 			return;
 		}
-//		ContextOrders orders=(ContextOrders)userContext;
-		logger.warn("onBufferFailure falure",falure);//こないと思う
-		logger.warn("onBufferFailure now",new Exception());
-		context.failure(falure);
-		context.unref();//storeが終了したのでcontextは開放してもよい
-//		setStore(null);
+		synchronized(this){
+			if(isContextUnref){
+				logger.error("duplicate ReadBuffer#onBufferFailure",new Throwable());
+			}
+			isContextUnref=true;
+//			ContextOrders orders=(ContextOrders)userContext;
+			logger.warn("onBufferFailure falure",falure);//こないと思う
+			logger.warn("onBufferFailure now",new Exception());
+			context.failure(falure);
+			context.unref();//storeが終了したのでcontextは開放してもよい
+//			setStore(null);
+		}
 	}
 
 	public long getOnBufferLength() {

@@ -453,8 +453,13 @@ public class Pool {
 				ByteBufferLife byteBufferLife = byteArrayLife.getOnlyByteBufferLife();
 				if (byteBufferLife != null) {
 					byteBufferLife.clear();
+					logger.warn("!!ByteBuffer releaseLife1!!"+byteArrayLife +":" +byteBufferLife);
+				}else{
+					logger.warn("!!ByteBuffer releaseLife2!!"+byteArrayLife);
 				}
 				byteArrayLife.clear();
+			}else{
+				logger.warn("!!ByteBuffer releaseLife4!!");
 			}
 			break;
 		case TYPE_ARRAY:
@@ -560,6 +565,13 @@ public class Pool {
 		lifes = byteArrayLifes.values().toArray();
 		for (int i = 0; i < lifes.length; i++) {
 			ReferenceLife life = (ReferenceLife) lifes[i];
+			if (life.getRef() != 0) {
+				life.info(isDitail);
+			}
+		}
+		Iterator<ReferenceLife> itr= poolLifesMap.values().iterator();
+		while(itr.hasNext()){
+			ReferenceLife life=itr.next();
 			if (life.getRef() != 0) {
 				life.info(isDitail);
 			}
