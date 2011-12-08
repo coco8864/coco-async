@@ -28,6 +28,7 @@ public class Page extends PoolBase{
 		for(int i=0;i<INIT_FREE_PAGE;i++){
 			Page freePage=getSafeFreePage(persistenceStore.getTopFreePageId());
 			if(freePage!=null){
+//				logger.debug("$$$1 in:"+freePage.getPageId());
 				freePages.put(freePage.getPageId(),freePage);
 				persistenceStore.setTopFreePageId(freePage.getNextPageId());
 			}else{
@@ -86,6 +87,7 @@ public class Page extends PoolBase{
 				}
 				Page freePage=itr.next();
 				itr.remove();
+//				logger.debug("$$$2 out:"+freePage.pageId);
 				freePage.nextPageId=persistenceStore.getTopFreePageId();
 				freePage.save();
 				persistenceStore.setTopFreePageId(freePage.getPageId());
@@ -260,6 +262,7 @@ public class Page extends PoolBase{
 				Entry<Long,Page> entry=itr.next();
 				itr.remove();
 				freePage=entry.getValue();
+//				logger.debug("$$$1 out:"+freePage.pageId);
 			}else if(topFreePageId!=FREE_ID){
 				freePage=getSafeFreePage(topFreePageId);
 				if(freePage!=null){
@@ -332,7 +335,12 @@ public class Page extends PoolBase{
 		if(isPageFile){
 			synchronized(pageFile){
 				//‚±‚±‚ÅPage‚ª‚½‚Ü‚è‚·‚¬‚é
-				freePages.put(pageId,this);
+//				logger.debug("$$$2 in:"+pageId);
+				Page prevPage=freePages.put(pageId,this);
+				if(prevPage!=null){
+					logger.error("duplicate free Page.pageId:"+pageId);
+					freePages.remove(pageId);
+				}
 			}
 			//TODO
 			if(isSaveFree){

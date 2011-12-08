@@ -19,6 +19,8 @@ public class WriteBuffer implements BufferGetter {
 	
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private ChannelContext context;
+	private boolean isContextUnref=false;
+	
 	//setupで設定されrecycleされるまで保持する
 	private Store store;
 	private long onBufferLength;
@@ -70,6 +72,7 @@ public class WriteBuffer implements BufferGetter {
 	public void setup(){
 		logger.debug("setup().cid:"+context.getPoolId()+":workBuffer:"+workBuffer);
 		onBufferLength=0;
+		isContextUnref=false;
 //		setStore(Store.open(false));
 		store=Store.open(false);//storeはここでしか設定しない
 		store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
@@ -186,20 +189,32 @@ public class WriteBuffer implements BufferGetter {
 			logger.debug("onBufferEnd.store!=userContext cid:"+context.getPoolId()+":store:"+store);//こないと思う
 			return;
 		}
-		logger.debug("onBufferEnd.cid:"+context.getPoolId());//こないと思う
-//		setStore(null);
-		context.unref();//storeが終了したのでcontextは開放してもよい
+		synchronized(this){
+			if(isContextUnref){
+				logger.error("duplicate WriterBuffer#onBufferEnd",new Throwable());
+			}
+			isContextUnref=true;
+			logger.debug("onBufferEnd.cid:"+context.getPoolId());//こないと思う
+//			setStore(null);
+			context.unref();//storeが終了したのでcontextは開放してもよい
+		}
 	}
 	
 	public void onBufferFailure(Object userContext, Throwable falure) {
 		if(store!=userContext){//callbackされる前にcloseされた場合
 			return;
 		}
-		logger.warn("onBufferFailure falure.cid:"+context.getPoolId(),falure);//こないと思う
-		logger.warn("onBufferFailure now",new Exception());
-		context.failure(falure);
-//		setStore(null);
-		context.unref();//storeが終了したのでcontextは開放してもよい
+		synchronized(this){
+			if(isContextUnref){
+				logger.error("duplicate WriterBuffer#onBufferFailure",new Throwable());
+			}
+			isContextUnref=true;
+			logger.warn("onBufferFailure falure.cid:"+context.getPoolId(),falure);//こないと思う
+			logger.warn("onBufferFailure now",new Exception());
+			context.failure(falure);
+//			setStore(null);
+			context.unref();//storeが終了したのでcontextは開放してもよい
+		}
 	}
 
 	/**

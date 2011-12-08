@@ -507,6 +507,9 @@ public class PoolManager implements Queuelet,Timer{
 			pool=addBufferPool(bufferSize);
 		}
 		ByteBuffer buffer=(ByteBuffer)pool.getInstance();
+//		if(bufferSize==defaultBufferSize){
+//			logger.info("getBufferInstance:"+buffer.array(),new Exception());
+//		}
 		return buffer;
 	}
 	
@@ -590,6 +593,7 @@ public class PoolManager implements Queuelet,Timer{
 			return;
 		}
 		ByteArrayLife arrayLife=pool.getByteArrayLife(array);
+//		logger.info("poolBufferInstance:"+array +":" +arrayLife);
 		if(arrayLife==null){//poolä«óùäO
 			return;
 		}

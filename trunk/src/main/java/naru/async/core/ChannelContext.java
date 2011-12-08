@@ -1014,4 +1014,23 @@ public class ChannelContext extends PoolBase{
 		return writeBuffer.getPutLength();
 	}
 	
+	/*
+	@Override
+	public void ref() {
+		logger.info("###ref cid:" +getPoolId(),new Throwable());
+		super.ref();
+	}
+
+	@Override
+	public boolean unref() {
+		logger.info("###unref cid:" +getPoolId(),new Throwable());
+		return super.unref();
+	}
+
+	@Override
+	public boolean unref(boolean isPool) {
+		logger.info("###unref2 cid:" +getPoolId(),new Throwable());
+		return super.unref(isPool);
+	}
+	*/
 }
