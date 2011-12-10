@@ -268,6 +268,10 @@ public class Store extends PoolBase {
 		}
 		if(bufferGetter!=null){//イベントがないのにcallbackだけが登録されている
 			logger.debug("checkFin asyncBufferEnd");
+			if(isClosed){
+				return false;
+			}
+			isClosed=true;//GETで終端まで読んだ場合、終了を通知する
 			//PUTでasyncCloseした場合はここを通る
 			StoreCallback storeCallback=(StoreCallback)PoolManager.getInstance(StoreCallback.class);
 			storeCallback.asyncBufferEnd(this,bufferGetter,userContext);
@@ -318,11 +322,13 @@ public class Store extends PoolBase {
 			puttingPage=null;
 		}
 		if(bufferGetter!=null){
-			bufferGetter.onBufferEnd(userContext);//直接呼出し
+			if(isClosed==false){
+				bufferGetter.onBufferEnd(userContext);//直接呼出し
+				isClosed=true;//onBufferEndを呼び出したのでclose通知
+			}
 			bufferGetter=null;
 			isOnAsyncBuffer=false;
 			isOnAsyncBufferRequest=false;
-			isClosed=true;//onBufferEndを呼び出したのでclose通知
 		}
 	}
 	
@@ -634,6 +640,9 @@ public class Store extends PoolBase {
 			return false;
 		}
 		if(failure!=null){//errorが発生していればfailureをcallback
+			if(isClosed){
+				return true;
+			}
 			isClosed=true;//GETで終端まで読んだ場合、終了を通知する
 			StoreCallback storeCallback=(StoreCallback)PoolManager.getInstance(StoreCallback.class);
 			storeCallback.asyncBufferFailure(this, bufferGetter, userContext, failure);
@@ -643,7 +652,10 @@ public class Store extends PoolBase {
 		}
 		ByteBuffer[] buffer=null;
 		long nextPageId=FREE_ID;
-		if(loadingPage==null&&gettingPage==null){//終端に達している
+		if(loadingPage==null && gettingPage==null){//終端に達している
+			if(isClosed){
+				return true;
+			}
 			//非同期 onBufferEnd呼び出し
 			isClosed=true;//GETで終端まで読んだ場合、終了を通知する
 			StoreCallback storeCallback=(StoreCallback)PoolManager.getInstance(StoreCallback.class);
@@ -809,12 +821,10 @@ public class Store extends PoolBase {
 	
 	@Override
 	public void ref() {
-		// TODO Auto-generated method stub
 		super.ref();
 	}
 	@Override
 	public boolean unref() {
-		// TODO Auto-generated method stub
 		return super.unref();
 	}
 	public boolean checkRef(){

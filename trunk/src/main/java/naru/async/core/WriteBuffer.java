@@ -20,6 +20,7 @@ public class WriteBuffer implements BufferGetter {
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private ChannelContext context;
 	private boolean isContextUnref=false;
+//	private Throwable unrefStack=null;//TODO 削除 debug用,
 	
 	//setupで設定されrecycleされるまで保持する
 	private Store store;
@@ -192,8 +193,11 @@ public class WriteBuffer implements BufferGetter {
 		synchronized(this){
 			if(isContextUnref){
 				logger.error("duplicate WriterBuffer#onBufferEnd",new Throwable());
+//				logger.error("duplicate WriterBuffer#onBufferEnd prev",unrefStack);
+				return;
 			}
 			isContextUnref=true;
+//			unrefStack=new Throwable();
 			logger.debug("onBufferEnd.cid:"+context.getPoolId());//こないと思う
 //			setStore(null);
 			context.unref();//storeが終了したのでcontextは開放してもよい
@@ -207,8 +211,11 @@ public class WriteBuffer implements BufferGetter {
 		synchronized(this){
 			if(isContextUnref){
 				logger.error("duplicate WriterBuffer#onBufferFailure",new Throwable());
+//				logger.error("duplicate WriterBuffer#onBufferFailure prev",unrefStack);
+				return;
 			}
 			isContextUnref=true;
+//			unrefStack=new Throwable();
 			logger.warn("onBufferFailure falure.cid:"+context.getPoolId(),falure);//こないと思う
 			logger.warn("onBufferFailure now",new Exception());
 			context.failure(falure);

@@ -733,6 +733,14 @@ public class ChannelContext extends PoolBase{
 						}
 						return -1;
 					}
+					//Ç±Ç±Ç≈closeÇ≥ÇÍÇƒÇ¢ÇÈÇ∆à»â∫ÇÃó·äO
+					/*
+2011-11-24 11:32:11,462 [selector-2] WARN  naru.async.core.ChannelContext - select aleady closed.
+java.nio.channels.ClosedChannelException
+        at java.nio.channels.spi.AbstractSelectableChannel.configureBlocking(AbstractSelectableChannel.java:252)
+        at naru.async.core.ChannelContext.select(ChannelContext.java:736)
+        at naru.async.core.SelectorContext.selectAll(SelectorContext.java:134)
+					 */
 					channel.configureBlocking(false);
 					selectionKey=selector.register(channel, ops,this);
 					//TODO í≤ç∏ÇÃÇΩÇﬂÇ…info
@@ -741,6 +749,7 @@ public class ChannelContext extends PoolBase{
 				} catch (ClosedChannelException e) {
 					logger.warn("select aleady closed.",e);
 //					doneClosed(true);
+					failure(e);
 				} catch (IOException e) {
 					logger.error("select io error.",e);
 					failure(e);

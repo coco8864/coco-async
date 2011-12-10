@@ -78,10 +78,10 @@ public class Pool {
 
 	private boolean isDelayRecycle = false;// íxâÑrecycle
 
-	public ByteArrayLife getByteArrayLife(byte[] array) {
-		synchronized (byteArrayLifes) {
+	public synchronized ByteArrayLife getByteArrayLife(byte[] array) {
+//		synchronized (byteArrayLifes) {
 			return byteArrayLifes.get(array);
-		}
+//		}
 	}
 
 	/* ìùåvèÓïÒÇÃï‘ãp */
@@ -388,8 +388,7 @@ public class Pool {
 			break;
 		case TYPE_BYTE_BUFFER:
 			ByteBuffer byteBuffer = (ByteBuffer) obj;
-			ByteArrayLife byteArrayLife = byteArrayLifes
-					.get(byteBuffer.array());
+			ByteArrayLife byteArrayLife = byteArrayLifes.get(byteBuffer.array());
 			obj = byteArrayLife.getOnlyByteBuffer();
 			if(byteBuffer!=obj){//Ç†ÇËÇ¶Ç»Ç¢ÇÕÇ∏ÇæÇ™
 				logger.error("TYPE_BYTE_BUFFERÅ@getInstance error.byteBuffer:"+byteBuffer+":obj:"+obj);
@@ -452,8 +451,12 @@ public class Pool {
 			if (byteArrayLife != null) {
 				ByteBufferLife byteBufferLife = byteArrayLife.getOnlyByteBufferLife();
 				if (byteBufferLife != null) {
+					Object ref=byteBufferLife.get();
+					if(ref!=obj){
+						logger.warn("#releaseLife ByteBuffer get error.ref:"+ref);
+					}
 					byteBufferLife.clear();
-					logger.warn("!!ByteBuffer releaseLife1!!"+byteArrayLife +":" +byteBufferLife);
+					logger.debug("!!ByteBuffer releaseLife1!!"+byteArrayLife +":" +byteBufferLife);
 				}else{
 					logger.warn("!!ByteBuffer releaseLife2!!"+byteArrayLife);
 				}

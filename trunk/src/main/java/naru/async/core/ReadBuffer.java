@@ -19,6 +19,7 @@ public class ReadBuffer implements BufferGetter {
 	private ChannelContext context;
 	//setupÇ≈ê›íËÇ≥ÇÍrecycleÇ≥ÇÍÇÈÇ‹Ç≈ï€éùÇ∑ÇÈ
 	private boolean isContextUnref=false;
+//	private Throwable unrefStack=null;//TODO çÌèú debugóp,
 	
 	private Store store;
 	private long onBufferLength;
@@ -194,8 +195,11 @@ public class ReadBuffer implements BufferGetter {
 		synchronized(this){
 			if(isContextUnref){
 				logger.error("duplicate ReadBuffer#onBufferEnd",new Throwable());
+//				logger.error("duplicate ReadBuffer#onBufferEnd prev",unrefStack);
+				return;
 			}
 			isContextUnref=true;
+//			unrefStack=new Throwable();
 //			ContextOrders orders=(ContextOrders)userContext;
 			logger.debug("onBufferEnd.cid:"+context.getPoolId());//Ç±Ç»Ç¢Ç∆évÇ§
 //			setStore(null);
@@ -210,8 +214,11 @@ public class ReadBuffer implements BufferGetter {
 		synchronized(this){
 			if(isContextUnref){
 				logger.error("duplicate ReadBuffer#onBufferFailure",new Throwable());
+//				logger.error("duplicate ReadBuffer#onBufferFailure prev",unrefStack);
+				return;
 			}
 			isContextUnref=true;
+//			unrefStack=new Throwable();
 //			ContextOrders orders=(ContextOrders)userContext;
 			logger.warn("onBufferFailure falure",falure);//Ç±Ç»Ç¢Ç∆évÇ§
 			logger.warn("onBufferFailure now",new Exception());
