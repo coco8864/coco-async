@@ -65,7 +65,9 @@ public class ByteArrayLife extends ReferenceLife {
 		byteBufferLife.ref();
 		synchronized(byteBufferLifes){
 			logger.debug("getByteBuffer:size:" +byteBufferLifes.size() +":refCounter:"+refCounter);
-			byteBufferLifes.add(byteBufferLife);
+			if(byteBufferLifes.add(byteBufferLife)==false){
+				logger.error("byteBufferLifes.add return false",new Throwable());
+			}
 			ref();
 		}
 		return byteBuffer;
@@ -115,7 +117,6 @@ public class ByteArrayLife extends ReferenceLife {
 	private ByteBufferLife 	removeByteBuffer(ByteBuffer buffer){
 		synchronized(byteBufferLifes){
 			logger.debug("removeByteBuffer:size:" +byteBufferLifes.size() +":refCounter:"+refCounter);
-			
 			Iterator<ByteBufferLife> itr=byteBufferLifes.iterator();
 			while(itr.hasNext()){
 				ByteBufferLife life=itr.next();
@@ -130,7 +131,9 @@ public class ByteArrayLife extends ReferenceLife {
 	
 	/* gcÇÃâÑí∑Ç≈åƒÇ—èoÇ≥ÇÍÇÈéñÇëzíË */
 	void gcByteBufferLife(ByteBufferLife byteBufferLife){
-		logger.warn("gcByteBufferLife.getInstance date:"+fomatLogDate(new Date(timeOfGet))+":thread:"+threadNameOfGet,stackOfGet);
+		logger.warn("gcByteBufferLife.getInstance ByteBufferLife:date:"+fomatLogDate(new Date(timeOfGet))+":thread:"+threadNameOfGet+":BBLsize:"+byteBufferLifes.size(),stackOfGet);
+		logger.warn("gcByteBufferLife.getInstance ByteBufferLife:date:"+fomatLogDate(new Date(byteBufferLife.timeOfGet))+":thread:"+byteBufferLife.threadNameOfGet,byteBufferLife.stackOfGet);
+		
 		pool.gcLife(byteBufferLife);
 		synchronized(byteBufferLifes){
 			if( byteBufferLifes.remove(byteBufferLife)==false ){
@@ -144,7 +147,9 @@ public class ByteArrayLife extends ReferenceLife {
 				byteBufferLife=new ByteBufferLife(byteBuffer,this);
 				byteBufferLife.ref();
 				synchronized(byteBufferLifes){
-					byteBufferLifes.add(byteBufferLife);
+					if(byteBufferLifes.add(byteBufferLife)==false){
+						logger.error("byteBufferLifes.add return false",new Throwable());
+					}
 				}
 				pool.poolInstance(byteBuffer);
 				return;

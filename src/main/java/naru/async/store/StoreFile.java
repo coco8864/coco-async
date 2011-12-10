@@ -230,6 +230,7 @@ public class StoreFile {
 		try {
 			//ƒtƒ@ƒCƒ‹‚ð0‚É
 			writeChannel.truncate(0);
+			writeChannel.position(0);
 			length=0;
 		} catch (IOException e) {
 			logger.error("fail to truncate(0)",e);
