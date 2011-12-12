@@ -502,7 +502,10 @@ public class PoolManager implements Queuelet,Timer{
 	}
 	
 	public static ByteBuffer getBufferInstance(int bufferSize) {
-		Pool pool=instance.byteBufferPoolMap.get(bufferSize);
+		Pool pool=null;
+		synchronized(instance.byteBufferPoolMap){
+			pool=instance.byteBufferPoolMap.get(bufferSize);
+		}
 		if(pool==null){
 			pool=addBufferPool(bufferSize);
 		}
@@ -576,6 +579,8 @@ public class PoolManager implements Queuelet,Timer{
 			return;
 		}
 		byte[] array=buffer.array();
+		int length=array.length;
+		/*
 		List<ByteBuffer> constPool=constByteBufferPool.get(array);
 		if(constPool!=null){
 			synchronized(constPool){
@@ -585,16 +590,22 @@ public class PoolManager implements Queuelet,Timer{
 			}
 			return;
 		}
+		*/
 		Pool pool=null;
 		synchronized(instance.byteBufferPoolMap){
-			pool=instance.byteBufferPoolMap.get(array.length);
+			pool=instance.byteBufferPoolMap.get(length);
 		}
 		if(pool==null){//poolä«óùäO
+			if(length==16384){
+				logger.warn("poolBufferInstance 1:"+array);
+			}
 			return;
 		}
 		ByteArrayLife arrayLife=pool.getByteArrayLife(array);
-//		logger.info("poolBufferInstance:"+array +":" +arrayLife);
 		if(arrayLife==null){//poolä«óùäO
+			if(length==16384){
+				logger.warn("poolBufferInstance 2:"+array +":"+pool);
+			}
 			return;
 		}
 		arrayLife.poolByteBuffer(buffer);
