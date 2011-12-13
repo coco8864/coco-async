@@ -503,9 +503,9 @@ public class PoolManager implements Queuelet,Timer{
 	
 	public static ByteBuffer getBufferInstance(int bufferSize) {
 		Pool pool=null;
-		synchronized(instance.byteBufferPoolMap){
+//		synchronized(instance.byteBufferPoolMap){
 			pool=instance.byteBufferPoolMap.get(bufferSize);
-		}
+//		}
 		if(pool==null){
 			pool=addBufferPool(bufferSize);
 		}
@@ -522,9 +522,9 @@ public class PoolManager implements Queuelet,Timer{
 		}
 		byte[] array=buffer.array();
 		Pool pool=null;
-		synchronized(instance.byteBufferPoolMap){
+//		synchronized(instance.byteBufferPoolMap){
 			pool=instance.byteBufferPoolMap.get(array.length);
-		}
+//		}
 //		if(true){
 		if(pool==null){//poolä«óùäO
 			return buffer.duplicate();
@@ -592,9 +592,9 @@ public class PoolManager implements Queuelet,Timer{
 		}
 		*/
 		Pool pool=null;
-		synchronized(instance.byteBufferPoolMap){
+//		synchronized(instance.byteBufferPoolMap){
 			pool=instance.byteBufferPoolMap.get(length);
-		}
+//		}
 		if(pool==null){//poolä«óùäO
 			if(length==16384){
 				logger.warn("poolBufferInstance 1:"+array);

@@ -399,7 +399,7 @@ public class Page extends PoolBase{
 			return true;
 		}
 		ByteBuffer lastBuffer=getLastBuffer();
-//		if((lastBuffer.capacity()-lastBuffer.remaining())>=length){
+//		logger.warn("concat lastBuffer."+lastBuffer.capacity(),new Throwable());
 		if((lastBuffer.capacity()-lastBuffer.limit())>=length){
 //			lastBuffer.compact();array‚ð”j‰ó‚·‚é‚Ì‚ÅŽg‚¦‚È‚¢
 			int orgPosition=lastBuffer.position();

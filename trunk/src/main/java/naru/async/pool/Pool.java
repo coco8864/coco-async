@@ -511,7 +511,7 @@ public class Pool {
 			life = getGeneralReferenceLife(obj);
 		}
 		if (life == null || life.get() != obj) {
-			logger.warn("poolArrayGeneralInstance not in pool.obj:" + obj,
+			logger.warn("poolArrayGeneralInstance not in pool.obj:" + obj+":" +life,
 					new Exception());
 			return;// ä«óùäO
 		}

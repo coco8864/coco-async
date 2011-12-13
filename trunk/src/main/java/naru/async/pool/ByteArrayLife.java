@@ -109,8 +109,10 @@ public class ByteArrayLife extends ReferenceLife {
 				logger.error("poolByteBuffer...",new Throwable());//TODO
 				return;
 			}
+//			logger.warn("byteBufferLife.clear."+byteBufferLife);
 			byteBufferLife.unref();
-			byteBufferLife.clear();
+//			byteBufferLife.stackOfPool=new Throwable();
+			byteBufferLife.clear();//clearÇµÇƒÇ‡queueÇ≥ÇÍÇÈÇ±Ç∆Ç™Ç†ÇÈ...Ç»Ç∫???
 		}
 	}
 	
@@ -131,8 +133,14 @@ public class ByteArrayLife extends ReferenceLife {
 	
 	/* gcÇÃâÑí∑Ç≈åƒÇ—èoÇ≥ÇÍÇÈéñÇëzíË */
 	void gcByteBufferLife(ByteBufferLife byteBufferLife){
-		logger.warn("gcByteBufferLife.getInstance ByteBufferLife:date:"+fomatLogDate(new Date(timeOfGet))+":thread:"+threadNameOfGet+":BBLsize:"+byteBufferLifes.size(),stackOfGet);
-		logger.warn("gcByteBufferLife.getInstance ByteBufferLife:date:"+fomatLogDate(new Date(byteBufferLife.timeOfGet))+":thread:"+byteBufferLife.threadNameOfGet,byteBufferLife.stackOfGet);
+		if(byteBufferLife.getRef()==0){
+			//clearÇµÇƒÇ‡ReferenceQueueÇ…í ímÇ≥ÇÍÇÈéñÇ™Ç†ÇÈ
+			return;
+		}
+		logger.warn("gcByteBufferLife.getInstance ByteBufferLife:date:"+fomatLogDate(new Date(timeOfGet))+":thread:"+threadNameOfGet+":BBLsize:"+byteBufferLifes.size()+":byteBufferLife:"+byteBufferLife,stackOfGet);
+		logger.warn("gcByteBufferLife.getInstance ByteBufferLife:date:"+fomatLogDate(new Date(byteBufferLife.timeOfGet))+":get thread:"+byteBufferLife.threadNameOfGet,byteBufferLife.stackOfGet);
+		logger.warn("gcByteBufferLife.getInstance ByteBufferLife:date:"+fomatLogDate(new Date(byteBufferLife.timeOfPool))+":pool thread:"+byteBufferLife.threadNameOfPool,byteBufferLife.stackOfPool);
+		logger.warn("gcByteBufferLife.getInstance get:"+byteBufferLife.get());
 		
 		pool.gcLife(byteBufferLife);
 		synchronized(byteBufferLifes){
