@@ -517,13 +517,27 @@ public class PoolManager implements Queuelet,Timer{
 	}
 	
 	public static ByteBuffer duplicateBuffer(ByteBuffer buffer) {
+		return duplicateBuffer(buffer,false);
+	}
+	
+	public static ByteBuffer duplicateBuffer(ByteBuffer buffer,boolean isNewBuffer) {
 		if(buffer==null){
 			return null;
 		}
 		byte[] array=buffer.array();
+		int length=array.length;
+		if(isNewBuffer){
+			ByteBuffer newBuffer=PoolManager.getBufferInstance(length);
+			byte[] newArray=newBuffer.array();
+			System.arraycopy(array, 0, newArray, 0, length);
+			newBuffer.position(buffer.position());
+			newBuffer.limit(buffer.limit());
+			return newBuffer;
+		}
+		
 		Pool pool=null;
 //		synchronized(instance.byteBufferPoolMap){
-			pool=instance.byteBufferPoolMap.get(array.length);
+			pool=instance.byteBufferPoolMap.get(length);
 //		}
 //		if(true){
 		if(pool==null){//poolä«óùäO
@@ -538,11 +552,15 @@ public class PoolManager implements Queuelet,Timer{
 		dupBuffer.limit(buffer.limit());
 		return dupBuffer;
 	}
-	
+
 	public static ByteBuffer[] duplicateBuffers(ByteBuffer buffer[]) {
+		return duplicateBuffers(buffer,false);
+	}
+	
+	public static ByteBuffer[] duplicateBuffers(ByteBuffer buffer[],boolean isNewBuffer) {
 		ByteBuffer[] dupBuffers=BuffersUtil.newByteBufferArray(buffer.length);
 		for(int i=0;i<buffer.length;i++){
-			dupBuffers[i]=duplicateBuffer(buffer[i]);
+			dupBuffers[i]=duplicateBuffer(buffer[i],isNewBuffer);
 		}
 		return dupBuffers;
 	}
