@@ -521,6 +521,7 @@ public class Store extends PoolBase {
 		puttingPage=Page.allocPage(this,orgPuttingPage);
 		puttingPage.putBuffer(buffers);
 		if(orgPuttingPage!=gettingPage){
+//			logger.warn("putBuffer pageOut.",new Throwable());
 			savingPages.put(orgPuttingPage.getPageId(),orgPuttingPage);
 			orgPuttingPage.pageOut();
 		}

@@ -233,6 +233,7 @@ public class TimerManager implements Queuelet,Runnable{
 			try{
 				timer.onTimer(userContext);
 			}catch(Throwable t){
+				logger.error("onTimer return excption",t);
 			}
 			synchronized(this){
 				if(isClearRecived){
