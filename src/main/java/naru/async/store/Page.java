@@ -22,9 +22,38 @@ public class Page extends PoolBase{
 	private static StoreFile pageFile;
 	private static PersistenceStore persistenceStore;
 	
+	private static void recoverPageFile(){
+		logger.warn("recoverPageFile");
+		long pageId=0;
+		Page page=null;
+		long nextPageId=FREE_ID;
+		int usePageCount=0;
+		int freePageCount=0;
+		while(true){
+			page=Page.loadPage(null,pageId);
+			if(page==null){
+				break;//ç≈å„Ç‹Ç≈ì«ÇÒÇæ
+			}
+			if(persistenceStore.getStoreByStoreId(page.getStoreId())!=null){
+				usePageCount++;
+				continue;//óLå¯Ç»page
+			}
+			freePageCount++;
+			page.storeId=FREE_ID;
+			page.nextPageId=nextPageId;
+			nextPageId=pageId;
+			pageId+=PAGE_SIZE;
+		}
+		persistenceStore.setTopFreePageId(nextPageId);
+		logger.warn("usePageCount:" +usePageCount + ":freePageCount:"+freePageCount);
+	}
+	
 	public static void init(PersistenceStore persistenceStore,StoreFile pageFile){
 		Page.persistenceStore=persistenceStore;
 		Page.pageFile=pageFile;
+		if(persistenceStore.isNomalEnd()){
+			recoverPageFile();
+		}
 		for(int i=0;i<INIT_FREE_PAGE;i++){
 			Page freePage=getSafeFreePage(persistenceStore.getTopFreePageId());
 			if(freePage!=null){
