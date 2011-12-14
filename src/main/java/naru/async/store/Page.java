@@ -24,12 +24,13 @@ public class Page extends PoolBase{
 	
 	private static void recoverPageFile(){
 		logger.warn("recoverPageFile");
-		long pageId=0;
+		long pageId=pageFile.length();
 		Page page=null;
 		long nextPageId=FREE_ID;
 		int usePageCount=0;
 		int freePageCount=0;
 		while(true){
+			pageId-=PAGE_SIZE;
 			page=Page.loadPage(null,pageId);
 			if(page==null){
 				break;//ç≈å„Ç‹Ç≈ì«ÇÒÇæ
@@ -41,8 +42,8 @@ public class Page extends PoolBase{
 			freePageCount++;
 			page.storeId=FREE_ID;
 			page.nextPageId=nextPageId;
+			page.save();
 			nextPageId=pageId;
-			pageId+=PAGE_SIZE;
 		}
 		persistenceStore.setTopFreePageId(nextPageId);
 		logger.warn("usePageCount:" +usePageCount + ":freePageCount:"+freePageCount);
