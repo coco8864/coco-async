@@ -44,6 +44,7 @@ public class PersistenceStore implements Serializable {
 			p.storeIdMap=new HashMap<Long,StoreEntry>();
 			p.pageIdMap=new HashMap<Long,StoreEntry>();
 			p.digestMap=new HashMap<String,StoreEntry>();
+			p.isNomalEnd=true;
 			return p;
 		}
 		ObjectInputStream ois=new ObjectInputStream(is);
@@ -62,14 +63,15 @@ public class PersistenceStore implements Serializable {
 		}
 	}
 	
-	public void save(){
+	public void save(boolean isTerm){
 		synchronized(this){
-			if(isUpdate==false){
+			if(isTerm==false && isUpdate==false){
 				return;
 			}
 			isUpdate=false;
 		}
 		logger.debug("save() start");
+		this.isNomalEnd=isTerm;
 		OutputStream os=null;
 		try {
 			os=new FileOutputStream(persistenceStoreFile);
@@ -93,6 +95,8 @@ public class PersistenceStore implements Serializable {
 	/* saveしてからの更新の有無 */
 	private boolean isUpdate=false;
 
+	/* 終了処理をしたか否か */
+	private boolean isNomalEnd;
 	
 	//Page管理用の保存値
 	private long pageIdSequence;
@@ -329,6 +333,11 @@ public class PersistenceStore implements Serializable {
 	public synchronized long nextStoreId(){
 		storeIdSequence++;
 		return storeIdSequence;
+	}
+
+
+	public boolean isNomalEnd() {
+		return isNomalEnd;
 	}
 
 }

@@ -492,7 +492,7 @@ public class StoreManager {
 			//timerŠÔŠu‚ÌŠÔ‚Ìcallback”‚Å•‰‰×—Ê‚ğ„‘ªA‰É‚È‚Æ‚«‚Écompress‚âpersistenceStore.save‚·‚é
 			if(callbackCount==lastCallbackCount){
 				logger.debug("persistenceStore.save() lastCallbackCount:"+lastCallbackCount);
-				persistenceStore.save();
+				persistenceStore.save(false);
 				logger.debug("persistenceStore.save() return");
 			}
 			lastCallbackCount=callbackCount;
@@ -634,7 +634,7 @@ public class StoreManager {
 			}
 			Page.term();
 			Store.term();
-			persistenceStore.save();
+			persistenceStore.save(true);
 		}
 		
 		public boolean service(Object req) {
