@@ -590,7 +590,9 @@ public class StoreManager {
 				}
 				String pageReaderCountParam=(String)param.get("page.readerCount");
 				int pageReaderCount=Integer.parseInt(pageReaderCountParam);
-				Page.init(persistenceStore,new StoreFile(pageFile,pageReaderCount));
+				StoreFile pageStoreFile=new StoreFile(pageFile,pageReaderCount);
+				
+				Page.init(persistenceStore,pageStoreFile);
 				
 				//Buffer�̍쐬
 				String bufferReaderCountParam=(String)param.get("buffer.readerCount");

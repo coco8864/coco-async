@@ -22,6 +22,55 @@ public class PersistenceStore implements Serializable {
 	
 	private File persistenceStoreFile;
 	
+	public void recoverPageFile(StoreFile pageStoreFile){
+		if(isNomalEnd){
+			isNomalEnd=false;
+			return;
+		}
+		//ダウンした場合、以下は信用できない、計算する必要がある
+		/*pageIdSequence
+		 *topFreePageId
+		 *storeIdSequence
+		 */
+		logger.warn("recoverPageFile");
+		long pageId=pageStoreFile.length();
+		if(pageId==0){
+			setTopFreePageId(0);
+			return;
+		}
+		pageIdSequence=pageId/(long)Page.PAGE_SIZE;
+		pageId=pageIdSequence*(long)Page.PAGE_SIZE;
+		Page page=null;
+		long nextPageId=Page.FREE_ID;
+		storeIdSequence=0;
+		int usePageCount=0;
+		int freePageCount=0;
+		while(true){
+			pageId-=Page.PAGE_SIZE;
+			if(pageId<0){
+				break;
+			}
+			page=Page.loadPage(null,pageId);
+			if(page==null){
+				break;//最後まで読んだ
+			}
+			long storeId=page.getStoreId();
+			if(storeId!=Page.FREE_ID && getStoreByStoreId(storeId)!=null){
+				if(storeIdSequence<storeId){
+					storeIdSequence=storeId;
+				}
+				usePageCount++;
+				continue;//有効なpage
+			}
+			freePageCount++;
+			page.recoverSavefreePage(nextPageId);
+			page.unref(true);
+			nextPageId=pageId;
+		}
+		setTopFreePageId(nextPageId);
+		logger.warn("usePageCount:" +usePageCount + ":freePageCount:"+freePageCount);
+	}
+	
 	public static PersistenceStore load(File persistenceStoreFile) throws IOException{
 		InputStream is=null;
 		if(persistenceStoreFile.exists()){
@@ -35,7 +84,6 @@ public class PersistenceStore implements Serializable {
 		}
 		return instance;
 	}
-	
 
 	private static PersistenceStore load(InputStream is) throws IOException{
 		if(is==null){
@@ -334,10 +382,4 @@ public class PersistenceStore implements Serializable {
 		storeIdSequence++;
 		return storeIdSequence;
 	}
-
-
-	public boolean isNomalEnd() {
-		return isNomalEnd;
-	}
-
 }

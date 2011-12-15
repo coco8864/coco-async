@@ -22,39 +22,13 @@ public class Page extends PoolBase{
 	private static StoreFile pageFile;
 	private static PersistenceStore persistenceStore;
 	
-	private static void recoverPageFile(){
-		logger.warn("recoverPageFile");
-		long pageId=pageFile.length();
-		Page page=null;
-		long nextPageId=FREE_ID;
-		int usePageCount=0;
-		int freePageCount=0;
-		while(true){
-			pageId-=PAGE_SIZE;
-			page=Page.loadPage(null,pageId);
-			if(page==null){
-				break;//最後まで読んだ
-			}
-			if(persistenceStore.getStoreByStoreId(page.getStoreId())!=null){
-				usePageCount++;
-				continue;//有効なpage
-			}
-			freePageCount++;
-			page.storeId=FREE_ID;
-			page.nextPageId=nextPageId;
-			page.save();
-			nextPageId=pageId;
-		}
-		persistenceStore.setTopFreePageId(nextPageId);
-		logger.warn("usePageCount:" +usePageCount + ":freePageCount:"+freePageCount);
-	}
-	
 	public static void init(PersistenceStore persistenceStore,StoreFile pageFile){
 		Page.persistenceStore=persistenceStore;
 		Page.pageFile=pageFile;
-		if(persistenceStore.isNomalEnd()){
-			recoverPageFile();
-		}
+		
+		//前回ダウンした場合、pageが汚れている,必要な場合リカバリする
+		persistenceStore.recoverPageFile(pageFile);
+		
 		for(int i=0;i<INIT_FREE_PAGE;i++){
 			Page freePage=getSafeFreePage(persistenceStore.getTopFreePageId());
 			if(freePage!=null){
@@ -325,6 +299,12 @@ public class Page extends PoolBase{
 	
 	public String toString(){
 		return "pageId:"+pageId +":"+super.toString();
+	}
+	
+	void recoverSavefreePage(long nextPageId){
+		this.storeId=FREE_ID;
+		this.nextPageId=nextPageId;
+		save();
 	}
 	
 	public void save(){
