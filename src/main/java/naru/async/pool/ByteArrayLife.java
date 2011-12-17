@@ -142,13 +142,13 @@ public class ByteArrayLife extends ReferenceLife {
 		logger.warn("gcByteBufferLife.getInstance ByteBufferLife:date:"+fomatLogDate(new Date(byteBufferLife.timeOfPool))+":pool thread:"+byteBufferLife.threadNameOfPool,byteBufferLife.stackOfPool);
 		logger.warn("gcByteBufferLife.getInstance get:"+byteBufferLife.get());
 		
-		pool.gcLife(byteBufferLife);
 		synchronized(byteBufferLifes){
 			if( byteBufferLifes.remove(byteBufferLife)==false ){
 				throw new IllegalStateException();
 			}
 			byteBufferLife.unref();
 			byteBufferLife.clear();
+//			pool.gcLife(byteBufferLife);
 			if(unref()){
 				//最後のByteBufferLifeがGCされた場合は、・・・
 				ByteBuffer byteBuffer=ByteBuffer.wrap(array);

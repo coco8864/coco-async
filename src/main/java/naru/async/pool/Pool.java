@@ -75,6 +75,11 @@ public class Pool {
 	private long poolBackCount;// 返却された数
 	private long instanceCount;// 作成したinstance数
 	private long gcCount;// GCされたオブジェクト数,ByteBufferは、arrayをリサイクル
+	private long maxUseCount;
+	
+	private long getUseCount(){
+		return sequence-(poolBackCount+gcCount);
+	}	
 
 	private boolean isDelayRecycle = false;// 遅延recycle
 
@@ -89,6 +94,10 @@ public class Pool {
 		return initial;
 	}
 
+	/* limitは任意に書き換えても支障はない */
+	public void setLimit(int limit){
+		this.limit=limit;
+	}
 	public int getLimit() {
 		return limit;
 	}
@@ -191,8 +200,11 @@ public class Pool {
 			increment = 1;
 		}
 		this.increment = increment;
+		
 		addInstance(this.initial);
+		
 		this.isDelayRecycle = isDelayRecycle;
+		this.maxUseCount=0;
 	}
 
 	Class getPoolClass() {
@@ -241,10 +253,13 @@ public class Pool {
 	}
 
 	// poolは、arrayに対するpoolのはず
+	/*
+	 * byteBufferLifeは、GCされてもarrayから復活させる。GCによりpool数が減ることはない
 	public synchronized void gcLife(ByteBufferLife byteBufferLife) {
 		gcCount++;
 		// arrayLifes.remove(byteBufferLife.getArray());
 	}
+	*/
 
 	private Object instantiateArray() {
 		Object obj = null;
@@ -377,6 +392,10 @@ public class Pool {
 			return getInstance();
 		}
 		sequence++;
+		long useCount=getUseCount();
+		if(useCount>maxUseCount){
+			maxUseCount=useCount;
+		}
 //		logger.debug("getInstance:" + poolClass.getName() + "#" + sequence + "#" + instanceCount);
 		ReferenceLife referenceLife=null;
 		switch (type) {
@@ -551,9 +570,11 @@ public class Pool {
 		sb.append(":");
 		sb.append(instanceCount);//作成数
 		sb.append(":");
-		sb.append(sequence-poolBackCount);//現在使用数
+		sb.append(getUseCount());//現在使用数
 		sb.append(":");
 		sb.append(getPoolCount());//現在プール数
+		sb.append(":");
+		sb.append(maxUseCount);
 		sb.append(":");
 		sb.append(gcCount);//GC数
 		// バッファサイズ、総割り当て数、総作成数、使用数
