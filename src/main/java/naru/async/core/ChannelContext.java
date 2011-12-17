@@ -985,7 +985,7 @@ java.nio.channels.ClosedChannelException
 			if(buffers!=null){
 				setIoStatus(IO.WRITING);
 			}else{
-				dump();
+//				dump();
 				//setIoStatus(IO.WAIT_WRITE_BUFFER);
 				//queueuSelect();
 			}
