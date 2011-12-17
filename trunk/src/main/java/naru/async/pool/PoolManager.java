@@ -14,8 +14,6 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 
 import naru.async.Timer;
-import naru.async.core.ChannelContext;
-import naru.async.store.Page;
 import naru.async.timer.TimerManager;
 import naru.queuelet.Queuelet;
 import naru.queuelet.QueueletContext;
@@ -52,6 +50,12 @@ public class PoolManager implements Queuelet,Timer{
 	public static Pool getBufferPool(int size) {
 		return instance.byteBufferPoolMap.get(size);
 	}
+	
+	public static void createBufferPool(int size,int limit){
+		Pool pool=addBufferPool(size);
+		pool.setLimit(limit);
+	}
+	
 	///
 	public static Pool getClassPool(Class clazz) {
 		return instance.classPoolMap.get(clazz);
@@ -63,6 +67,11 @@ public class PoolManager implements Queuelet,Timer{
 		}
 		Pool p=am.get(size);
 		return p;
+	}
+	
+	public static void createArrayPool(Class clazz,int size,int limit){
+		Pool pool=addArrayPool(clazz,size);
+		pool.setLimit(limit);
 	}
 	
     public static ReferenceQueue getReferenceQueue(){
@@ -189,6 +198,10 @@ public class PoolManager implements Queuelet,Timer{
 					"clear",
 					1,-1,1);
 			synchronized(instance.byteBufferPoolMap){
+				Pool orgPool=instance.byteBufferPoolMap.get(bufferSize);
+				if(orgPool!=null){
+					return orgPool;
+				}
 				instance.byteBufferPoolMap.put(bufferSize, pool);
 			}
 			return pool;

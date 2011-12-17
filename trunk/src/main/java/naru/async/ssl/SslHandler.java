@@ -8,7 +8,6 @@ import javax.net.ssl.SSLException;
 import org.apache.log4j.Logger;
 
 import naru.async.ChannelHandler;
-import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolManager;
 import naru.async.store.Store;
 /**
