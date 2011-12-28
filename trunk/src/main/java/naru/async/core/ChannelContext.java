@@ -832,10 +832,10 @@ java.nio.channels.ClosedChannelException
 					channel.close();
 					if(socket!=null){
 						socket.close();
-						socket=null;
+//						socket=null;
 					}else if(serverSocket!=null){
 						serverSocket.close();
-						serverSocket=null;
+//						serverSocket=null;
 					}
 					
 				}
@@ -851,7 +851,7 @@ java.nio.channels.ClosedChannelException
 				}else if(serverSocket!=null){
 					if( !serverSocket.isClosed() ){
 						serverSocket.close();
-						serverSocket=null;
+//						serverSocket=null;
 					}
 				}else{
 					if(channel!=null && channel.isOpen()){
@@ -863,8 +863,8 @@ java.nio.channels.ClosedChannelException
 		} catch (IOException e) {
 			//peer‚©‚çØ‚ç‚ê‚é‚È‚Çclose‚ª¸”s‚·‚é‚±‚Æ‚Í‚ ‚éAclose‚É¸”s‚µ‚Ä‚àŒãˆ—‚Í‚È‚¢
 			logger.debug("close erroe.",e);
-			serverSocket=null;
-			socket=null;
+//			serverSocket=null;
+//			socket=null;
 		}
 		finishChannel();
 	}

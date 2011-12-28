@@ -112,12 +112,12 @@ public class IOManager implements Queuelet {
 			failure=e;
 		}
 		if(failure!=null){
+			PoolManager.poolBufferInstance(buffer);
+			context.disconnect();
 			if( context.failure(failure) ){
 				logger.warn("fail to read closable");
 			}
 			context.dump();
-			PoolManager.poolBufferInstance(buffer);
-			context.disconnect();
 			return false;
 		}
 		
