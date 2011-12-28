@@ -187,6 +187,18 @@ public class WriteBuffer implements BufferGetter {
 			if( context.queueIO(ChannelContext.IO.WRITABLE)==false ){
 				context.queueuSelect();
 			}
+			‚±‚¿‚ç‚ð—LŒø‚É‚·‚é‚ÆˆÈ‰º‚Ì—áŠO‚ª‚Å‚é‚æ‚¤‚É‚È‚Á‚½
+2011-12-28 23:20:29,130 [thread-dispatch:1] ERROR naru.async.store.Page - buf.put error.offset:0:length:8:allocBufferSize:16384
+java.nio.BufferOverflowException
+	at java.nio.HeapByteBuffer.put(HeapByteBuffer.java:165)
+	at naru.async.store.Page.putBytes(Page.java:456)
+	at naru.async.store.Page.putBytes(Page.java:444)
+	at naru.aweb.http.HeaderParser.getHeaderBuffer(HeaderParser.java:922)
+	at naru.aweb.http.HeaderParser.getHeaderBuffer(HeaderParser.java:829)
+	at naru.aweb.http.WebServerHandler.flushFirstResponse(WebServerHandler.java:674)
+	at naru.aweb.http.WebServerHandler.responseEnd(WebServerHandler.java:356)
+	at naru.aweb.handler.FileSystemHandler.responseBodyChannel(FileSystemHandler.java:352)
+			get‚µ‚½‚Î‚©‚è‚ÌByteBuffer‚ªŠù‚ÉŽg‚í‚ê‚Ä‚¢‚é!!!
 			*/
 		}
 		return false;
