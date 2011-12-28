@@ -180,7 +180,14 @@ public class WriteBuffer implements BufferGetter {
 			}
 		}
 		if(isQueueSelect){//write‰Â”\‚É‚È‚é‚Ì‚ğ‘Ò‚Â
+			//write‚Ìblock‚ğl—¶‚·‚éê‡
 			context.queueuSelect();
+			//write‚ªblock‚·‚é‚Ì‚ğl—¶‚µ‚È‚¢ê‡
+			/*
+			if( context.queueIO(ChannelContext.IO.WRITABLE)==false ){
+				context.queueuSelect();
+			}
+			*/
 		}
 		return false;
 	}
