@@ -46,6 +46,58 @@ public class PoolManager implements Queuelet,Timer{
 	private List<Class> delayRecycleClasses=new ArrayList<Class>();
 	private LinkedList delayRecycleArray=new LinkedList();
 	
+	private static void setupPool(Pool pool,int limit){
+		long poolCount=pool.getPoolCount();
+		pool.setLimit(limit);
+		for(long i=(long)limit;i<poolCount;i++){
+			Object o=pool.getInstance();
+			pool.recycleInstance(o);
+		}
+	}
+	
+	public static void setupClassPool(String className,int limit){
+		Class clazz=null;
+		try {
+			clazz = findClass(className);
+		} catch (ClassNotFoundException e) {
+			logger.error("fail to setupClassPool."+className,e);
+			return;
+		}
+		Pool pool=getClassPool(clazz);
+		if(pool==null){
+			pool=addClassPool(clazz);
+		}
+		setupPool(pool,limit);
+	}
+	
+	public static void setupBufferPool(int size,int limit){
+		Pool pool=getBufferPool(size);
+		if(pool==null){
+			pool=addBufferPool(size);
+		}
+		setupPool(pool,limit);
+	}
+	
+	public static void setupArrayPool(String className,int size,int limit){
+		Class clazz=null;
+		try {
+			clazz = findClass(className);
+		} catch (ClassNotFoundException e) {
+			logger.error("fail to setupArrayPool."+className,e);
+			return;
+		}
+		Pool pool=addArrayPool(clazz,size);
+		setupPool(pool,limit);
+	}
+	
+	/* defaultBufferを変更する */
+	public static void changeDefaultBuffer(int updateDefaultBufferSize,int limit){
+		int orgDefaultBufferSize=defaultBufferSize;
+		defaultBufferSize=updateDefaultBufferSize;
+		setupBufferPool(updateDefaultBufferSize,limit);
+		setupBufferPool(orgDefaultBufferSize,0);
+	}
+	
 	/* 統計情報の返却 */
 	public static Pool getBufferPool(int size) {
 		return instance.byteBufferPoolMap.get(size);
@@ -139,7 +191,6 @@ public class PoolManager implements Queuelet,Timer{
 		}
 	}
     
-	/* ランタイムに実行,TODO 定義にあらかじめ定義することはできない */
 	private static Pool addArrayPool(Class clazz,int size){
 		try {
 			synchronized(instance.arrayPoolMap){
@@ -158,7 +209,7 @@ public class PoolManager implements Queuelet,Timer{
 				}
 				Pool pool=new Pool(
 						clazz,size,
-						1,ARRAY_MAX_POOL_COUNT,1,isDelayRecycleClass(clazz));
+						1,ARRAY_MAX_POOL_COUNT,1,false);
 				m.put(size, pool);
 				return pool;
 			}
@@ -324,6 +375,25 @@ public class PoolManager implements Queuelet,Timer{
 		return (String [])argsList.toArray(new String[0]);
 	}
 	
+	private static Class findClass(String className) throws ClassNotFoundException{
+		if("byte".equals(className)){
+			return byte.class;
+		}else if("int".equals(className)){
+			return int.class;
+		}else if("short".equals(className)){
+			return short.class;
+		}else if("long".equals(className)){
+			return long.class;
+		}else if("char".equals(className)){
+			return char.class;
+		}else if("float".equals(className)){
+			return float.class;
+		}else if("double".equals(className)){
+			return double.class;
+		}
+		return Class.forName(className);
+	}
+	
 	/* 起動時に実行 */
 	private void createPool(Map param,String name) throws SecurityException, IllegalArgumentException, ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException{
 		String className=(String)param.get(name + ".className");
@@ -332,7 +402,8 @@ public class PoolManager implements Queuelet,Timer{
 		}
 		boolean isExtendsPoolBase=false;
 		String recycleMethodName=(String)param.get(name + ".recycleMethod");
-		Class poolClass=Class.forName(className);
+		
+		Class poolClass=findClass(className);
 		if(PoolBase.class.isAssignableFrom(poolClass)){
 			recycleMethodName="recycle";
 			isExtendsPoolBase=true;
@@ -351,11 +422,23 @@ public class PoolManager implements Queuelet,Timer{
 			increment=Integer.parseInt(incrementString);
 		}
 		
-		Pool pool=new Pool(
-				poolClass.getConstructor(NO_TYPES),isExtendsPoolBase,
-				recycleMethodName,
-				initial,limit,increment,isDelayRecycleClass(poolClass));
-		classPoolMap.put(poolClass, pool);
+		String arrayLengthParam=(String)param.get(name + ".arrayLength");
+		if(arrayLengthParam==null){
+			Pool pool=new Pool(
+					poolClass.getConstructor(NO_TYPES),isExtendsPoolBase,
+					recycleMethodName,
+					initial,limit,increment,isDelayRecycleClass(poolClass));
+			classPoolMap.put(poolClass, pool);
+		}else{
+			int arrayLength=Integer.parseInt(arrayLengthParam);
+			Pool pool=new Pool(poolClass,arrayLength,initial,limit,increment,false);
+			Map<Integer,Pool> m=arrayPoolMap.get(poolClass);
+			if(m==null){
+				m=new HashMap<Integer,Pool>();
+				instance.arrayPoolMap.put(poolClass, m);
+			}
+			m.put(arrayLength, pool);
+		}
 	}
 	
 	private void createBufferPool(Map param,String name) throws SecurityException, IllegalArgumentException, ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
@@ -513,6 +596,10 @@ public class PoolManager implements Queuelet,Timer{
 	public static int getDefaultBufferSize(){
 		return defaultBufferSize;
 	}
+	
+//	public static void setDefaultBufferSize(int defaultBufferSize){
+//		PoolManager.defaultBufferSize=defaultBufferSize;
+//	}
 	
 	public static ByteBuffer getBufferInstance(int bufferSize) {
 		Pool pool=null;
