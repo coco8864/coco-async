@@ -56,16 +56,17 @@ public class PersistenceStore implements Serializable {
 			}
 			long storeId=page.getStoreId();
 			if(storeId!=Page.FREE_ID && getStoreByStoreId(storeId)!=null){
+				//—LŒø‚Èpage
 				if(storeIdSequence<storeId){
 					storeIdSequence=storeId;
 				}
 				usePageCount++;
-				continue;//—LŒø‚Èpage
+			}else{
+				freePageCount++;
+				page.recoverSavefreePage(nextPageId);
+				nextPageId=pageId;
 			}
-			freePageCount++;
-			page.recoverSavefreePage(nextPageId);
 			page.unref(true);
-			nextPageId=pageId;
 		}
 		setTopFreePageId(nextPageId);
 		logger.warn("usePageCount:" +usePageCount + ":freePageCount:"+freePageCount);
