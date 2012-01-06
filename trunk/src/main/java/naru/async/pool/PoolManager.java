@@ -41,6 +41,7 @@ public class PoolManager implements Queuelet,Timer{
 	private Map<Class,Pool> classPoolMap=new HashMap<Class,Pool>();
 	private Map<Integer,Pool> byteBufferPoolMap=new HashMap<Integer,Pool>();
 	private Map<Class,Map<Integer,Pool>> arrayPoolMap=new HashMap<Class,Map<Integer,Pool>>();
+	private Map<Class,Object> array0PoolMap=new HashMap<Class,Object>();
 
     private ReferenceQueue referenceQueue = new ReferenceQueue();
 	private List<Class> delayRecycleClasses=new ArrayList<Class>();
@@ -92,6 +93,10 @@ public class PoolManager implements Queuelet,Timer{
 	
 	/* defaultBufferを変更する */
 	public static void changeDefaultBuffer(int updateDefaultBufferSize,int limit){
+		if(defaultBufferSize==updateDefaultBufferSize){
+			setupBufferPool(updateDefaultBufferSize,limit);
+			return;
+		}
 		int orgDefaultBufferSize=defaultBufferSize;
 		defaultBufferSize=updateDefaultBufferSize;
 		setupBufferPool(updateDefaultBufferSize,limit);
@@ -279,6 +284,17 @@ public class PoolManager implements Queuelet,Timer{
 	public static Object getArrayInstance(Class clazz,int size){
 //		System.out.println("logger:"+logger.getClass().getClassLoader().toString());
 //		Thread.dumpStack();
+		if(size==0){
+			//sizeが0の場合、状態がないので同じオブジェクトを返却すればよい
+			Object obj=instance.array0PoolMap.get(clazz);
+			if(obj==null){
+				obj=Array.newInstance(clazz, 0);
+				synchronized(instance.array0PoolMap){
+					instance.array0PoolMap.put(clazz, obj);
+				}
+			}
+			return obj;
+		}
 		Pool pool=getArrayPool(clazz,size);
 		if(pool==null){
 			pool=addArrayPool(clazz, size);

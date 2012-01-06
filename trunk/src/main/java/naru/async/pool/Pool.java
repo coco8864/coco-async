@@ -576,6 +576,8 @@ public class Pool {
 		sb.append(":");
 		sb.append(maxUseCount);
 		sb.append(":");
+		sb.append(limit);//pool limit
+		sb.append(":");
 		sb.append(gcCount);//GC数
 		// バッファサイズ、総割り当て数、総作成数、使用数
 		logger.info(sb.toString());
