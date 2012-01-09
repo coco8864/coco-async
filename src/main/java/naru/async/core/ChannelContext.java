@@ -506,9 +506,9 @@ public class ChannelContext extends PoolBase{
 			}
 			ByteBuffer[] buffers=writeOrder.popBuffers();
 			long writeLength=BuffersUtil.remaining(buffers);
-			if(writeLength==0){
-				logger.warn("write buffer length 0.cid:"+getPoolId()+":buffers:"+buffers,new Throwable());
-			}
+//			if(writeLength==0){
+//				logger.warn("write buffer length 0.cid:"+getPoolId()+":buffers:"+buffers,new Throwable());
+//			}
 			long asyncWriteLength=stastics.addAsyncWriteLength(writeLength);
 //			writeOrderLength+=writeLength;
 			logger.debug("writeOrder."+writeLength+":"+asyncWriteLength + ":cid:"+ getPoolId());

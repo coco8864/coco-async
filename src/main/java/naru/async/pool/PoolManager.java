@@ -308,7 +308,11 @@ public class PoolManager implements Queuelet,Timer{
 	
 	public static void poolArrayInstance(Object objs){
 		Class clazz=objs.getClass();
-		Pool pool=getArrayPool(clazz.getComponentType(), Array.getLength(objs));
+		int arraySize=Array.getLength(objs);
+		if(arraySize==0){
+			return;
+		}
+		Pool pool=getArrayPool(clazz.getComponentType(), arraySize);
 		if(pool==null){
 			logger.warn("isn't pool instance."+clazz.getName()+":length:"+Array.getLength(objs));
 			/* いきなり返してきたパターンは、再利用しない */
