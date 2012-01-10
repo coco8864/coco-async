@@ -621,7 +621,13 @@ public class PoolManager implements Queuelet,Timer{
 //		PoolManager.defaultBufferSize=defaultBufferSize;
 //	}
 	
+	private static final ByteBuffer ZERO_BUFFER=ByteBuffer.allocate(0);
+	
 	public static ByteBuffer getBufferInstance(int bufferSize) {
+		if(bufferSize==0){
+			return ZERO_BUFFER;
+		}
+		bufferSize=(((bufferSize-1)/(1024))+1)*1024;//1024ÇÃî{êîÇ…í≤êÆÇ∑ÇÈ
 		Pool pool=null;
 //		synchronized(instance.byteBufferPoolMap){
 			pool=instance.byteBufferPoolMap.get(bufferSize);
@@ -713,7 +719,7 @@ public class PoolManager implements Queuelet,Timer{
 	}
 	
 	public static void poolBufferInstance(ByteBuffer buffer) {
-		if(buffer==null){
+		if(buffer==null||buffer==ZERO_BUFFER){
 			return;
 		}
 		byte[] array=buffer.array();
