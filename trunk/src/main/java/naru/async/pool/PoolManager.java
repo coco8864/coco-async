@@ -30,7 +30,7 @@ import naru.queuelet.QueueletContext;
 public class PoolManager implements Queuelet,Timer{
 	private static Logger logger=Logger.getLogger(PoolManager.class);
 	private static final int ARRAY_SIZE_COUNT=32;//同一配列クラスは、サイズによって32種類まで
-	private static final int ARRAY_MAX_POOL_COUNT=128;//配列クラスは、これ以上Poolしない
+	private static final int ARRAY_MAX_POOL_COUNT=16;//配列クラスは、これ以上Poolしない
 	private static final Object[] NO_ARGS=new Object[0];
 	private static final Class[] NO_TYPES=new Class[0];
 	
