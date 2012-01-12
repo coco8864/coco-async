@@ -362,7 +362,11 @@ public class Page extends PoolBase{
 	}
 	
 	private ByteBuffer getLastBuffer(){
-		return this.buffer[this.buffer.length-1];
+		int len=this.buffer.length;
+		if(len==0){
+			return null;
+		}
+		return this.buffer[len-1];
 	}
 	private void setLastBuffer(ByteBuffer newLastBuffer){
 		this.buffer[this.buffer.length-1]=newLastBuffer;
@@ -371,6 +375,9 @@ public class Page extends PoolBase{
 	//¬‚³‚·‚¬‚éBuffer‚ð”rœ‚·‚é
 	private void checkLastBuffer(){
 		ByteBuffer lastBuffer=getLastBuffer();
+		if(lastBuffer==null){//0’·‚Ìbuffer”z—ñ‚ª“ü‚Á‚Ä‚¢‚é
+			return;
+		}
 		int defaultBufferSize=PoolManager.getDefaultBufferSize();
 		if(lastBuffer.capacity()>=defaultBufferSize){
 			//lastBuffer.compact();compact‚Åarray‚ª‘‚«Š·‚í‚é
@@ -401,7 +408,7 @@ public class Page extends PoolBase{
 	public synchronized boolean putBuffer(ByteBuffer[] buffer,boolean isExpand){
 		long length=BuffersUtil.remaining(buffer);
 		logger.debug("putBuffer."+this +":" + bufferLength +":"+length);
-		if(this.buffer==null){
+		if(this.buffer==null||this.buffer.length==0){
 			this.buffer=buffer;
 			checkLastBuffer();
 			this.bufferLength+=length;
@@ -445,7 +452,7 @@ public class Page extends PoolBase{
 	}
 	
 	public synchronized boolean putBytes(byte[] bytes, int offset, int length){
-		if(this.buffer==null){
+		if(this.buffer==null||this.buffer.length==0){
 			int defaultBufferSize=PoolManager.getDefaultBufferSize();
 			int allocBufferSize=defaultBufferSize;
 			if(length>defaultBufferSize){
