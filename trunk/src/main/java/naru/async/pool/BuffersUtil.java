@@ -72,11 +72,17 @@ public class BuffersUtil {
 	
 	/* lengthï™ÇÃbuffersÇämï€Ç∑ÇÈ */
 	public static ByteBuffer[] prepareBuffers(long length){
-		List<ByteBuffer> bufList=new ArrayList<ByteBuffer>();
+		if(length<=0){
+			return (ByteBuffer[])PoolManager.getArrayInstance(ByteBuffer.class, 0);
+		}
+//		List<ByteBuffer> bufList=new ArrayList<ByteBuffer>();
+		int bufferSize=PoolManager.getDefaultBufferSize();
+		int bufferCount=(int)(((length-1)/(long)bufferSize)+1);
+		ByteBuffer[] result=(ByteBuffer[])PoolManager.getArrayInstance(ByteBuffer.class, bufferCount);
 		long lenSum=0;
-		while(true){
+		for(int i=0;i<bufferCount;i++){
 			ByteBuffer buf=PoolManager.getBufferInstance();
-			bufList.add(buf);
+			result[i]=buf;
 			int capacity=buf.capacity();
 			lenSum+=(long)capacity;
 			if(lenSum>=length){
@@ -84,7 +90,7 @@ public class BuffersUtil {
 				break;
 			}
 		}
-		return (ByteBuffer[])bufList.toArray(newByteBufferArray(bufList.size()));
+		return result;
 //		ByteBuffer[] b=newByteBufferArray(bufList.size());Ç±ÇÒÇ»êSîzÇÕÇ»Ç©Ç¡ÇΩ
 //		ByteBuffer[] c=(ByteBuffer[])bufList.toArray(b);
 //		if(b!=c){
