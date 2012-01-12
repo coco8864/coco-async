@@ -636,6 +636,7 @@ public class PoolManager implements Queuelet,Timer{
 			pool=addBufferPool(bufferSize);
 		}
 		ByteBuffer buffer=(ByteBuffer)pool.getInstance();
+		buffer.limit(bufferSize);
 //		if(bufferSize==defaultBufferSize){
 //			logger.info("getBufferInstance:"+buffer.array(),new Exception());
 //		}
