@@ -29,10 +29,12 @@ import naru.queuelet.QueueletContext;
  */
 public class PoolManager implements Queuelet,Timer{
 	private static Logger logger=Logger.getLogger(PoolManager.class);
+	private static final int BUFFER_SIZE_UNIT=1024;//バッファーサイズの単位
 	private static final int ARRAY_SIZE_COUNT=32;//同一配列クラスは、サイズによって32種類まで
 	private static final int ARRAY_MAX_POOL_COUNT=16;//配列クラスは、これ以上Poolしない
 	private static final Object[] NO_ARGS=new Object[0];
 	private static final Class[] NO_TYPES=new Class[0];
+	private static final ByteBuffer ZERO_BUFFER=ByteBuffer.allocate(0);
 	
 	private static PoolManager instance;
 	private static QueueletContext queueletContext;
@@ -621,19 +623,17 @@ public class PoolManager implements Queuelet,Timer{
 //		PoolManager.defaultBufferSize=defaultBufferSize;
 //	}
 	
-	private static final ByteBuffer ZERO_BUFFER=ByteBuffer.allocate(0);
-	
 	public static ByteBuffer getBufferInstance(int bufferSize) {
 		if(bufferSize==0){
 			return ZERO_BUFFER;
 		}
-		bufferSize=(((bufferSize-1)/(1024))+1)*1024;//1024の倍数に調整する
+		int actualBufferSize=(((bufferSize-1)/(BUFFER_SIZE_UNIT))+1)*BUFFER_SIZE_UNIT;//1024の倍数に調整する
 		Pool pool=null;
 //		synchronized(instance.byteBufferPoolMap){
-			pool=instance.byteBufferPoolMap.get(bufferSize);
+			pool=instance.byteBufferPoolMap.get(actualBufferSize);
 //		}
 		if(pool==null){
-			pool=addBufferPool(bufferSize);
+			pool=addBufferPool(actualBufferSize);
 		}
 		ByteBuffer buffer=(ByteBuffer)pool.getInstance();
 		buffer.limit(bufferSize);

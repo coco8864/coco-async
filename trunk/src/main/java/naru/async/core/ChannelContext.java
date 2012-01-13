@@ -513,6 +513,15 @@ public class ChannelContext extends PoolBase{
 //			writeOrderLength+=writeLength;
 			logger.debug("writeOrder."+writeLength+":"+asyncWriteLength + ":cid:"+ getPoolId());
 			writeOrder.setWriteEndOffset(asyncWriteLength);
+			if(writeLength==0){
+				//‘‚«‚İ’·‚ª0‚Ìê‡AwriteŠ®—¹‚ª—ˆ‚È‚¢‚Ì‚Å‚±‚±‚Åcallback‚ğˆË—Š‚·‚é
+				long totalWriteLength=stastics.getWriteLength();
+				if(asyncWriteLength==totalWriteLength){
+					orders.doneWrite(totalWriteLength);
+				}
+				PoolManager.poolBufferInstance(buffers);
+				return true;
+			}
 			writeBuffer.putBuffer(buffers);
 			if( writeTimeout!=0 && writeTimeoutTime==Long.MAX_VALUE){
 				writeTimeoutTime=System.currentTimeMillis()+writeTimeout;
