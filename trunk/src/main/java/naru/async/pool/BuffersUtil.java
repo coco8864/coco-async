@@ -266,6 +266,7 @@ public class BuffersUtil {
 				int position=buf.position();
 				position+=(int)(offset);
 				buf.position(position);
+				break;
 			}
 		}
 		for(;i<buffers.length;i++){
