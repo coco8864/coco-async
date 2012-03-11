@@ -252,34 +252,53 @@ public class BuffersUtil {
 	}
 	
 	/**
-	 * ’†ŠÔ‚ğØ‚èæ‚é
+	 * Šù‘¶‚Ìbuffers‚Ìposition,limit‚Í•Ï‰»‚³‚¹‚¸AV‚½‚Èbuffer‚É’†ŠÔ‚ğØ‚èæ‚é
 	 */
-	public static void slice(ByteBuffer[] buffers,long offset,long length){
+	public static ByteBuffer[] slice(ByteBuffer[] buffers,long offset,long length){
 		int i=0;
+		List<ByteBuffer> result=new ArrayList<ByteBuffer>();
+		ByteBuffer workBuf=null;
 		for(;i<buffers.length;i++){
 			ByteBuffer buf=buffers[i];
 			long remaining=(long)buf.remaining();
 			if(offset>=remaining){
-				buf.position(buf.limit());
 				offset-=remaining;
 			}else{
 				int position=buf.position();
 				position+=(int)(offset);
-				buf.position(position);
+				workBuf=PoolManager.duplicateBuffer(buf);
+				workBuf.position(position);
+				result.add(workBuf);
 				break;
 			}
+		}
+		if(workBuf!=null){
+			long remaining=(long)workBuf.remaining();
+			if(length>remaining){
+				length-=remaining;
+			}else{
+				int position=workBuf.position();
+				workBuf.limit(position+(int)length);
+				return (ByteBuffer[])result.toArray(new ByteBuffer[result.size()]);
+			}
+			i++;
 		}
 		for(;i<buffers.length;i++){
 			ByteBuffer buf=buffers[i];
 			long remaining=(long)buf.remaining();
-			if(length>=remaining){
+			if(length>remaining){
 				length-=remaining;
+				workBuf=PoolManager.duplicateBuffer(buf);
+				result.add(workBuf);
 			}else{
 				int position=buf.position();
-				buf.limit(position+(int)length);
-				length=0;
+				workBuf=PoolManager.duplicateBuffer(buf);
+				workBuf.limit(position+(int)length);
+				result.add(workBuf);
+				break;
 			}
 		}
+		return (ByteBuffer[])result.toArray(new ByteBuffer[result.size()]);
 	}
 	
 	public static ByteBuffer[] concatenate(ByteBuffer[] part1,ByteBuffer[] part2){
