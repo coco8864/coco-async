@@ -102,7 +102,7 @@ public class BuffersUtil {
 	public static ByteBuffer[] dupBuffers(ByteBuffer[] buffers){
 		ArrayList<ByteBuffer> list=new ArrayList<ByteBuffer>();
 		for(int i=0;i<buffers.length;i++){
-			if(buffers[i].hasRemaining()){
+			if(!buffers[i].hasRemaining()){
 				continue;//’†g‚Ì‚È‚¢buffer‚ðdup‚·‚é•K—v‚Í‚È‚¢
 			}
 			ByteBuffer buf=PoolManager.getBufferInstance(buffers[i].capacity());
