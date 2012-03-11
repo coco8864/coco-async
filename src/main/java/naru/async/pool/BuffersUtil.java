@@ -102,6 +102,9 @@ public class BuffersUtil {
 	public static ByteBuffer[] dupBuffers(ByteBuffer[] buffers){
 		ArrayList<ByteBuffer> list=new ArrayList<ByteBuffer>();
 		for(int i=0;i<buffers.length;i++){
+			if(buffers[i].hasRemaining()){
+				continue;//íÜêgÇÃÇ»Ç¢bufferÇdupÇ∑ÇÈïKóvÇÕÇ»Ç¢
+			}
 			ByteBuffer buf=PoolManager.getBufferInstance(buffers[i].capacity());
 			buffers[i].mark();
 			buf.put(buffers[i]);
@@ -229,7 +232,6 @@ public class BuffersUtil {
 		}
 	}
 	
-	
 	/**
 	 * Ç®êKÇçÌÇÈ
 	 * @param buffers
@@ -237,6 +239,36 @@ public class BuffersUtil {
 	 */
 	public static void cut(ByteBuffer[] buffers,long length){
 		for(int i=0;i<buffers.length;i++){
+			ByteBuffer buf=buffers[i];
+			long remaining=(long)buf.remaining();
+			if(length>=remaining){
+				length-=remaining;
+			}else{
+				int position=buf.position();
+				buf.limit(position+(int)length);
+				length=0;
+			}
+		}
+	}
+	
+	/**
+	 * íÜä‘ÇêÿÇËéÊÇÈ
+	 */
+	public static void slice(ByteBuffer[] buffers,long offset,long length){
+		int i=0;
+		for(;i<buffers.length;i++){
+			ByteBuffer buf=buffers[i];
+			long remaining=(long)buf.remaining();
+			if(offset>=remaining){
+				buf.position(buf.limit());
+				offset-=remaining;
+			}else{
+				int position=buf.position();
+				position+=(int)(offset);
+				buf.position(position);
+			}
+		}
+		for(;i<buffers.length;i++){
 			ByteBuffer buf=buffers[i];
 			long remaining=(long)buf.remaining();
 			if(length>=remaining){
@@ -335,8 +367,5 @@ public class BuffersUtil {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
-		
-		
 	}
 }
