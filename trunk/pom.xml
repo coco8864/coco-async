@@ -3,7 +3,7 @@
   <groupId>naru.async</groupId>
   <artifactId>async</artifactId>
   <name>async</name>
-  <version>1.2.1</version>
+  <version>1.2.2</version>
   <url>https://code.google.com/p/coco-async/</url>
   <build>
     <plugins>
