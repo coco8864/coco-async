@@ -408,7 +408,7 @@ public class Pool {
 		case TYPE_BYTE_BUFFER:
 			ByteBuffer byteBuffer = (ByteBuffer) obj;
 			ByteArrayLife byteArrayLife = byteArrayLifes.get(byteBuffer.array());
-			obj = byteArrayLife.getOnlyByteBuffer();
+			obj = byteArrayLife.getOnlyByteBuffer(byteBuffer);
 			if(byteBuffer!=obj){//Ç†ÇËÇ¶Ç»Ç¢ÇÕÇ∏ÇæÇ™
 				logger.error("TYPE_BYTE_BUFFERÅ@getInstance error.byteBuffer:"+byteBuffer+":obj:"+obj);
 				return getInstance();
@@ -474,7 +474,7 @@ public class Pool {
 					if(ref!=obj){
 						logger.warn("#releaseLife ByteBuffer get error.ref:"+ref);
 					}
-					byteBufferLife.clear();
+//					byteBufferLife.clear();
 					logger.debug("!!ByteBuffer releaseLife1!!"+byteArrayLife +":" +byteBufferLife);
 				}else{
 					logger.warn("!!ByteBuffer releaseLife2!!"+byteArrayLife);
