@@ -2,9 +2,13 @@ package naru.async.pool;
 
 import java.nio.ByteBuffer;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
+
+import naru.async.pool.ByteBufferLife.SearchKey;
 
 import org.apache.log4j.Logger;
 
@@ -12,90 +16,113 @@ public class ByteArrayLife extends ReferenceLife {
 	static private Logger logger=Logger.getLogger(ByteArrayLife.class);
 	
 	private byte[] array;
-	private Set<ByteBufferLife> byteBufferLifes=new HashSet<ByteBufferLife>();//同一seedの次ReferenceLife
+	
+	/*ByteBufferをキーにByteBufferLifeを検索する時に使う */
+	private SearchKey searchKey=new SearchKey();//userLifesのロック中に利用
+	//同一seedの次ReferenceLife
+	private Set<ByteBufferLife> userLifes=new HashSet<ByteBufferLife>();
+	//freeLifesが管理するByteBufferがGCされないようにvalueで参照しておく
+	private Map<ByteBufferLife,ByteBuffer> freeLifes=new HashMap<ByteBufferLife,ByteBuffer>();
 	
 	public ByteArrayLife(ByteBuffer firstByteBuffer,Pool pool) {
 		super(firstByteBuffer.array());
 		setPool(pool);
 		array=firstByteBuffer.array();
 		ByteBufferLife byteBufferLife=new ByteBufferLife(firstByteBuffer,this);
-//		synchronized(byteBufferLifes){//作った直後なので参照している人がいないはず
-			byteBufferLifes.add(byteBufferLife);
-//		}
+		freeLifes.put(byteBufferLife,firstByteBuffer);
+//		userLifes.add(byteBufferLife);
 	}
 
 	void gcInstance() {//自分がarrayへの参照を保持しているので呼ばれるわけがない
 	}
 
-	/*　getBufferInstanceの延長で呼び出される事を想定 */
+	/*　初回getBufferInstanceの延長で呼び出される事を想定 */
 	/* 唯一持っているはずのByteBufferを返却,PoolからとられたばかりだからByteBufferは、1個のはず */
-	ByteBuffer getOnlyByteBuffer(){
-		synchronized(byteBufferLifes){
+	ByteBuffer getOnlyByteBuffer(ByteBuffer byteBuffer){
+		synchronized(userLifes){
 //			logger.debug("getOnlyByteBuffer:size:" +byteBufferLifes.size() +":refCounter:"+refCounter);
-			if(byteBufferLifes.size()!=1){
-				throw new IllegalStateException("byteBufferLifes.size()="+byteBufferLifes.size());
+			if(freeLifes.size()<1){
+				throw new IllegalStateException("freeLifes.size()="+freeLifes.size());
 			}
-			Iterator<ByteBufferLife> itr=byteBufferLifes.iterator();
-			ByteBufferLife byteBufferLife=itr.next();
+			searchKey.setByteBuffer(byteBuffer);
+			if(byteBuffer!=freeLifes.remove(searchKey)){
+				throw new IllegalStateException("freeLifes.size()="+freeLifes.size());
+			}
+			ByteBufferLife byteBufferLife=searchKey.getHit();
+//			Iterator<ByteBufferLife> itr=freeLifes.keySet().iterator();
+//			ByteBufferLife byteBufferLife=itr.next();
+//			itr.remove();
+			userLifes.add(byteBufferLife);
 			byteBufferLife.ref();
-			ByteBuffer byteBuffer=(ByteBuffer)byteBufferLife.get();
+//			ByteBuffer byteBuffer=(ByteBuffer)byteBufferLife.get();
 			ref();
 			return byteBuffer;
 		}
 	}
 	
-	/*　getBufferInstanceの延長で呼び出される事を想定 */
+	/*　最終poolInstanceの延長で呼び出される事を想定 */
 	/* 唯一持っているはずのByteBufferを返却,PoolからとられたばかりだからByteBufferは、1個のはず */
 	ByteBufferLife getOnlyByteBufferLife(){
-		synchronized(byteBufferLifes){
-			logger.debug("getOnlyByteBuffer:size:" +byteBufferLifes.size() +":refCounter:"+refCounter);
-			if(byteBufferLifes.size()!=1){
-				throw new IllegalStateException("byteBufferLifes.size()="+byteBufferLifes.size());
+		synchronized(userLifes){
+//			logger.debug("getOnlyByteBuffer:size:" +userLifes.size() +":refCounter:"+refCounter);
+			if(userLifes.size()!=1){
+				throw new IllegalStateException("byteBufferLifes.size()="+userLifes.size());
 			}
-			Iterator<ByteBufferLife> itr=byteBufferLifes.iterator();
+			Iterator<ByteBufferLife> itr=userLifes.iterator();
 			ByteBufferLife byteBufferLife=itr.next();
+			itr.remove();
+			byteBufferLife.unref();
+			freeLifes.put(byteBufferLife,(ByteBuffer)byteBufferLife.get());
 			return byteBufferLife;
 		}
 	}
 	
 	/*　duplicateの延長で呼び出される事を想定 */
 	ByteBuffer getByteBuffer(){
-		ByteBuffer byteBuffer=ByteBuffer.wrap(array);
-		ByteBufferLife byteBufferLife=new ByteBufferLife(byteBuffer,this);
-		byteBufferLife.ref();
-		synchronized(byteBufferLifes){
-			logger.debug("getByteBuffer:size:" +byteBufferLifes.size() +":refCounter:"+refCounter);
-			if(byteBufferLifes.add(byteBufferLife)==false){
+		synchronized(userLifes){
+			Iterator<ByteBufferLife> itr=freeLifes.keySet().iterator();
+			if(itr.hasNext()){
+				ByteBufferLife life=itr.next();
+				itr.remove();
+				userLifes.add(life);
+				life.ref();
+				ByteBuffer byteBuffer=(ByteBuffer)life.get();
+				ref();
+				return byteBuffer;
+			}
+			ByteBuffer byteBuffer=ByteBuffer.wrap(array);
+			ByteBufferLife byteBufferLife=new ByteBufferLife(byteBuffer,this);
+			byteBufferLife.ref();
+//			logger.debug("getByteBuffer:size:" +userLifes.size() +":refCounter:"+refCounter);
+			if(userLifes.add(byteBufferLife)==false){
 				logger.error("byteBufferLifes.add return false",new Throwable());
 			}
 			ref();
+			return byteBuffer;
 		}
-		return byteBuffer;
 	}
 	
 	/* poolBufferInstanceの延長で呼び出される事を想定 */
 	void poolByteBuffer(ByteBuffer buffer){
-		synchronized(byteBufferLifes){
-//			logger.debug("poolByteBuffer:size:" +byteBufferLifes.size() +":refCounter:"+refCounter);
+		synchronized(userLifes){
+			ByteBufferLife byteBufferLife=removeByteBuffer(buffer);
+			if(byteBufferLife==null){
+				//2重poolBufferInstance()..
+				logger.error("poolByteBuffer...",new Throwable());//TODO
+				return;
+			}
+			byteBufferLife.unref();
+			if(freeLifes.size()<16){
+				freeLifes.put(byteBufferLife,buffer);
+			}else{
+				/* poolに十分あるのでこのインスタンスは捨てる */
+				byteBufferLife.clear();//clearしてもqueueされることがある...なぜ???
+			}
 			if(unref()){
-				if(byteBufferLifes.size()!=1){
-					throw new IllegalStateException("byteBufferLifes.size()="+byteBufferLifes.size());
+				if(userLifes.size()!=0){
+					throw new IllegalStateException("byteBufferLifes.size()="+userLifes.size());
 				}
-				Iterator<ByteBufferLife> itr=byteBufferLifes.iterator();
-				ByteBufferLife byteBufferLife=itr.next();
-				//poolされる順番の関係で,byteBufferLife.get()=bufferとならない可能性がある;
-				//byteBufferLifesには順番の関係なくByteBufferLifeが格納されるので上記はない.
-				//2重開放された場合,arrayから計算するのでカウンタが狂う
-				if(byteBufferLife.get()!=buffer){
-					logger.error("poolByteBuffer counter error.buffer:"+buffer+":byteBufferLife.get():"+byteBufferLife.get());
-					itr.remove();
-					return;//怪しいのでpoolには戻さない
-					//byteBufferLife.get()のbyteBufferLifeは、GCされるはず
-					//byteBufferLife=new ByteBufferLife(buffer,this);
-					//byteBufferLife.ref();
-					//byteBufferLifes.add(byteBufferLife);
-				}
-				pool.poolInstance(buffer);
+				pool.poolInstance(buffer);//ArrayLifeがpoolに帰るので、一つだけByteBufferをpoolに戻す
 				return;
 			}
 			if(getRef()==0){//pool中にいる
@@ -103,22 +130,17 @@ public class ByteArrayLife extends ReferenceLife {
 				logger.error("poolByteBuffer...getRef()==0",new Throwable());//TODO
 				return;
 			}
-			ByteBufferLife byteBufferLife=removeByteBuffer(buffer);
-			if(byteBufferLife==null){
-				//2重poolBufferInstance()..
-				logger.error("poolByteBuffer...",new Throwable());//TODO
-				return;
-			}
-//			logger.warn("byteBufferLife.clear."+byteBufferLife);
-			byteBufferLife.unref();
-//			byteBufferLife.stackOfPool=new Throwable();
-			byteBufferLife.clear();//clearしてもqueueされることがある...なぜ???
 		}
 	}
 	
 	private ByteBufferLife 	removeByteBuffer(ByteBuffer buffer){
-		synchronized(byteBufferLifes){
-			logger.debug("removeByteBuffer:size:" +byteBufferLifes.size() +":refCounter:"+refCounter);
+		logger.debug("removeByteBuffer:size:" +userLifes.size() +":refCounter:"+refCounter);
+		synchronized(userLifes){
+			searchKey.setByteBuffer(buffer);
+			if(userLifes.remove(searchKey)){
+				return searchKey.getHit();
+			}
+			/*
 			Iterator<ByteBufferLife> itr=byteBufferLifes.iterator();
 			while(itr.hasNext()){
 				ByteBufferLife life=itr.next();
@@ -127,6 +149,7 @@ public class ByteArrayLife extends ReferenceLife {
 					return life;
 				}
 			}
+			*/
 		}
 		return null;
 	}
@@ -137,30 +160,22 @@ public class ByteArrayLife extends ReferenceLife {
 			//clearしてもReferenceQueueに通知される事がある
 			return;
 		}
-		logger.warn("gcByteBufferLife.getInstance ByteBufferLife:date:"+fomatLogDate(new Date(timeOfGet))+":thread:"+threadNameOfGet+":BBLsize:"+byteBufferLifes.size()+":byteBufferLife:"+byteBufferLife,stackOfGet);
-		logger.warn("gcByteBufferLife.getInstance ByteBufferLife:date:"+fomatLogDate(new Date(byteBufferLife.timeOfGet))+":get thread:"+byteBufferLife.threadNameOfGet,byteBufferLife.stackOfGet);
+		logger.warn("gcByteBufferLife.getInstance ByteBufferLife:date:"+fomatLogDate(new Date(timeOfGet))+":thread:"+threadNameOfGet+":BBLsize:"+userLifes.size()+":byteBufferLife:"+byteBufferLife,stackOfGet);
+		logger.warn("gcByteBufferLife.getInstance ByteBufferLife:date:"+fomatLogDate(new Date(byteBufferLife.timeOfGet))+":get thread:"+byteBufferLife.threadNameOfGet);
 		logger.warn("gcByteBufferLife.getInstance ByteBufferLife:date:"+fomatLogDate(new Date(byteBufferLife.timeOfPool))+":pool thread:"+byteBufferLife.threadNameOfPool,byteBufferLife.stackOfPool);
 		logger.warn("gcByteBufferLife.getInstance get:"+byteBufferLife.get());
 		
-		synchronized(byteBufferLifes){
-			if( byteBufferLifes.remove(byteBufferLife)==false ){
+		synchronized(userLifes){
+			if( userLifes.remove(byteBufferLife)==false ){
 				throw new IllegalStateException();
 			}
 			byteBufferLife.unref();
 			byteBufferLife.clear();
-//			pool.gcLife(byteBufferLife);
 			if(unref()){
-				//最後のByteBufferLifeがGCされた場合は、・・・
+				/* ArrayLifeがpoolに帰るので,返却するByteBufferを作る */
 				ByteBuffer byteBuffer=ByteBuffer.wrap(array);
 				byteBufferLife=new ByteBufferLife(byteBuffer,this);
-				byteBufferLife.ref();
-				synchronized(byteBufferLifes){
-					if(byteBufferLifes.add(byteBufferLife)==false){
-						logger.error("byteBufferLifes.add return false",new Throwable());
-					}
-				}
-				pool.poolInstance(byteBuffer);
-				return;
+				pool.poolInstance(byteBuffer);//ByteBufferをpoolに戻す
 			}
 		}
 	}
@@ -170,7 +185,7 @@ public class ByteArrayLife extends ReferenceLife {
 	}
 	
 	public void info(boolean isDetail){
-		Object[] bfls=byteBufferLifes.toArray();
+		Object[] bfls=userLifes.toArray();
 //		Iterator<ByteBufferLife> itr=byteBufferLifes.iterator();
 		logger.debug("array:"+array +":ref:"+ getRef());
 		for(int i=0;i<bfls.length;i++){
