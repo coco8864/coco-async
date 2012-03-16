@@ -134,7 +134,7 @@ public class ByteArrayLife extends ReferenceLife {
 	}
 	
 	private ByteBufferLife 	removeByteBuffer(ByteBuffer buffer){
-		logger.debug("removeByteBuffer:size:" +userLifes.size() +":refCounter:"+refCounter);
+//		logger.debug("removeByteBuffer:size:" +userLifes.size() +":refCounter:"+refCounter);
 		synchronized(userLifes){
 			searchKey.setByteBuffer(buffer);
 			if(userLifes.remove(searchKey)){
