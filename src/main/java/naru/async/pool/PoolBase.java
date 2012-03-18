@@ -3,7 +3,7 @@ package naru.async.pool;
 import org.apache.log4j.Logger;
 
 public class PoolBase {
-	static private Logger logger=Logger.getLogger(PoolBase.class);
+	private static Logger logger=Logger.getLogger(PoolBase.class);
 	
 	//関係するオブジェクト群を格納し、プールに戻すタイミングの同期をとる
 	private long poolId;//プール管理から割り当てる、そのオブジェクトライフサイクルに対する一意な番号

@@ -21,6 +21,7 @@ public class Page extends PoolBase{
 	
 	private static StoreFile pageFile;
 	private static PersistenceStore persistenceStore;
+	private static PageCache pageCache=PageCache.getInstance();
 	
 	public static void init(PersistenceStore persistenceStore,StoreFile pageFile){
 		Page.persistenceStore=persistenceStore;
@@ -176,6 +177,17 @@ public class Page extends PoolBase{
 	private int fileId;
 	private ByteBuffer[] buffer;
 
+	public long setupCachePage(Page page){
+		page.storeId=storeId;
+		page.pageId=pageId;
+		page.bufferLength=bufferLength;
+		page.nextPageId=nextPageId;
+		page.filePosition=filePosition;
+		page.fileId=fileId;
+		page.buffer=PoolManager.duplicateBuffers(buffer);
+		return store.getPutLength();
+	}
+	
 	public void recycle() {
 		setStore(null);
 		storeId=0;
@@ -569,14 +581,23 @@ public class Page extends PoolBase{
 	}
 
 	public void pageOut(){
+//		if(pageCache.put(this, false)){
+//			return;
+//		}
 //		logger.debug("pageOut.storeId:"+storeId +":pageId:"+pageId+":digest:"+BuffersUtil.digestString(buffer));
 		StoreManager.asyncWritePage(this);
 	}
 	
 	public void pageIn(){
 		logger.debug("pageIn."+this);
+		if(pageCache.get(this)){
+			onPageIn();
+			return;
+		}
 		StoreManager.asyncReadPage(this);
 	}
+	
+//	private PageCache pageCache;
 	
 	public void onPageOut(){
 		logger.debug("onPageOut.this:"+this);
@@ -589,6 +610,9 @@ public class Page extends PoolBase{
 	
 	public void onPageIn(){
 //		logger.debug("onPageIn.storeId:"+storeId +":pageId:"+pageId+":digest:"+BuffersUtil.digestString(buffer));
+		if( store.getKind()==Store.Kind.GET ){
+			pageCache.put(this, true);
+		}
 		if(store!=null){
 			store.onPageIn(this);
 		}else{

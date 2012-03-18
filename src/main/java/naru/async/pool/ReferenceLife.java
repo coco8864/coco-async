@@ -11,7 +11,7 @@ import naru.async.core.ChannelContext;
 import org.apache.log4j.Logger;
 
 public class ReferenceLife extends WeakReference {
-	static private Logger logger=Logger.getLogger(ReferenceLife.class);
+	private static Logger logger=Logger.getLogger(ReferenceLife.class);
 	private static SimpleDateFormat logDateFormat=null; 
 	static{
 		logDateFormat=new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
