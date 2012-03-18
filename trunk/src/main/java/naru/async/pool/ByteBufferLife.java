@@ -5,7 +5,7 @@ import java.nio.ByteBuffer;
 import org.apache.log4j.Logger;
 
 public class ByteBufferLife extends ReferenceLife {
-	static private Logger logger=Logger.getLogger(ByteBufferLife.class);
+	private static Logger logger=Logger.getLogger(ByteBufferLife.class);
 	/* ByteBuffer‚ğƒL[‚ÉByteBufferLife‚ğŒŸõ‚·‚éê‡‚É—˜—p */
 	static class SearchKey extends ByteBufferLife{
 		private ByteBufferLife hit;//ŒŸõŒ‹‰Ê

@@ -110,10 +110,12 @@ public class PoolManager implements Queuelet,Timer{
 		return instance.byteBufferPoolMap.get(size);
 	}
 	
+	/* setupBufferPool‚É•ÏX
 	public static void createBufferPool(int size,int limit){
 		Pool pool=addBufferPool(size);
 		pool.setLimit(limit);
 	}
+	*/
 	
 	///
 	public static Pool getClassPool(Class clazz) {
@@ -552,6 +554,12 @@ public class PoolManager implements Queuelet,Timer{
 //		Page.saveFreePage(0);
 		onTimer(null);
 		delayRecycleObjects(null);
+		/* ByteBufferPool‚ÌŠJ•ú */
+		Object[] pools=byteBufferPoolMap.values().toArray();
+		for(int i=0;i<pools.length;i++){
+			Pool pool=(Pool)pools[i];
+			pool.term();
+		}
 		dumpPool(true);
 		logger.info("===PoolManager term end===");
 	}

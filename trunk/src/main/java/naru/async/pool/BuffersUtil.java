@@ -17,7 +17,7 @@ import java.util.List;
 import org.apache.log4j.Logger;
 
 public class BuffersUtil {
-	static private Logger logger=Logger.getLogger(BuffersUtil.class);
+	private static Logger logger=Logger.getLogger(BuffersUtil.class);
 	
 	public static String toStringFromBuffer(ByteBuffer buffer,String enc){
 		byte[] array=buffer.array();

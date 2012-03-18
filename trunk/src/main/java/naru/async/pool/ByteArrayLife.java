@@ -13,8 +13,8 @@ import naru.async.pool.ByteBufferLife.SearchKey;
 import org.apache.log4j.Logger;
 
 public class ByteArrayLife extends ReferenceLife {
-	static private Logger logger=Logger.getLogger(ByteArrayLife.class);
-	
+	private static Logger logger=Logger.getLogger(ByteArrayLife.class);
+	private static final int FREE_LIFE_MAX = 16;
 	private byte[] array;
 	
 	/*ByteBufferをキーにByteBufferLifeを検索する時に使う */
@@ -37,8 +37,7 @@ public class ByteArrayLife extends ReferenceLife {
 	}
 
 	/*　初回getBufferInstanceの延長で呼び出される事を想定 */
-	/* 唯一持っているはずのByteBufferを返却,PoolからとられたばかりだからByteBufferは、1個のはず */
-	ByteBuffer getOnlyByteBuffer(ByteBuffer byteBuffer){
+	ByteBuffer getFirstByteBuffer(ByteBuffer byteBuffer){
 		synchronized(userLifes){
 //			logger.debug("getOnlyByteBuffer:size:" +byteBufferLifes.size() +":refCounter:"+refCounter);
 			if(freeLifes.size()<1){
@@ -60,20 +59,19 @@ public class ByteArrayLife extends ReferenceLife {
 		}
 	}
 	
-	/*　最終poolInstanceの延長で呼び出される事を想定 */
-	/* 唯一持っているはずのByteBufferを返却,PoolからとられたばかりだからByteBufferは、1個のはず */
-	ByteBufferLife getOnlyByteBufferLife(){
+	/*　poolから溢れて参照を開放する場合に呼び出される */
+	void releaseLife(){
 		synchronized(userLifes){
 //			logger.debug("getOnlyByteBuffer:size:" +userLifes.size() +":refCounter:"+refCounter);
-			if(userLifes.size()!=1){
+			if(userLifes.size()!=0){
 				throw new IllegalStateException("byteBufferLifes.size()="+userLifes.size());
 			}
-			Iterator<ByteBufferLife> itr=userLifes.iterator();
-			ByteBufferLife byteBufferLife=itr.next();
-			itr.remove();
-			byteBufferLife.unref();
-			freeLifes.put(byteBufferLife,(ByteBuffer)byteBufferLife.get());
-			return byteBufferLife;
+			Iterator<ByteBufferLife> itr=freeLifes.keySet().iterator();
+			while(itr.hasNext()){
+				ByteBufferLife byteBufferLife=itr.next();
+				itr.remove();
+				byteBufferLife.clear();
+			}
 		}
 	}
 	
@@ -112,7 +110,7 @@ public class ByteArrayLife extends ReferenceLife {
 				return;
 			}
 			byteBufferLife.unref();
-			if(freeLifes.size()<16){
+			if(freeLifes.size()<FREE_LIFE_MAX){
 				freeLifes.put(byteBufferLife,buffer);
 			}else{
 				/* poolに十分あるのでこのインスタンスは捨てる */
@@ -122,7 +120,9 @@ public class ByteArrayLife extends ReferenceLife {
 				if(userLifes.size()!=0){
 					throw new IllegalStateException("byteBufferLifes.size()="+userLifes.size());
 				}
-				pool.poolInstance(buffer);//ArrayLifeがpoolに帰るので、一つだけByteBufferをpoolに戻す
+				//代表のByteBufferをpoolに戻す
+				//poolが溢れた場合この延長でreleaseLifeメソッドが呼び出される
+				pool.poolInstance(buffer);
 				return;
 			}
 			if(getRef()==0){//pool中にいる
@@ -172,7 +172,7 @@ public class ByteArrayLife extends ReferenceLife {
 			byteBufferLife.unref();
 			byteBufferLife.clear();
 			if(unref()){
-				/* ArrayLifeがpoolに帰るので,返却するByteBufferを作る */
+				/* 代表のByteBufferを作る */
 				ByteBuffer byteBuffer=ByteBuffer.wrap(array);
 				byteBufferLife=new ByteBufferLife(byteBuffer,this);
 				pool.poolInstance(byteBuffer);//ByteBufferをpoolに戻す

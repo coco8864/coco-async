@@ -15,7 +15,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 public class Pool {
-	static private Logger logger = Logger.getLogger(Pool.class);
+	private static Logger logger = Logger.getLogger(Pool.class);
 	private static int DEFAULT_POOL_LIMIT = 16;
 	/* このpoolに属するlifeを集める */
 	// TYPE_BYTE_BUFFERで使用
@@ -408,7 +408,7 @@ public class Pool {
 		case TYPE_BYTE_BUFFER:
 			ByteBuffer byteBuffer = (ByteBuffer) obj;
 			ByteArrayLife byteArrayLife = byteArrayLifes.get(byteBuffer.array());
-			obj = byteArrayLife.getOnlyByteBuffer(byteBuffer);
+			obj = byteArrayLife.getFirstByteBuffer(byteBuffer);
 			if(byteBuffer!=obj){//ありえないはずだが
 				logger.error("TYPE_BYTE_BUFFER　getInstance error.byteBuffer:"+byteBuffer+":obj:"+obj);
 				return getInstance();
@@ -452,7 +452,7 @@ public class Pool {
 		}
 	}
 
-	// Pool.java
+	// Poolから溢れて参照を開放するメソッド
 	private void releaseLife(Object obj) {
 		ReferenceLife referenceLife = null;
 		switch (type) {
@@ -468,17 +468,7 @@ public class Pool {
 			ByteBuffer byteBuffer = (ByteBuffer) obj;
 			ByteArrayLife byteArrayLife = byteArrayLifes.remove(byteBuffer.array());
 			if (byteArrayLife != null) {
-				ByteBufferLife byteBufferLife = byteArrayLife.getOnlyByteBufferLife();
-				if (byteBufferLife != null) {
-					Object ref=byteBufferLife.get();
-					if(ref!=obj){
-						logger.warn("#releaseLife ByteBuffer get error.ref:"+ref);
-					}
-//					byteBufferLife.clear();
-					logger.debug("!!ByteBuffer releaseLife1!!"+byteArrayLife +":" +byteBufferLife);
-				}else{
-					logger.warn("!!ByteBuffer releaseLife2!!"+byteArrayLife);
-				}
+				byteArrayLife.releaseLife();
 				byteArrayLife.clear();
 			}else{
 				logger.warn("!!ByteBuffer releaseLife4!!");
@@ -547,6 +537,12 @@ public class Pool {
 		}
 		recycleInstance(obj);
 	}
+	
+	/*　ByteBufferPoolの場合,poolに入っているのは代表だけなので放置するとGCされてしまう */
+	public void term(){
+		Iterator<ByteArrayLife> itr=byteArrayLifes.values().iterator();
+		
+	}
 
 	public void info() {
 		info(false);
@@ -602,6 +598,5 @@ public class Pool {
 				life.info(isDitail);
 			}
 		}
-
 	}
 }
