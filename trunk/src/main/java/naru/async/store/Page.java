@@ -7,6 +7,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import naru.async.cache.BufferCache;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
@@ -21,7 +22,7 @@ public class Page extends PoolBase{
 	
 	private static StoreFile pageFile;
 	private static PersistenceStore persistenceStore;
-	private static PageCache pageCache=PageCache.getInstance();
+	private static BufferCache bufferCache=BufferCache.getInstance();
 	
 	public static void init(PersistenceStore persistenceStore,StoreFile pageFile){
 		Page.persistenceStore=persistenceStore;
@@ -590,7 +591,9 @@ public class Page extends PoolBase{
 	
 	public void pageIn(){
 		logger.debug("pageIn."+this);
-		if(pageCache.get(this)){
+		ByteBuffer[] buffer=bufferCache.get(this);
+		if(buffer!=null){
+			this.buffer=buffer;
 			onPageIn();
 			return;
 		}
@@ -611,7 +614,7 @@ public class Page extends PoolBase{
 	public void onPageIn(){
 //		logger.debug("onPageIn.storeId:"+storeId +":pageId:"+pageId+":digest:"+BuffersUtil.digestString(buffer));
 		if( store.getKind()==Store.Kind.GET ){
-			pageCache.put(this, true);
+			bufferCache.put(this,buffer,store.getPutLength());
 		}
 		if(store!=null){
 			store.onPageIn(this);
