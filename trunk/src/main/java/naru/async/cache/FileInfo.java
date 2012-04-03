@@ -16,8 +16,8 @@ public class FileInfo extends PoolBase{
 	/* 統計情報 */
 	private long cacheInTime;
 	private long lastTime;
-	private int totalCount;
-	private int intervalCount;
+	private long totalCount;
+	private long intervalCount;
 	
 	public void init(File file){
 		this.file=file;
@@ -59,14 +59,14 @@ public class FileInfo extends PoolBase{
 	public long getLastTime() {
 		return lastTime;
 	}
-	public int getTotalCount() {
+	public long getTotalCount() {
 		return totalCount;
 	}
-	public int getIntervalCount() {
+	public long getIntervalCount() {
 		return intervalCount;
 	}
 	
-	public boolean check(){
+	public boolean isChange(){
 		boolean nowExist=file.exists();
 		if(exists){
 			if(!nowExist){
@@ -89,10 +89,25 @@ public class FileInfo extends PoolBase{
 		lastTime=System.currentTimeMillis();
 		super.ref();
 	}
+
+	private float lastScore=0.0f;
 	
-	public int intervalReset(){
-		int orgIntervalCount=intervalCount;
+	/* 当該infoの不要度(大きいと捨てられる可能性が高い) */
+	public float getScore(long now){
+		float result=0.0f;
+		long orgIntervalCount=intervalCount;
 		intervalCount=0;
-		return orgIntervalCount;
+		if(orgIntervalCount>=1){
+			return result;
+		}
+		if(totalCount==0){
+			totalCount=1;
+		}
+		//TODO 精査する事
+		return (float)(now-(long)lastTime)/(float)totalCount;
+	}
+	
+	public float getLastScore(){
+		return lastScore;
 	}
 }
