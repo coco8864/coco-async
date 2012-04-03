@@ -7,6 +7,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.apache.commons.collections.map.MultiKeyMap;
+
 import naru.async.Timer;
 import naru.async.store.Page;
 import naru.async.timer.TimerManager;
@@ -23,14 +25,60 @@ public class BufferCache implements Timer{
 	private Object timer;
 	private Map<Long,BufferInfo> pageCache=new HashMap<Long,BufferInfo>();
 	private Map<Long,BufferInfo> tmpPageCache=new HashMap<Long,BufferInfo>();
-	private Map<FileInfo,Map<Long,BufferInfo>> filePositionCache=new HashMap<FileInfo,Map<Long,BufferInfo>>();
-	private Map<FileInfo,Map<Long,BufferInfo>> tmpFilePositionCache=new HashMap<FileInfo,Map<Long,BufferInfo>>();
-	private int filePositionCurrent=0;
+	private MultiKeyMap filePositionCache=new MultiKeyMap();
+	private MultiKeyMap tmpFilePositionCache=new MultiKeyMap();
 	private int min=128;
 	private int max=512;
 	private int overFlow=0;
 	private int hit=0;
 	private int miss=0;
+	
+	private boolean check(BufferInfo bufferInfo,long now){
+		if(bufferInfo.isChange()==false){//変更があるか?
+			return false;
+		}
+		float lastScore=bufferInfo.getLastScore();
+		float score=bufferInfo.getScore(now);
+		if(lastScore>scoreThreshold&&score>lastScore){
+			return false;
+		}
+		//TODO 全部入ったとしても、minを超えない場合は、addしないようにする
+		scores.add(score);
+		return true;
+	}
+	
+	public void term(){
+		TimerManager.clearInterval(timer);
+		synchronized(pageCache){
+			Iterator<BufferInfo> itr=pageCache.values().iterator();
+			while(itr.hasNext()){
+				BufferInfo fileInfo=itr.next();
+				itr.remove();
+				fileInfo.unref();
+			}
+			Iterator<BufferInfo> tmpItr=tmpPageCache.values().iterator();
+			while(tmpItr.hasNext()){
+				BufferInfo fileInfo=itr.next();
+				itr.remove();
+				fileInfo.unref();
+			}
+			max=0;
+		}
+		synchronized(filePositionCache){
+			Iterator<BufferInfo> itr=filePositionCache.values().iterator();
+			while(itr.hasNext()){
+				BufferInfo fileInfo=itr.next();
+				itr.remove();
+				fileInfo.unref();
+			}
+			Iterator<BufferInfo> tmpItr=tmpFilePositionCache.values().iterator();
+			while(tmpItr.hasNext()){
+				BufferInfo fileInfo=itr.next();
+				itr.remove();
+				fileInfo.unref();
+			}
+		}
+	}
 		
 	public ByteBuffer[] get(Page page){
 		BufferInfo cacheInfo=pageCache.get(page.getPageId());
@@ -44,12 +92,7 @@ public class BufferCache implements Timer{
 	}
 	
 	public ByteBuffer[] get(FileInfo fileInfo,long filePosition){
-		Map<Long,BufferInfo> positionCache=filePositionCache.get(fileInfo);
-		if(positionCache==null){
-			miss++;
-			return null;
-		}
-		BufferInfo cacheInfo=positionCache.get(filePosition);
+		BufferInfo cacheInfo=(BufferInfo)filePositionCache.get(fileInfo,filePosition);
 		if(cacheInfo==null){
 			miss++;
 			return null;
@@ -60,7 +103,7 @@ public class BufferCache implements Timer{
 	}
 	
 	public void put(Page page,ByteBuffer[] buffer,long totalLength){
-		if((filePositionCurrent+pageCache.size())>=max){
+		if((filePositionCache.size()+pageCache.size())>=max){
 			overFlow++;
 			return;
 		}
@@ -84,29 +127,21 @@ public class BufferCache implements Timer{
 	}
 	
 	public void put(FileInfo fileInfo,long filePosition,ByteBuffer[] buffer){
-		if((filePositionCurrent+pageCache.size())>=max){
+		if((filePositionCache.size()+pageCache.size())>=max){
 			overFlow++;
 			return;
 		}
-		Map<Long,BufferInfo> positionCache=filePositionCache.get(fileInfo);
-		if(positionCache==null){
-			positionCache=new HashMap<Long,BufferInfo>();
-			filePositionCache.put(fileInfo,positionCache);
-		}
-		BufferInfo cacheInfo=positionCache.get(filePosition);
+		BufferInfo cacheInfo=(BufferInfo)filePositionCache.get(fileInfo,filePosition);
 		if(cacheInfo!=null){
 			return;//登録済み
 		}
 		cacheInfo=BufferInfo.create(buffer,fileInfo.getLength());
 		BufferInfo orgInfo=null;
-		synchronized(positionCache){
+		synchronized(filePositionCache){
 			if(isFileCheck){
-				
+				orgInfo=(BufferInfo)tmpFilePositionCache.put(fileInfo,filePosition, cacheInfo);
 			}else{
-				orgInfo=positionCache.put(filePosition, cacheInfo);
-			}
-			if(orgInfo==null){
-				filePositionCurrent++;
+				orgInfo=(BufferInfo)filePositionCache.put(fileInfo,filePosition, cacheInfo);
 			}
 		}
 		if(orgInfo!=null){//チェック直後なので殆どないはず
@@ -135,7 +170,7 @@ public class BufferCache implements Timer{
 		}
 		synchronized(pageCache){
 			isPageCheck=false;
-			pageCache.putAll(tmpPageCache);
+			pageCache.putAll(tmpPageCache);//重複した場合、BufferInfoが漏れる可能性あり
 			tmpPageCache.clear();
 		}
 	}
@@ -145,27 +180,18 @@ public class BufferCache implements Timer{
 			isFileCheck=true;
 		}
 		long now=System.currentTimeMillis();
-		Iterator<Map<Long,BufferInfo>> positionItr=filePositionCache.values().iterator();
-		while(positionItr.hasNext()){
-			Map<Long,BufferInfo> positionCache=positionItr.next();
-			Iterator<BufferInfo> itr=positionCache.values().iterator();
-			int positionCount=0;
-			while(itr.hasNext()){
-				BufferInfo bufferInfo=itr.next();
-				if(check(bufferInfo,now)){
-					itr.remove();
-					bufferInfo.unref();
-					continue;
-				}
-				positionCount++;
-			}
-			if(positionCount==0){
-				positionItr.remove();
+		Iterator<BufferInfo> itr=filePositionCache.values().iterator();
+		while(itr.hasNext()){
+			BufferInfo bufferInfo=itr.next();
+			if(check(bufferInfo,now)){
+				itr.remove();
+				bufferInfo.unref();
+				continue;
 			}
 		}
 		synchronized(filePositionCache){
 			isFileCheck=false;
-			filePositionCache.putAll(tmpFilePositionCache);
+			filePositionCache.putAll(tmpFilePositionCache);//重複した場合、BufferInfoが漏れる可能性あり
 			tmpFilePositionCache.clear();
 		}
 	}
@@ -181,5 +207,4 @@ public class BufferCache implements Timer{
 		}
 		scores.clear();
 	}
-	
 }

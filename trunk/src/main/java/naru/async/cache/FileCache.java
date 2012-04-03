@@ -63,8 +63,6 @@ public class FileCache implements Timer{
 	private float scoreThreshold=Float.MAX_VALUE;
 	private ArrayList<Float> scores=new ArrayList<Float>();
 	
-	//前回のチェックでの削除候補
-	//今回チェックの削除候補
 	private boolean check(FileInfo fileInfo,long now){
 		if(fileInfo.isChange()==false){//変更があるか?
 			return false;
