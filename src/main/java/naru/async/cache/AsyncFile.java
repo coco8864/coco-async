@@ -26,6 +26,14 @@ public class AsyncFile extends PoolBase{
 		return asyncFile;
 	}
 	
+	@Override
+	public void recycle() {
+		if(fileInfo!=null){
+			fileInfo.unref();
+			fileInfo=null;
+		}
+	}
+
 	private FileInfo fileInfo;
 	/* ©—Í‚Å“Ç‚İ‚Şê‡‚É—˜—p‚·‚é */
 	private java.nio.channels.FileChannel fileChannel;

@@ -1,6 +1,8 @@
 package naru.async.cache;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -24,8 +26,6 @@ public class FileCache implements Timer{
 	private int overFlow=0;
 	private int hit=0;
 	private int miss=0;
-	private int intervalGet=0;
-	private int intervalPut=0;
 	
 	private Map<File,FileInfo> cache=new HashMap<File,FileInfo>();
 	
@@ -35,7 +35,7 @@ public class FileCache implements Timer{
 	
 	public FileInfo get(File file){
 		FileInfo result=cache.get(file);
-		intervalGet++;
+//		intervalGet++;
 		if(result!=null){
 			result.ref();
 			hit++;
@@ -48,7 +48,7 @@ public class FileCache implements Timer{
 			overFlow++;
 			return result;
 		}
-		intervalPut++;
+//		intervalPut++;
 		synchronized(this){
 			if(!isCheck){
 				cache.put(file, result);
@@ -60,32 +60,53 @@ public class FileCache implements Timer{
 		return result;
 	}
 	
+	private float scoreThreshold=Float.MAX_VALUE;
+	private ArrayList<Float> scores=new ArrayList<Float>();
+	
 	//前回のチェックでの削除候補
 	//今回チェックの削除候補
-	private boolean check(FileInfo fileInfo){
-		if(fileInfo.check()==false){//変更があるか?
+	private boolean check(FileInfo fileInfo,long now){
+		if(fileInfo.isChange()==false){//変更があるか?
 			return false;
 		}
-		int count=fileInfo.getIntervalCount();
-		if(count!=0){
-			return true;
+		float lastScore=fileInfo.getLastScore();
+		float score=fileInfo.getScore(now);
+		if(lastScore>scoreThreshold&&score>lastScore){
+			return false;
 		}
+		//TODO 全部入ったとしても、minを超えない場合は、addしないようにする
+		scores.add(score);
 		return true;
 	}
 	
+	public void term(){
+		TimerManager.clearInterval(timer);
+		synchronized(this){
+			Iterator<FileInfo> itr=cache.values().iterator();
+			while(itr.hasNext()){
+				FileInfo fileInfo=itr.next();
+				itr.remove();
+				fileInfo.unref();
+			}
+			Iterator<FileInfo> tmpItr=tmpCache.values().iterator();
+			while(tmpItr.hasNext()){
+				FileInfo fileInfo=itr.next();
+				itr.remove();
+				fileInfo.unref();
+			}
+			max=0;
+		}
+	}
+	
 	public void onTimer(Object userContext) {
-		int getCount;
-		int putCount;
 		synchronized(this){
 			isCheck=true;
-			getCount=intervalGet;
-			putCount=intervalPut;
-			intervalGet=intervalPut=0;
 		}
+		long now=System.currentTimeMillis();
 		Iterator<FileInfo> itr=cache.values().iterator();
 		while(itr.hasNext()){
 			FileInfo fileInfo=itr.next();
-			if(check(fileInfo)){
+			if(check(fileInfo,now)){
 				itr.remove();
 				fileInfo.unref();
 				continue;
@@ -96,5 +117,12 @@ public class FileCache implements Timer{
 			cache.putAll(tmpCache);
 			tmpCache.clear();
 		}
+		if(scores.size()<min){
+			scoreThreshold=Float.MAX_VALUE;
+		}else{
+			Collections.sort(scores);
+			scoreThreshold=scores.get(min);
+		}
+		scores.clear();
 	}
 }

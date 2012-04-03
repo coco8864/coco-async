@@ -1,7 +1,10 @@
 package naru.async.cache;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import naru.async.Timer;
@@ -19,7 +22,9 @@ public class BufferCache implements Timer{
 	}
 	private Object timer;
 	private Map<Long,BufferInfo> pageCache=new HashMap<Long,BufferInfo>();
+	private Map<Long,BufferInfo> tmpPageCache=new HashMap<Long,BufferInfo>();
 	private Map<FileInfo,Map<Long,BufferInfo>> filePositionCache=new HashMap<FileInfo,Map<Long,BufferInfo>>();
+	private Map<FileInfo,Map<Long,BufferInfo>> tmpFilePositionCache=new HashMap<FileInfo,Map<Long,BufferInfo>>();
 	private int filePositionCurrent=0;
 	private int min=128;
 	private int max=512;
@@ -67,7 +72,11 @@ public class BufferCache implements Timer{
 		bufferInfo=BufferInfo.create(buffer,totalLength);
 		BufferInfo orgInfo=null;
 		synchronized(pageCache){
-			orgInfo=pageCache.put(pageId, bufferInfo);
+			if(isPageCheck){
+				orgInfo=tmpPageCache.put(pageId, bufferInfo);
+			}else{
+				orgInfo=pageCache.put(pageId, bufferInfo);
+			}
 		}
 		if(orgInfo!=null){//チェック直後なので殆どないはず
 			orgInfo.unref();
@@ -91,15 +100,86 @@ public class BufferCache implements Timer{
 		cacheInfo=BufferInfo.create(buffer,fileInfo.getLength());
 		BufferInfo orgInfo=null;
 		synchronized(positionCache){
-			filePositionCurrent++;
-			orgInfo=positionCache.put(filePosition, cacheInfo);
+			if(isFileCheck){
+				
+			}else{
+				orgInfo=positionCache.put(filePosition, cacheInfo);
+			}
+			if(orgInfo==null){
+				filePositionCurrent++;
+			}
 		}
 		if(orgInfo!=null){//チェック直後なので殆どないはず
 			orgInfo.unref();
 		}
 	}
 
+	private boolean isPageCheck=false;
+	private boolean isFileCheck=false;
+	private float scoreThreshold=Float.MAX_VALUE;
+	private ArrayList<Float> scores=new ArrayList<Float>();
+	
+	private void checkPageCache(){
+		synchronized(pageCache){
+			isPageCheck=true;
+		}
+		long now=System.currentTimeMillis();
+		Iterator<BufferInfo> itr=pageCache.values().iterator();
+		while(itr.hasNext()){
+			BufferInfo bufferInfo=itr.next();
+			if(check(bufferInfo,now)){
+				itr.remove();
+				bufferInfo.unref();
+				continue;
+			}
+		}
+		synchronized(pageCache){
+			isPageCheck=false;
+			pageCache.putAll(tmpPageCache);
+			tmpPageCache.clear();
+		}
+	}
+	
+	private void checkFileCache(){
+		synchronized(filePositionCache){
+			isFileCheck=true;
+		}
+		long now=System.currentTimeMillis();
+		Iterator<Map<Long,BufferInfo>> positionItr=filePositionCache.values().iterator();
+		while(positionItr.hasNext()){
+			Map<Long,BufferInfo> positionCache=positionItr.next();
+			Iterator<BufferInfo> itr=positionCache.values().iterator();
+			int positionCount=0;
+			while(itr.hasNext()){
+				BufferInfo bufferInfo=itr.next();
+				if(check(bufferInfo,now)){
+					itr.remove();
+					bufferInfo.unref();
+					continue;
+				}
+				positionCount++;
+			}
+			if(positionCount==0){
+				positionItr.remove();
+			}
+		}
+		synchronized(filePositionCache){
+			isFileCheck=false;
+			filePositionCache.putAll(tmpFilePositionCache);
+			tmpFilePositionCache.clear();
+		}
+	}
+	
 	public void onTimer(Object userContext) {
+		checkPageCache();
+		checkFileCache();
+		if(scores.size()<min){
+			scoreThreshold=Float.MAX_VALUE;
+		}else{
+			Collections.sort(scores);
+			scoreThreshold=scores.get(min);
+		}
+		scores.clear();
 	}
 	
 }

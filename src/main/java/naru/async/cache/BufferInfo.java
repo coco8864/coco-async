@@ -2,6 +2,7 @@ package naru.async.cache;
 
 import java.nio.ByteBuffer;
 
+import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
 
@@ -23,12 +24,17 @@ public class BufferInfo extends PoolBase{
 	}
 	private void init(ByteBuffer[] buffer,long totalLength){
 		this.buffer=PoolManager.duplicateBuffers(buffer);
-		this.totalLength=totalLength;
+		long length=BuffersUtil.remaining(buffer);
+//		this.totalLength=totalLength;
+		this.lengthRate=(float)length/(float)totalLength;
 		this.cacheTime=System.currentTimeMillis();
 	}
 	private ByteBuffer[] buffer;
 	/* 統計情報 */
-	private long totalLength;//全体の長さ,
+//	private long length;//当該バッファの長さ
+//	private long totalLength;//データ全体の長さ,
+	
+	private float lengthRate;
 	private long cacheTime;
 	private long lastTime;
 	private int totalCount;
@@ -45,9 +51,24 @@ public class BufferInfo extends PoolBase{
 		super.ref();
 	}
 	
-	public int intervalReset(){
-		int orgIntervalCount=intervalCount;
+	private float lastScore=0.0f;
+	
+	/* 当該infoの不要度(大きいと捨てられる可能性が高い) */
+	public float getScore(long now){
+		float result=0.0f;
+		long orgIntervalCount=intervalCount;
 		intervalCount=0;
-		return orgIntervalCount;
+		if(orgIntervalCount>=1){
+			return result;
+		}
+		if(totalCount==0){
+			totalCount=1;
+		}
+		//TODO 精査する事
+		return (float)(now-(long)lastTime)/((float)totalCount*lengthRate);
+	}
+	
+	public float getLastScore(){
+		return lastScore;
 	}
 }
