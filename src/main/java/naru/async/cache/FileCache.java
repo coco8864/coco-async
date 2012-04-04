@@ -21,8 +21,8 @@ public class FileCache implements Timer{
 		this.timer=TimerManager.setInterval(INTERVAL, this, null);
 	}
 	private Object timer;
-	private int min=128;
-	private int max=512;
+	private int min=512;
+	private int max=min*2;
 	private int overFlow=0;
 	private int hit=0;
 	private int miss=0;
@@ -104,7 +104,7 @@ public class FileCache implements Timer{
 		Iterator<FileInfo> itr=cache.values().iterator();
 		while(itr.hasNext()){
 			FileInfo fileInfo=itr.next();
-			if(check(fileInfo,now)){
+			if(!check(fileInfo,now)){
 				itr.remove();
 				fileInfo.unref();
 				continue;

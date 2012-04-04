@@ -5,13 +5,19 @@ import java.nio.ByteBuffer;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
+import naru.async.store.StoreManager;
 
 /* bufferをpoolで眠らせるより,何がし有効なデータを保持しているbufferは積極的に再利用するポリシー */
 //default　Buffer poolの状況をみてcacheからの追い出しを行う
 public class BufferInfo extends PoolBase{
-	public static BufferInfo create(ByteBuffer[] buffer,long totalLength){
+	public static BufferInfo create(ByteBuffer[] buffer,long totalLength,FileInfo fileInfo){
 		BufferInfo bufferInfo=(BufferInfo)PoolManager.getInstance(BufferInfo.class);
-		bufferInfo.init(buffer, totalLength);
+		bufferInfo.init(buffer, totalLength,-1,fileInfo);
+		return bufferInfo;
+	}
+	public static BufferInfo create(ByteBuffer[] buffer,long totalLength,long storeId){
+		BufferInfo bufferInfo=(BufferInfo)PoolManager.getInstance(BufferInfo.class);
+		bufferInfo.init(buffer, totalLength,storeId,null);
 		return bufferInfo;
 	}
 	
@@ -21,14 +27,26 @@ public class BufferInfo extends PoolBase{
 			PoolManager.poolBufferInstance(buffer);
 			buffer=null;
 		}
+		if(fileInfo!=null){
+			fileInfo.unref();
+		}
 	}
-	private void init(ByteBuffer[] buffer,long totalLength){
+	
+	private void init(ByteBuffer[] buffer,long totalLength,long storeId,FileInfo fileInfo){
 		this.buffer=PoolManager.duplicateBuffers(buffer);
 		long length=BuffersUtil.remaining(buffer);
 //		this.totalLength=totalLength;
 		this.lengthRate=(float)length/(float)totalLength;
 		this.cacheTime=System.currentTimeMillis();
+		this.storeId=storeId;
+		if(fileInfo!=null){
+			fileInfo.ref();
+		}
+		this.fileInfo=fileInfo;
 	}
+	private long storeId;
+	private FileInfo fileInfo;
+	
 	private ByteBuffer[] buffer;
 	/* 統計情報 */
 //	private long length;//当該バッファの長さ
@@ -70,5 +88,12 @@ public class BufferInfo extends PoolBase{
 	
 	public float getLastScore(){
 		return lastScore;
+	}
+	public boolean isChange() {
+		if(fileInfo!=null){
+			return fileInfo.isChange();
+		}
+		long totalLength=StoreManager.getStoreLength(storeId);
+		return(totalLength<0);
 	}
 }

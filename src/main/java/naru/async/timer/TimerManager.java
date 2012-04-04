@@ -159,8 +159,12 @@ public class TimerManager implements Queuelet,Runnable{
 		TimerEntry entry=TimerEntry.getEntry();
 		entry.setup(timoutTime, timer, userContext);
 		long timerId=entry.getId();
-		timers.put(timerId, entry);
-		orderByTime.add(entry);
+		if(interval==0){//0‚Ìê‡‚Í‘Ò‚½‚¸‚É‚»‚Ì‚Ü‚Üqueue‚·‚éAThread‚ğØ‚è‘Ö‚¦‚éê‡‚É—˜—p
+			timerManager.enqueSafe(entry);
+		}else{
+			timers.put(timerId, entry);
+			orderByTime.add(entry);
+		}
 //		logger.debug("setTimeout interval:"+interval + ":userContext:" +userContext +":timerId:" +timerId);
 		return timerId;
 	}

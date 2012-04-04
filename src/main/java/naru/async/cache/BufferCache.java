@@ -11,6 +11,7 @@ import org.apache.commons.collections.map.MultiKeyMap;
 
 import naru.async.Timer;
 import naru.async.store.Page;
+import naru.async.store.StoreManager;
 import naru.async.timer.TimerManager;
 
 public class BufferCache implements Timer{
@@ -27,8 +28,8 @@ public class BufferCache implements Timer{
 	private Map<Long,BufferInfo> tmpPageCache=new HashMap<Long,BufferInfo>();
 	private MultiKeyMap filePositionCache=new MultiKeyMap();
 	private MultiKeyMap tmpFilePositionCache=new MultiKeyMap();
-	private int min=128;
-	private int max=512;
+	private int min=1024;//16k bufferÇÃèÍçá16MÉLÉÉÉbÉVÉÖÇéùÇ¬
+	private int max=min*2;
 	private int overFlow=0;
 	private int hit=0;
 	private int miss=0;
@@ -64,6 +65,7 @@ public class BufferCache implements Timer{
 			}
 			max=0;
 		}
+		
 		synchronized(filePositionCache){
 			Iterator<BufferInfo> itr=filePositionCache.values().iterator();
 			while(itr.hasNext()){
@@ -102,17 +104,22 @@ public class BufferCache implements Timer{
 		return cacheInfo.duplicateBuffers();
 	}
 	
-	public void put(Page page,ByteBuffer[] buffer,long totalLength){
+	public void put(Page page,ByteBuffer[] buffer){
 		if((filePositionCache.size()+pageCache.size())>=max){
 			overFlow++;
 			return;
 		}
 		long pageId=page.getPageId();
+		long storeId=page.getStoreId();
+		long totalLength=StoreManager.getStoreLength(storeId);
+		if(totalLength<0){
+			return;//ñ≥å¯Ç»storeId
+		}
 		BufferInfo bufferInfo=pageCache.get(pageId);
 		if(bufferInfo!=null){
 			return;//ìoò^çœÇ›
 		}
-		bufferInfo=BufferInfo.create(buffer,totalLength);
+		bufferInfo=BufferInfo.create(buffer,totalLength,storeId);
 		BufferInfo orgInfo=null;
 		synchronized(pageCache){
 			if(isPageCheck){
@@ -135,7 +142,7 @@ public class BufferCache implements Timer{
 		if(cacheInfo!=null){
 			return;//ìoò^çœÇ›
 		}
-		cacheInfo=BufferInfo.create(buffer,fileInfo.getLength());
+		cacheInfo=BufferInfo.create(buffer,fileInfo.getLength(),fileInfo);
 		BufferInfo orgInfo=null;
 		synchronized(filePositionCache){
 			if(isFileCheck){
@@ -162,7 +169,7 @@ public class BufferCache implements Timer{
 		Iterator<BufferInfo> itr=pageCache.values().iterator();
 		while(itr.hasNext()){
 			BufferInfo bufferInfo=itr.next();
-			if(check(bufferInfo,now)){
+			if(!check(bufferInfo,now)){
 				itr.remove();
 				bufferInfo.unref();
 				continue;
@@ -183,7 +190,7 @@ public class BufferCache implements Timer{
 		Iterator<BufferInfo> itr=filePositionCache.values().iterator();
 		while(itr.hasNext()){
 			BufferInfo bufferInfo=itr.next();
-			if(check(bufferInfo,now)){
+			if(!check(bufferInfo,now)){
 				itr.remove();
 				bufferInfo.unref();
 				continue;
