@@ -614,7 +614,7 @@ public class Page extends PoolBase{
 	public void onPageIn(){
 //		logger.debug("onPageIn.storeId:"+storeId +":pageId:"+pageId+":digest:"+BuffersUtil.digestString(buffer));
 		if( store.getKind()==Store.Kind.GET ){
-			bufferCache.put(this,buffer,store.getPutLength());
+			bufferCache.put(this,buffer);
 		}
 		if(store!=null){
 			store.onPageIn(this);
