@@ -21,10 +21,20 @@ import naru.async.timer.TimerManager;
 public class AsyncFile extends PoolBase implements Timer{
 	private static FileCache fileCache=FileCache.getInstance();
 	private static BufferCache bufferCache=BufferCache.getInstance();
-	
+
 	public static AsyncFile open(File file){
+		return open(file,true);
+	}
+
+	/* 再利用の可能性がないファイルはcacheを使わない */
+	public static AsyncFile open(File file,boolean useCache){
 		AsyncFile asyncFile=(AsyncFile)PoolManager.getInstance(AsyncFile.class);
-		asyncFile.fileInfo=fileCache.get(file);
+		asyncFile.useCache=useCache;
+		if(useCache){
+			asyncFile.fileInfo=fileCache.get(file);
+		}else{
+			asyncFile.fileInfo=fileCache.createFileInfo(file);
+		}
 		return asyncFile;
 	}
 	
@@ -35,13 +45,21 @@ public class AsyncFile extends PoolBase implements Timer{
 			fileInfo=null;
 		}
 		inAsyncRead=false;
+		position=0;
 	}
 
 	private FileInfo fileInfo;
 	/* 自力で読み込む場合に利用する */
 	private java.nio.channels.FileChannel fileChannel;
 	private long position=0;
+	private boolean inAsyncRead=false;
+	private boolean useCache;
 	
+	public FileInfo getFileInfo(){
+		return fileInfo;
+	}
+	
+	/*
 	public boolean isDirectory() {
 		return fileInfo.isDirectory();
 	}
@@ -70,8 +88,10 @@ public class AsyncFile extends PoolBase implements Timer{
 	public File[] listFiles() {
 		return fileInfo.listFiles();
 	}
-	
-	private boolean inAsyncRead=false;
+	*/
+	public void position(long position){
+		this.position=position;
+	}
 
 	/* 基本的にBufferGetterイベントからasyncReadは呼び出さない事 */
 	public synchronized boolean asyncRead(BufferGetter bufferGetter,Object userContext){
@@ -81,21 +101,24 @@ public class AsyncFile extends PoolBase implements Timer{
 		}
 		inAsyncRead=true;
 		//終端の判断
-		if(position>=fileInfo.getLength()){
+		if(position>=fileInfo.length()){
 			bufferGetter.onBufferEnd(userContext);
 			inAsyncRead=false;
 			return true;
 		}
-		//cacheに存在するか？
-		ByteBuffer[] buffer=bufferCache.get(fileInfo,position);
-		if(buffer!=null){
-			position+=BuffersUtil.remaining(buffer);
-			if(bufferGetter.onBuffer(userContext, buffer)){
-				/* この先でTimer処理になる、推奨しない */
-				asyncRead(bufferGetter,userContext);
+		ByteBuffer[] buffer=null;
+		if(useCache){//cacheを使うか?
+			//cacheに存在するか？
+			buffer=bufferCache.get(fileInfo,position);
+			if(buffer!=null){
+				position+=BuffersUtil.remaining(buffer);
+				if(bufferGetter.onBuffer(userContext, buffer)){
+					/* この先でTimer処理になる、推奨しない */
+					asyncRead(bufferGetter,userContext);
+				}
+				inAsyncRead=false;
+				return true;
 			}
-			inAsyncRead=false;
-			return true;
 		}
 		ByteBuffer dst=null;
 		int length;
@@ -120,7 +143,9 @@ public class AsyncFile extends PoolBase implements Timer{
 		dst.flip();
 		buffer=BuffersUtil.toByteBufferArray(dst);
 		//cacheに登録
-		bufferCache.put(fileInfo,position,buffer);
+		if(useCache){
+			bufferCache.put(fileInfo,position,buffer);
+		}
 		position+=(long)length;
 		if(bufferGetter.onBuffer(userContext, buffer)){
 			/* この先でTimer処理になる、推奨しない */
