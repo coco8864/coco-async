@@ -8,6 +8,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import org.apache.commons.collections.map.MultiKeyMap;
+import org.apache.log4j.Logger;
 
 import naru.async.Timer;
 import naru.async.store.Page;
@@ -15,6 +16,7 @@ import naru.async.store.StoreManager;
 import naru.async.timer.TimerManager;
 
 public class BufferCache implements Timer{
+	private static Logger logger=Logger.getLogger(BufferCache.class);
 	private static final long INTERVAL=10000;
 	private static BufferCache instance=new BufferCache();
 	public static BufferCache getInstance(){
@@ -55,6 +57,8 @@ public class BufferCache implements Timer{
 	
 	public void term(){
 		TimerManager.clearInterval(timer);
+		logger.info("BufferCache term: pageCache.size:"+pageCache.size()+":filePositionCache.size:"+filePositionCache.size()+":min:"+min+":hit:"+hit+":miss:"+miss+":overFlow:"+overFlow);
+		
 		synchronized(pageCache){
 			Iterator<BufferInfo> itr=pageCache.values().iterator();
 			while(itr.hasNext()){
@@ -147,7 +151,7 @@ public class BufferCache implements Timer{
 		if(cacheInfo!=null){
 			return;//ìoò^çœÇ›
 		}
-		cacheInfo=BufferInfo.create(buffer,fileInfo.getLength(),fileInfo);
+		cacheInfo=BufferInfo.create(buffer,fileInfo.length(),fileInfo);
 		BufferInfo orgInfo=null;
 		synchronized(filePositionCache){
 			if(isFileCheck){

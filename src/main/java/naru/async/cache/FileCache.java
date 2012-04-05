@@ -7,11 +7,14 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.apache.log4j.Logger;
+
 import naru.async.Timer;
 import naru.async.pool.PoolManager;
 import naru.async.timer.TimerManager;
 
 public class FileCache implements Timer{
+	private static Logger logger=Logger.getLogger(FileCache.class);
 	private static final long INTERVAL=10000;
 	private static FileCache instance=new FileCache();
 	public static FileCache getInstance(){
@@ -38,6 +41,12 @@ public class FileCache implements Timer{
 		this.max=min*2;
 	}
 	
+	public FileInfo createFileInfo(File file){
+		FileInfo result=(FileInfo)PoolManager.getInstance(FileInfo.class);
+		result.init(file);
+		return result;
+	}
+	
 	public FileInfo get(File file){
 		FileInfo result=cache.get(file);
 //		intervalGet++;
@@ -47,8 +56,7 @@ public class FileCache implements Timer{
 			return result;
 		}
 		miss++;
-		result=(FileInfo)PoolManager.getInstance(FileInfo.class);
-		result.init(file);
+		result=createFileInfo(file);
 		if(cache.size()>max){
 			overFlow++;
 			return result;
@@ -84,6 +92,7 @@ public class FileCache implements Timer{
 	
 	public void term(){
 		TimerManager.clearInterval(timer);
+		logger.info("FileCache term: size:"+cache.size()+":min:"+min+":hit:"+hit+":miss:"+miss+":overFlow:"+overFlow);
 		synchronized(this){
 			Iterator<FileInfo> itr=cache.values().iterator();
 			while(itr.hasNext()){

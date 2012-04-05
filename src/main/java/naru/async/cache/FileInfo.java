@@ -1,6 +1,7 @@
 package naru.async.cache;
 
 import java.io.File;
+import java.io.IOException;
 
 import naru.async.pool.PoolBase;
 
@@ -12,6 +13,9 @@ public class FileInfo extends PoolBase{
 	private boolean canRead;
 	private long lastModified;
 	private long length;
+	private File canonicalFile;
+	private boolean isError;
+	private boolean isChange=false;
 	
 	/* ìùåvèÓïÒ */
 	private long cacheInTime;
@@ -22,18 +26,26 @@ public class FileInfo extends PoolBase{
 	public void init(File file){
 		this.file=file;
 		this.exists=file.exists();
-		this.isDirectory=file.isDirectory();
-		this.isFile=file.isFile();
-		this.canRead=file.canRead();
-		this.lastModified=file.lastModified();
-		this.length=file.length();
-		this.cacheInTime=System.currentTimeMillis();
 		this.isChange=false;
+		this.isError=false;
+		this.cacheInTime=System.currentTimeMillis();
+		if(this.exists){
+			this.isDirectory=file.isDirectory();
+			this.isFile=file.isFile();
+			this.canRead=file.canRead();
+			this.lastModified=file.lastModified();
+			this.length=file.length();
+			try {
+				this.canonicalFile=file.getCanonicalFile();
+			} catch (IOException e) {
+				this.isError=true;
+			}
+		}
 	}
 	public File getFile() {
 		return file;
 	}
-	public boolean isExists() {
+	public boolean exists() {
 		return exists;
 	}
 	public boolean isDirectory() {
@@ -42,13 +54,13 @@ public class FileInfo extends PoolBase{
 	public boolean isFile() {
 		return isFile;
 	}
-	public boolean isCanRead() {
+	public boolean canRead() {
 		return canRead;
 	}
 	public long getLastModified() {
 		return lastModified;
 	}
-	public long getLength() {
+	public long length() {
 		return length;
 	}
 	public File[] listFiles(){
@@ -66,8 +78,12 @@ public class FileInfo extends PoolBase{
 	public long getIntervalCount() {
 		return intervalCount;
 	}
-	
-	private boolean isChange=false;
+	public File getCanonicalFile() {
+		return canonicalFile;
+	}
+	public boolean isError(){
+		return isError;
+	}
 	
 	public boolean isChange(){
 		if(isChange){
