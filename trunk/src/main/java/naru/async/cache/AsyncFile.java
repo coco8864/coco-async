@@ -40,6 +40,13 @@ public class AsyncFile extends PoolBase implements Timer{
 	
 	@Override
 	public void recycle() {
+		if(fileChannel!=null){
+			try {
+				fileChannel.close();
+			} catch (IOException ignore) {
+			}
+			fileChannel=null;
+		}
 		if(fileInfo!=null){
 			fileInfo.unref();
 			fileInfo=null;
@@ -161,6 +168,7 @@ public class AsyncFile extends PoolBase implements Timer{
 				fileChannel.close();
 			} catch (IOException ignore) {
 			}
+			fileChannel=null;
 		}
 		unref();
 	}
