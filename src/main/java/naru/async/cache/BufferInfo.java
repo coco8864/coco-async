@@ -40,7 +40,7 @@ public class BufferInfo extends PoolBase{
 		this.cacheTime=System.currentTimeMillis();
 		this.storeId=storeId;
 		if(fileInfo!=null){
-			fileInfo.ref();
+			fileInfo.ref(false);
 		}
 		this.fileInfo=fileInfo;
 	}
@@ -73,17 +73,18 @@ public class BufferInfo extends PoolBase{
 	
 	/* 当該infoの不要度(大きいと捨てられる可能性が高い) */
 	public float getScore(long now){
-		float result=0.0f;
+		float lastScore=0.0f;
 		long orgIntervalCount=intervalCount;
 		intervalCount=0;
 		if(orgIntervalCount>=1){
-			return result;
+			return lastScore;
 		}
 		if(totalCount==0){
 			totalCount=1;
 		}
 		//TODO 精査する事
-		return (float)(now-(long)lastTime)/((float)totalCount*lengthRate);
+		lastScore=(float)(now-(long)lastTime)/((float)totalCount*lengthRate);
+		return lastScore;
 	}
 	
 	public float getLastScore(){
