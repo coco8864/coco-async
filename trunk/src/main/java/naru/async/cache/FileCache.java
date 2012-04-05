@@ -33,6 +33,11 @@ public class FileCache implements Timer{
 	private boolean isCheck=false; 
 	private Map<File,FileInfo> tmpCache=new HashMap<File,FileInfo>();
 	
+	public void setCacheSize(int min){
+		this.min=min;
+		this.max=min*2;
+	}
+	
 	public FileInfo get(File file){
 		FileInfo result=cache.get(file);
 //		intervalGet++;

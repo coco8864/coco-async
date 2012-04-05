@@ -89,11 +89,18 @@ public class FileInfo extends PoolBase{
 		isChange=true;
 		return true;
 	}
-	
+
 	public void ref(){
-		totalCount++;
-		intervalCount++;
-		lastTime=System.currentTimeMillis();
+		ref(true);
+	}
+	
+	//BufferInfoが保持する分はaccessとは見なさない
+	public void ref(boolean isAccess){
+		if(isAccess){
+			totalCount++;
+			intervalCount++;
+			lastTime=System.currentTimeMillis();
+		}
 		super.ref();
 	}
 
@@ -101,17 +108,22 @@ public class FileInfo extends PoolBase{
 	
 	/* 当該infoの不要度(大きいと捨てられる可能性が高い) */
 	public float getScore(long now){
-		float result=0.0f;
+		lastScore=0.0f;
 		long orgIntervalCount=intervalCount;
 		intervalCount=0;
-		if(orgIntervalCount>=1){
-			return result;
+		if(orgIntervalCount>=1){//直近に１回でも使われていれば捨てない
+			return lastScore;
 		}
 		if(totalCount==0){
 			totalCount=1;
 		}
 		//TODO 精査する事
-		return (float)(now-(long)lastTime)/(float)totalCount;
+		if(exists){
+			lastScore=(float)(now-(long)lastTime)/(float)totalCount;
+		}else{
+			lastScore=(float)(now-(long)lastTime)*10.0f/(float)totalCount;
+		}
+		return lastScore;
 	}
 	
 	public float getLastScore(){

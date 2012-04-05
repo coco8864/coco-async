@@ -131,12 +131,11 @@ public class AsyncFile extends PoolBase implements Timer{
 	}
 	
 	public void close(){
-		if(fileChannel==null){
-			return;
-		}
-		try {
-			fileChannel.close();
-		} catch (IOException ignore) {
+		if(fileChannel!=null){
+			try {
+				fileChannel.close();
+			} catch (IOException ignore) {
+			}
 		}
 		unref();
 	}

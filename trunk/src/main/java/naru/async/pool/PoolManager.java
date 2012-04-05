@@ -14,6 +14,8 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 
 import naru.async.Timer;
+import naru.async.cache.BufferCache;
+import naru.async.cache.FileCache;
 import naru.async.timer.TimerManager;
 import naru.queuelet.Queuelet;
 import naru.queuelet.QueueletContext;
@@ -533,6 +535,19 @@ public class PoolManager implements Queuelet,Timer{
 					createBufferPool(param,poolBuffersArray[i]);
 				}
 			}
+			//cacheÇèâä˙âªÇ∑ÇÈ
+			int fileCacheSize=512;
+			int bufferCacheSize=2048;
+			String size=(String)param.get("fileCacheSize");
+			if(size!=null){
+				fileCacheSize=Integer.parseInt(size);
+			}
+			size=(String)param.get("bufferCacheSize");
+			if(size!=null){
+				bufferCacheSize=Integer.parseInt(size);
+			}
+			FileCache.getInstance().setCacheSize(fileCacheSize);
+			BufferCache.getInstance().setCacheSize(bufferCacheSize);
 		} catch (Throwable e) {
 			logger.error("PoolManger init error.",e);
 			context.finish();
@@ -550,6 +565,10 @@ public class PoolManager implements Queuelet,Timer{
 	private boolean isStop=false;
 	public void term() {
 		TimerManager.clearInterval(interval);
+		//cacheÇèIóπÇ≥ÇπÇÈ
+		BufferCache.getInstance().term();
+		FileCache.getInstance().term();
+		
 		logger.info("===PoolManager term start===");
 //		Page.saveFreePage(0);
 		onTimer(null);

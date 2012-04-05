@@ -28,11 +28,16 @@ public class BufferCache implements Timer{
 	private Map<Long,BufferInfo> tmpPageCache=new HashMap<Long,BufferInfo>();
 	private MultiKeyMap filePositionCache=new MultiKeyMap();
 	private MultiKeyMap tmpFilePositionCache=new MultiKeyMap();
-	private int min=1024;//16k bufferの場合16Mキャッシュを持つ
+	private int min=2048;//16k bufferの場合約32Mキャッシュを持つ
 	private int max=min*2;
 	private int overFlow=0;
 	private int hit=0;
 	private int miss=0;
+	
+	public void setCacheSize(int min){
+		this.min=min;
+		this.max=min*2;
+	}
 	
 	private boolean check(BufferInfo bufferInfo,long now){
 		if(bufferInfo.isChange()==false){//変更があるか?
@@ -89,7 +94,7 @@ public class BufferCache implements Timer{
 			return null;
 		}
 		hit++;
-		cacheInfo.ref();
+//		cacheInfo.ref();
 		return cacheInfo.duplicateBuffers();
 	}
 	
@@ -100,7 +105,7 @@ public class BufferCache implements Timer{
 			return null;
 		}
 		hit++;
-		cacheInfo.ref();
+//		cacheInfo.ref();
 		return cacheInfo.duplicateBuffers();
 	}
 	
