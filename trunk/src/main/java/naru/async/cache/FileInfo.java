@@ -95,10 +95,7 @@ public class FileInfo extends PoolBase{
 		}
 		boolean nowExist=file.exists();
 		if(exists){
-			if(nowExist){
-				return false;
-			}
-			if(file.lastModified()==lastModified){
+			if(nowExist && file.lastModified()==lastModified){
 				return false;
 			}
 		}else{

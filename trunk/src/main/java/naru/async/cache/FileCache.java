@@ -31,6 +31,8 @@ public class FileCache implements Timer{
 	private int miss=0;
 	
 	private Map<File,FileInfo> cache=new HashMap<File,FileInfo>();
+	private boolean useCache=true;//cache‚ðŽg‚¤‚©”Û‚©
+	private boolean flushCache=false;//cache‚ðflush‚·‚é‚©”Û‚©
 	
 	//check’†‚ÍtmpCache‚É“ü‚ê‚Ä‚¨‚­
 	private boolean isCheck=false; 
@@ -47,7 +49,18 @@ public class FileCache implements Timer{
 		return result;
 	}
 	
+	public void setUseCache(boolean useCache){
+		this.useCache=useCache;
+	}
+	
+	public void setFlushCache(boolean flushCache){
+		this.flushCache=flushCache;
+	}
+	
 	public FileInfo get(File file){
+		if(!useCache){
+			return createFileInfo(file);
+		}
 		FileInfo result=cache.get(file);
 //		intervalGet++;
 		if(result!=null){
