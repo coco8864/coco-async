@@ -77,12 +77,14 @@ public class FileCache implements Timer{
 	private ArrayList<Float> scores=new ArrayList<Float>();
 	
 	private boolean check(FileInfo fileInfo,long now){
-		if(fileInfo.isChange()==false){//変更があるか?
+		if(fileInfo.isChange(true)){//変更があるか?
 			return false;
 		}
 		float lastScore=fileInfo.getLastScore();
 		float score=fileInfo.getScore(now);
 		if(lastScore>scoreThreshold&&score>lastScore){
+			//cache監視から外れるため,
+			fileInfo.setChange();
 			return false;
 		}
 		//TODO 全部入ったとしても、minを超えない場合は、addしないようにする

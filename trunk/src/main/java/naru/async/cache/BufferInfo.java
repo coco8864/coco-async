@@ -73,7 +73,7 @@ public class BufferInfo extends PoolBase{
 	
 	/* 当該infoの不要度(大きいと捨てられる可能性が高い) */
 	public float getScore(long now){
-		float lastScore=0.0f;
+		lastScore=0.0f;
 		long orgIntervalCount=intervalCount;
 		intervalCount=0;
 		if(orgIntervalCount>=1){

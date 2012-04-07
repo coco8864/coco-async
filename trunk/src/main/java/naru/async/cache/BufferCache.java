@@ -42,7 +42,7 @@ public class BufferCache implements Timer{
 	}
 	
 	private boolean check(BufferInfo bufferInfo,long now){
-		if(bufferInfo.isChange()==false){//•ÏX‚ª‚ ‚é‚©?
+		if(bufferInfo.isChange()){//•ÏX‚ª‚ ‚é‚©?
 			return false;
 		}
 		float lastScore=bufferInfo.getLastScore();

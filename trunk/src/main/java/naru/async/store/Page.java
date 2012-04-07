@@ -594,7 +594,11 @@ public class Page extends PoolBase{
 		ByteBuffer[] buffer=bufferCache.get(this);
 		if(buffer!=null){
 			this.buffer=buffer;
-			onPageIn();
+			if(store!=null){
+				store.onPageIn(this);
+			}else{
+				logger.error("pageIn.store=null",new Exception());
+			}
 			return;
 		}
 		StoreManager.asyncReadPage(this);
