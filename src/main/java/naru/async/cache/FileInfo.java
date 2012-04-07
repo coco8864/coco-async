@@ -86,24 +86,33 @@ public class FileInfo extends PoolBase{
 	}
 	
 	public boolean isChange(){
+		return isChange(false);
+	}
+	
+	public boolean isChange(boolean isReal){
 		if(isChange){
 			return true;
 		}
 		boolean nowExist=file.exists();
 		if(exists){
-			if(!nowExist){
+			if(nowExist){
 				return false;
 			}
-			if(file.lastModified()!=lastModified){
+			if(file.lastModified()==lastModified){
 				return false;
 			}
 		}else{
-			if(nowExist){
+			if(!nowExist){
 				return false;
 			}
 		}
 		isChange=true;
 		return true;
+	}
+	
+	/* cacheŠÄ‹‚©‚çŠO‚ê‚é‚ÉŒÄ‚Ño‚³‚ê‚é */
+	void setChange(){
+		isChange=true;
 	}
 
 	public void ref(){
