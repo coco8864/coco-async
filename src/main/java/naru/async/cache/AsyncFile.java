@@ -107,6 +107,30 @@ public class AsyncFile extends PoolBase implements Timer{
 	public void position(long position){
 		this.position=position;
 	}
+	
+	private static final int TYPE_ONBUFFER=1;
+	private static final int TYPE_ONBUFFER_END=2;
+	private static final int TYPE_ONBUFFER_FAILURE=3;
+	private void callback(int type,BufferGetter bufferGetter,Object userContext,ByteBuffer[] buffer,Throwable failure){
+		try{
+			switch(type){
+			case TYPE_ONBUFFER:
+				if(bufferGetter.onBuffer(userContext, buffer)){
+					/* この先でTimer処理になる、推奨しない */
+					asyncRead(bufferGetter,userContext);
+				}
+				break;
+			case TYPE_ONBUFFER_END:
+				bufferGetter.onBufferEnd(userContext);
+				break;
+			case TYPE_ONBUFFER_FAILURE:
+				bufferGetter.onBufferFailure(userContext, failure);
+				break;
+			}
+		}finally{
+			inAsyncRead=false;
+		}
+	}
 
 	/* 基本的にBufferGetterイベントからasyncReadは呼び出さない事 */
 	public synchronized boolean asyncRead(BufferGetter bufferGetter,Object userContext){
@@ -114,11 +138,10 @@ public class AsyncFile extends PoolBase implements Timer{
 			TimerManager.setTimeout(0, this, new Object[]{bufferGetter,userContext});
 			return false;
 		}
-		inAsyncRead=true;
+		inAsyncRead=true;//このmethodから復帰する際必ずfalseに変更する
 		//終端の判断
 		if(position>=fileInfo.length()){
-			bufferGetter.onBufferEnd(userContext);
-			inAsyncRead=false;
+			callback(TYPE_ONBUFFER_END,bufferGetter,userContext,null,null);
 			return true;
 		}
 		ByteBuffer[] buffer=null;
@@ -127,11 +150,7 @@ public class AsyncFile extends PoolBase implements Timer{
 			buffer=bufferCache.get(fileInfo,position);
 			if(buffer!=null){
 				position+=BuffersUtil.remaining(buffer);
-				if(bufferGetter.onBuffer(userContext, buffer)){
-					/* この先でTimer処理になる、推奨しない */
-					asyncRead(bufferGetter,userContext);
-				}
-				inAsyncRead=false;
+				callback(TYPE_ONBUFFER,bufferGetter,userContext,buffer,null);
 				return true;
 			}
 		}
@@ -146,13 +165,11 @@ public class AsyncFile extends PoolBase implements Timer{
 			fileChannel.position(position);
 			length = fileChannel.read(dst);
 		} catch (IOException e) {
-			bufferGetter.onBufferFailure(userContext,e);
-			inAsyncRead=false;
+			callback(TYPE_ONBUFFER_FAILURE,bufferGetter,userContext,null,e);
 			return true;
 		}
 		if(length<=0){
-			bufferGetter.onBufferEnd(userContext);
-			inAsyncRead=false;
+			callback(TYPE_ONBUFFER_END,bufferGetter,userContext,null,null);
 			return true;
 		}
 		dst.flip();
@@ -162,11 +179,7 @@ public class AsyncFile extends PoolBase implements Timer{
 			bufferCache.put(fileInfo,position,buffer);
 		}
 		position+=(long)length;
-		if(bufferGetter.onBuffer(userContext, buffer)){
-			/* この先でTimer処理になる、推奨しない */
-			asyncRead(bufferGetter,userContext);
-		}
-		inAsyncRead=false;
+		callback(TYPE_ONBUFFER,bufferGetter,userContext,buffer,null);
 		return true;
 	}
 	
