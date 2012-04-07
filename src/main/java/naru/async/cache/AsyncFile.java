@@ -175,6 +175,13 @@ public class AsyncFile extends PoolBase implements Timer{
 	
 	public void onTimer(Object userContext) {
 		Object[] params=(Object[])userContext;
+		synchronized(this){
+			if(inAsyncRead){//‚±‚Ì‚Ü‚ÜŒÄ‚Ô‚Æ–³ŒÀƒ‹[ƒv‚É—‚¿‚é
+				//onBuffer‚ª“’…‚µ‚È‚¢‚Ì‚ÉasyncBuffer‚ğŒÄ‚Ño‚µ‚½“™
+				((BufferGetter)params[0]).onBufferFailure(userContext, new IllegalStateException("AsyncFile secuence"));
+				return;
+			}
+		}
 		asyncRead((BufferGetter)params[0],params[1]);
 	}
 }
