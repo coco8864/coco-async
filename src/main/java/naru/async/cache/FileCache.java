@@ -48,7 +48,10 @@ public class FileCache implements Timer{
 		result.init(file);
 		return result;
 	}
-	
+
+	public boolean useCache(){
+		return useCache;
+	}
 	public void setUseCache(boolean useCache){
 		this.useCache=useCache;
 	}

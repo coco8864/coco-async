@@ -29,13 +29,21 @@ public class AsyncFile extends PoolBase implements Timer{
 	/* 再利用の可能性がないファイルはcacheを使わない */
 	public static AsyncFile open(File file,boolean useCache){
 		AsyncFile asyncFile=(AsyncFile)PoolManager.getInstance(AsyncFile.class);
-		asyncFile.useCache=useCache;
-		if(useCache){
-			asyncFile.fileInfo=fileCache.get(file);
-		}else{
-			asyncFile.fileInfo=fileCache.createFileInfo(file);
-		}
+		asyncFile.init(file, useCache);
 		return asyncFile;
+	}
+	
+	private void init(File file,boolean useCache){
+		if(useCache && fileCache.useCache()){
+			this.useCache=true;
+		}else{
+			this.useCache=false;
+		}
+		if(this.useCache){
+			fileInfo=fileCache.get(file);
+		}else{
+			fileInfo=fileCache.createFileInfo(file);
+		}
 	}
 	
 	@Override
