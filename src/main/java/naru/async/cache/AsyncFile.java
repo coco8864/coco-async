@@ -21,11 +21,18 @@ import naru.async.timer.TimerManager;
 public class AsyncFile extends PoolBase implements Timer{
 	private static FileCache fileCache=FileCache.getInstance();
 	private static BufferCache bufferCache=BufferCache.getInstance();
+	
+	/* write mode */
+	public static AsyncFile open(){
+		return null;
+	}
 
+	/* read modeでのopen */
 	public static AsyncFile open(File file){
 		return open(file,true);
 	}
 
+	/* read modeでのopen */
 	/* 再利用の可能性がないファイルはcacheを使わない */
 	public static AsyncFile open(File file,boolean useCache){
 		AsyncFile asyncFile=(AsyncFile)PoolManager.getInstance(AsyncFile.class);
@@ -59,7 +66,7 @@ public class AsyncFile extends PoolBase implements Timer{
 			fileInfo.unref();
 			fileInfo=null;
 		}
-		inAsyncRead=false;
+		inAsyncRead=false;/* asyncReadの再帰呼び出しをチェックするフラグ */
 		position=0;
 	}
 
@@ -74,36 +81,6 @@ public class AsyncFile extends PoolBase implements Timer{
 		return fileInfo;
 	}
 	
-	/*
-	public boolean isDirectory() {
-		return fileInfo.isDirectory();
-	}
-
-	public boolean isFile() {
-		return fileInfo.isFile();
-	}
-
-	public boolean isCanRead() {
-		return fileInfo.isCanRead();
-	}
-
-	public boolean isExists() {
-		return fileInfo.isExists();
-	}
-
-	public long getLastModified() {
-		return fileInfo.getLastModified();
-	}
-
-	public long getLength() {
-		return fileInfo.getLength();
-	}
-
-	//ここが使われるのは、listing機能のみ、この負荷を削減したければlisting機能をoffにする
-	public File[] listFiles() {
-		return fileInfo.listFiles();
-	}
-	*/
 	public void position(long position){
 		this.position=position;
 	}
