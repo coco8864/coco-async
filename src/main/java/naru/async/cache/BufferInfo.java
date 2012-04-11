@@ -33,7 +33,7 @@ public class BufferInfo extends PoolBase{
 	}
 	
 	private void init(ByteBuffer[] buffer,long totalLength,long storeId,FileInfo fileInfo){
-		this.buffer=PoolManager.duplicateBuffers(buffer);
+		this.buffer=buffer;
 		long length=BuffersUtil.remaining(buffer);
 //		this.totalLength=totalLength;
 		this.lengthRate=(float)length/(float)totalLength;
