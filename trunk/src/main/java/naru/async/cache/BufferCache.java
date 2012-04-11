@@ -11,6 +11,7 @@ import org.apache.commons.collections.map.MultiKeyMap;
 import org.apache.log4j.Logger;
 
 import naru.async.Timer;
+import naru.async.pool.PoolManager;
 import naru.async.store.Page;
 import naru.async.store.StoreManager;
 import naru.async.timer.TimerManager;
@@ -128,7 +129,7 @@ public class BufferCache implements Timer{
 		if(bufferInfo!=null){
 			return;//ìoò^çœÇ›
 		}
-		bufferInfo=BufferInfo.create(buffer,totalLength,storeId);
+		bufferInfo=BufferInfo.create(PoolManager.duplicateBuffers(buffer),totalLength,storeId);
 		BufferInfo orgInfo=null;
 		synchronized(pageCache){
 			if(isPageCheck){
@@ -151,7 +152,7 @@ public class BufferCache implements Timer{
 		if(cacheInfo!=null){
 			return;//ìoò^çœÇ›
 		}
-		cacheInfo=BufferInfo.create(buffer,fileInfo.length(),fileInfo);
+		cacheInfo=BufferInfo.create(PoolManager.duplicateBuffers(buffer),fileInfo.length(),fileInfo);
 		BufferInfo orgInfo=null;
 		synchronized(filePositionCache){
 			if(isFileCheck){

@@ -2,6 +2,8 @@ package naru.async.cache;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -41,6 +43,7 @@ public class AsyncFile extends PoolBase implements Timer{
 	}
 	
 	private void init(File file,boolean useCache){
+		isReadMode=true;
 		if(useCache && fileCache.useCache()){
 			this.useCache=true;
 		}else{
@@ -51,6 +54,21 @@ public class AsyncFile extends PoolBase implements Timer{
 		}else{
 			fileInfo=fileCache.createFileInfo(file);
 		}
+	}
+	
+	/* write modeからreadModeに切り替え */
+	public void flip(){
+		if(isReadMode){
+			throw new IllegalStateException("AsyncFile flip");
+		}
+		if(fileChannel!=null){
+			try {
+				fileChannel.close();
+			} catch (IOException ignore) {
+			}
+			fileChannel=null;
+		}
+		isReadMode=true;
 	}
 	
 	@Override
@@ -68,6 +86,15 @@ public class AsyncFile extends PoolBase implements Timer{
 		}
 		inAsyncRead=false;/* asyncReadの再帰呼び出しをチェックするフラグ */
 		position=0;
+		isReadMode=false;
+		if(topBuffer!=null){
+			PoolManager.poolBufferInstance(topBuffer);
+			topBuffer=null;
+		}
+		if(createTmpFile!=null){
+			createTmpFile.delete();
+			createTmpFile=null;
+		}
 	}
 
 	private FileInfo fileInfo;
@@ -76,6 +103,10 @@ public class AsyncFile extends PoolBase implements Timer{
 	private long position=0;
 	private boolean inAsyncRead=false;
 	private boolean useCache;
+	private boolean isReadMode=false;
+	//write modeからはじめた場合は、topBufferが設定される,データはこれが最後の可能性もある
+	private ByteBuffer[] topBuffer=null;
+	private File createTmpFile=null;
 	
 	public FileInfo getFileInfo(){
 		return fileInfo;
@@ -83,6 +114,10 @@ public class AsyncFile extends PoolBase implements Timer{
 	
 	public void position(long position){
 		this.position=position;
+	}
+	
+	public ByteBuffer[] getTopBuffer(){
+		return topBuffer;
 	}
 	
 	private static final int TYPE_ONBUFFER=1;
@@ -108,9 +143,43 @@ public class AsyncFile extends PoolBase implements Timer{
 			inAsyncRead=false;
 		}
 	}
+	
+	public synchronized void write(ByteBuffer[] buffer){
+		if(!isReadMode){
+			throw new IllegalStateException("write asyncRead");
+		}
+		long length=BuffersUtil.remaining(buffer);
+		if(topBuffer==null){
+			topBuffer=buffer;
+			position+=length;
+			return;
+		}
+		try {
+			if(fileChannel==null){
+				File file=File.createTempFile("AF","dat");//TODO dir指定
+				fileInfo=fileCache.createFileInfo(file);
+				if(useCache){
+					bufferCache.put(fileInfo,0,topBuffer);
+				}
+				FileOutputStream fos=new FileOutputStream(fileInfo.getFile());
+				fileChannel=fos.getChannel();
+				fileChannel.write(topBuffer);
+			}
+			if(useCache){
+				bufferCache.put(fileInfo,position,buffer);
+			}
+			fileChannel.write(buffer);
+			position+=length;
+		} catch (IOException e) {
+			throw new IllegalStateException(e);
+		}
+	}
 
 	/* 基本的にBufferGetterイベントからasyncReadは呼び出さない事 */
 	public synchronized boolean asyncRead(BufferGetter bufferGetter,Object userContext){
+		if(isReadMode){
+			throw new IllegalStateException("AsyncFile asyncRead");
+		}
 		if(inAsyncRead){//callbackからasyncReadが呼ばれた、この呼び出しは推奨しない,処理が無意味に遅くなる
 			TimerManager.setTimeout(0, this, new Object[]{bufferGetter,userContext});
 			return false;
