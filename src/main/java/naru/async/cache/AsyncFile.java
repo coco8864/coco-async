@@ -2,7 +2,6 @@ package naru.async.cache;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -26,7 +25,10 @@ public class AsyncFile extends PoolBase implements Timer{
 	
 	/* write mode */
 	public static AsyncFile open(){
-		return null;
+		AsyncFile asyncFile=(AsyncFile)PoolManager.getInstance(AsyncFile.class);
+		asyncFile.useCache=true;//
+		asyncFile.isReadMode=false;//
+		return asyncFile;
 	}
 
 	/* read modeでのopen */
@@ -144,8 +146,12 @@ public class AsyncFile extends PoolBase implements Timer{
 		}
 	}
 	
+	public void write(ByteBuffer buffer){
+		write(BuffersUtil.toByteBufferArray(buffer));
+	}
+	
 	public synchronized void write(ByteBuffer[] buffer){
-		if(!isReadMode){
+		if(isReadMode){
 			throw new IllegalStateException("write asyncRead");
 		}
 		long length=BuffersUtil.remaining(buffer);
@@ -156,14 +162,14 @@ public class AsyncFile extends PoolBase implements Timer{
 		}
 		try {
 			if(fileChannel==null){
-				File file=File.createTempFile("AF","dat");//TODO dir指定
+				File file=File.createTempFile("AsyncFile","dat");//TODO dir指定
 				fileInfo=fileCache.createFileInfo(file);
 				if(useCache){
 					bufferCache.put(fileInfo,0,topBuffer);
 				}
 				FileOutputStream fos=new FileOutputStream(fileInfo.getFile());
 				fileChannel=fos.getChannel();
-				fileChannel.write(topBuffer);
+				fileChannel.write(PoolManager.duplicateBuffer(topBuffer));
 			}
 			if(useCache){
 				bufferCache.put(fileInfo,position,buffer);
@@ -177,7 +183,7 @@ public class AsyncFile extends PoolBase implements Timer{
 
 	/* 基本的にBufferGetterイベントからasyncReadは呼び出さない事 */
 	public synchronized boolean asyncRead(BufferGetter bufferGetter,Object userContext){
-		if(isReadMode){
+		if(!isReadMode){
 			throw new IllegalStateException("AsyncFile asyncRead");
 		}
 		if(inAsyncRead){//callbackからasyncReadが呼ばれた、この呼び出しは推奨しない,処理が無意味に遅くなる
