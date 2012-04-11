@@ -74,4 +74,21 @@ public class FileTest extends TestBase {
 		Thread.sleep(1000);
 	}
 	
+	@Test
+	public void test3() throws Throwable{
+		System.out.println("!!!testPage3!!!");
+		callTest("qtest3",Long.MAX_VALUE);
+	}
+	public void qtest3() throws Throwable{
+		AsyncFile asyncFile=AsyncFile.open();
+		asyncFile.write(ByteBuffer.wrap("abcdefg".getBytes()));
+		asyncFile.write(ByteBuffer.wrap("ABCDEFG".getBytes()));
+		asyncFile.flip();
+		ByteBuffer b[]=asyncFile.getTopBuffer();
+		System.out.println(BuffersUtil.toStringFromBuffer(b[0], "utf-8"));
+		asyncFile.asyncRead(new Getter(), asyncFile);
+		Thread.sleep(1000);
+	}
+	
+	
 }
