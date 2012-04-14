@@ -39,11 +39,11 @@ public class FileTest extends TestBase {
 		}
 		public void onBufferEnd(Object userContext) {
 			System.out.println("onBufferEnd");
-			((AsyncFile)userContext).close();
+			((AsyncBuffer)userContext).close();
 		}
 		public void onBufferFailure(Object userContext, Throwable failure) {
 			System.out.println("onBufferFailure");
-			((AsyncFile)userContext).close();
+			((AsyncBuffer)userContext).close();
 		}
 	}
 	
@@ -54,8 +54,8 @@ public class FileTest extends TestBase {
 	}
 	
 	public void qtest1() throws Throwable{
-		AsyncFile asyncFile=AsyncFile.open(new File("pom.xml"));
-		asyncFile.asyncRead(new Getter(), asyncFile);
+		AsyncBuffer asyncFile=AsyncBuffer.open(new File("pom.xml"));
+		asyncFile.asyncGet(new Getter(), asyncFile);
 	}
 	
 	@Test
@@ -65,12 +65,12 @@ public class FileTest extends TestBase {
 	}
 	
 	public void qtest2() throws Throwable{
-		AsyncFile asyncFile=AsyncFile.open(new File("pom.xml"));
-		AsyncFile asyncFile2=AsyncFile.open(new File("pom.xml"));
-		AsyncFile asyncFile3=AsyncFile.open(new File("pom.xml"));
-		asyncFile.asyncRead(new Getter(), asyncFile);
-		asyncFile2.asyncRead(new Getter(), asyncFile2);
-		asyncFile3.asyncRead(new Getter(), asyncFile3);
+		AsyncBuffer asyncFile=AsyncBuffer.open(new File("pom.xml"));
+		AsyncBuffer asyncFile2=AsyncBuffer.open(new File("pom.xml"));
+		AsyncBuffer asyncFile3=AsyncBuffer.open(new File("pom.xml"));
+		asyncFile.asyncGet(new Getter(), asyncFile);
+		asyncFile2.asyncGet(new Getter(), asyncFile2);
+		asyncFile3.asyncGet(new Getter(), asyncFile3);
 		Thread.sleep(1000);
 	}
 	
@@ -80,13 +80,13 @@ public class FileTest extends TestBase {
 		callTest("qtest3",Long.MAX_VALUE);
 	}
 	public void qtest3() throws Throwable{
-		AsyncFile asyncFile=AsyncFile.open();
-		asyncFile.write(ByteBuffer.wrap("abcdefg".getBytes()));
-		asyncFile.write(ByteBuffer.wrap("ABCDEFG".getBytes()));
+		AsyncBuffer asyncFile=AsyncBuffer.open();
+		asyncFile.putBuffer(ByteBuffer.wrap("abcdefg".getBytes()));
+		asyncFile.putBuffer(ByteBuffer.wrap("ABCDEFG".getBytes()));
 		asyncFile.flip();
 		ByteBuffer b[]=asyncFile.getTopBuffer();
 		System.out.println(BuffersUtil.toStringFromBuffer(b[0], "utf-8"));
-		asyncFile.asyncRead(new Getter(), asyncFile);
+		asyncFile.asyncGet(new Getter(), asyncFile);
 		Thread.sleep(1000);
 	}
 	
