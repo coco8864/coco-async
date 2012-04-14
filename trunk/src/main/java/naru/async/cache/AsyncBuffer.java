@@ -19,6 +19,7 @@ import naru.async.timer.TimerManager;
  * 2)writeモード時に先頭bufferを保持するので、Header/Data形式のデータ構造にフィットする
  * 
  * IOを発生を極力避けるポリシ
+ * cacheには、BUF_SIZE単位で登録する。きりのよくないところではそのままcacheせず、ファイルから読み出し時にcache
  * readに関しては順次アクセスをサポート
  * @author Owner
  *
@@ -26,6 +27,7 @@ import naru.async.timer.TimerManager;
 public class AsyncBuffer extends PoolBase implements Timer{
 	private static FileCache fileCache=FileCache.getInstance();
 	private static BufferCache bufferCache=BufferCache.getInstance();
+	private static long BUF_SIZE=PoolManager.getDefaultBufferSize();
 	
 	/* write mode */
 	public static AsyncBuffer open(){
@@ -113,7 +115,7 @@ public class AsyncBuffer extends PoolBase implements Timer{
 	private FileInfo fileInfo;
 	/* 自力で読み込む場合に利用する */
 	private java.nio.channels.FileChannel fileChannel;
-	private long position=0;
+	private long position=0;//読み出し時,offset計算は呼び出し側で行う事
 	private boolean inAsyncRead=false;
 	private boolean useCache;
 	private boolean isReadMode=false;
@@ -166,11 +168,11 @@ public class AsyncBuffer extends PoolBase implements Timer{
 		return BuffersUtil.remaining(topBuffer)==dataLength;
 	}
 	
-	public void write(ByteBuffer buffer){
-		write(BuffersUtil.toByteBufferArray(buffer));
+	public void putBuffer(ByteBuffer buffer){
+		putBuffer(BuffersUtil.toByteBufferArray(buffer));
 	}
 	
-	public synchronized void write(ByteBuffer[] buffer){
+	public synchronized void putBuffer(ByteBuffer[] buffer){
 		if(isReadMode){
 			throw new IllegalStateException("write asyncRead");
 		}
@@ -186,7 +188,9 @@ public class AsyncBuffer extends PoolBase implements Timer{
 				File file=File.createTempFile("AsyncFile","dat");//TODO dir指定
 				fileInfo=fileCache.createFileInfo(file);
 				if(useCache){
-					bufferCache.put(fileInfo,0,topBuffer);
+					if(position==BUF_SIZE){
+						bufferCache.put(fileInfo,0,topBuffer);
+					}
 				}
 				FileOutputStream fos=new FileOutputStream(fileInfo.getFile());
 				fileChannel=fos.getChannel();
@@ -196,7 +200,9 @@ public class AsyncBuffer extends PoolBase implements Timer{
 				dup=null;
 			}
 			if(useCache){
-				bufferCache.put(fileInfo,position,buffer);
+				if(position%BUF_SIZE==0){
+					bufferCache.put(fileInfo,position,buffer);
+				}
 			}
 			dup=buffer;
 			fileChannel.write(buffer);
@@ -223,7 +229,7 @@ public class AsyncBuffer extends PoolBase implements Timer{
 			throw new IllegalStateException("AsyncFile asyncRead");
 		}
 		if(inAsyncRead){//callbackからasyncReadが呼ばれた、この呼び出しは推奨しない,処理が無意味に遅くなる
-			TimerManager.setTimeout(0, this, new Object[]{bufferGetter,userContext});
+			TimerManager.setTimeout(0, this, new Object[]{bufferGetter,offset,userContext});
 			return false;
 		}
 		inAsyncRead=true;//このmethodから復帰する際必ずfalseに変更する
@@ -232,13 +238,28 @@ public class AsyncBuffer extends PoolBase implements Timer{
 			callback(TYPE_ONBUFFER_END,bufferGetter,userContext,null,null);
 			return true;
 		}
+		//0 -> 0
+		//1-> 0
+		//1023 -> 0
+		//1024 -> 1
+		//1025 -> 1
+		long sizeOffset=0;
+		long skipSize=0;
+		sizeOffset=(offset/BUF_SIZE)*BUF_SIZE;
+		skipSize=offset-sizeOffset;
 		ByteBuffer[] buffer=null;
 		if(useCache){//cacheを使うか?
 			//cacheに存在するか？
-			buffer=bufferCache.get(fileInfo,offset);
+			buffer=bufferCache.get(fileInfo,sizeOffset);
 			if(buffer!=null){
-				position=offset+BuffersUtil.remaining(buffer);
-				callback(TYPE_ONBUFFER,bufferGetter,userContext,buffer,null);
+				position=sizeOffset+BuffersUtil.remaining(buffer);
+				BuffersUtil.skip(buffer, skipSize);
+				if(BuffersUtil.remaining(buffer)==0){
+					PoolManager.poolBufferInstance(buffer);
+					callback(TYPE_ONBUFFER_END,bufferGetter,userContext,null,null);
+				}else{
+					callback(TYPE_ONBUFFER,bufferGetter,userContext,buffer,null);
+				}
 				return true;
 			}
 		}
@@ -250,7 +271,7 @@ public class AsyncBuffer extends PoolBase implements Timer{
 				fileChannel=fis.getChannel();
 			}
 			dst = PoolManager.getBufferInstance();
-			fileChannel.position(offset);
+			fileChannel.position(sizeOffset);
 			length = fileChannel.read(dst);
 		} catch (IOException e) {
 			callback(TYPE_ONBUFFER_FAILURE,bufferGetter,userContext,null,e);
@@ -264,9 +285,10 @@ public class AsyncBuffer extends PoolBase implements Timer{
 		buffer=BuffersUtil.toByteBufferArray(dst);
 		//cacheに登録
 		if(useCache){
-			bufferCache.put(fileInfo,offset,buffer);
+			bufferCache.put(fileInfo,sizeOffset,buffer);
 		}
-		position=offset+(long)length;
+		position=sizeOffset+(long)length;
+		BuffersUtil.skip(buffer, skipSize);
 		callback(TYPE_ONBUFFER,bufferGetter,userContext,buffer,null);
 		return true;
 	}
@@ -291,6 +313,6 @@ public class AsyncBuffer extends PoolBase implements Timer{
 				return;
 			}
 		}
-		asyncGet((BufferGetter)params[0],position,params[1]);
+		asyncGet((BufferGetter)params[0],(Long)params[1],params[2]);
 	}
 }
