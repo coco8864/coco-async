@@ -84,7 +84,7 @@ public class FileTest extends TestBase {
 		asyncFile.putBuffer(ByteBuffer.wrap("abcdefg".getBytes()));
 		asyncFile.putBuffer(ByteBuffer.wrap("ABCDEFG".getBytes()));
 		asyncFile.flip();
-		ByteBuffer b[]=asyncFile.getTopBuffer();
+		ByteBuffer b[]=asyncFile.popTopBuffer();
 		System.out.println(BuffersUtil.toStringFromBuffer(b[0], "utf-8"));
 		asyncFile.asyncGet(new Getter(), asyncFile);
 		Thread.sleep(1000);

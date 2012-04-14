@@ -36,6 +36,16 @@ public class AsyncBuffer extends PoolBase implements Timer{
 		asyncFile.isReadMode=false;//
 		return asyncFile;
 	}
+	
+	/* bufferÇÕè¡îÔÇ≥ÇÍÇÈ */
+	public static AsyncBuffer open(ByteBuffer[] buffer){
+		AsyncBuffer asyncFile=(AsyncBuffer)PoolManager.getInstance(AsyncBuffer.class);
+		asyncFile.useCache=false;//
+		asyncFile.isReadMode=true;//
+		asyncFile.topBuffer=buffer;//
+		asyncFile.dataLength=BuffersUtil.remaining(buffer);
+		return asyncFile;
+	}
 
 	/* read modeÇ≈ÇÃopen */
 	public static AsyncBuffer open(File file){
@@ -132,8 +142,10 @@ public class AsyncBuffer extends PoolBase implements Timer{
 		this.position=position;
 	}
 	
-	public ByteBuffer[] getTopBuffer(){
-		return topBuffer;
+	public ByteBuffer[] popTopBuffer(){
+		ByteBuffer[] result=topBuffer;
+		topBuffer=null;
+		return result;
 	}
 	
 	private static final int TYPE_ONBUFFER=1;
@@ -162,7 +174,7 @@ public class AsyncBuffer extends PoolBase implements Timer{
 	
 	/* topBufferÇ…ëSÇƒÇ™ä‹Ç‹ÇÍÇÈÇ© */
 	public boolean isInTopBuffer(){
-		if(!inAsyncRead||topBuffer==null){
+		if(!isReadMode||topBuffer==null){
 			return false;
 		}
 		return BuffersUtil.remaining(topBuffer)==dataLength;
