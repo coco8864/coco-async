@@ -684,8 +684,9 @@ public class PoolManager implements Queuelet,Timer{
 			ByteBuffer newBuffer=PoolManager.getBufferInstance(length);
 			byte[] newArray=newBuffer.array();
 			System.arraycopy(array, 0, newArray, 0, length);
-			newBuffer.position(buffer.position());
+			//limit -> positionの必要がある
 			newBuffer.limit(buffer.limit());
+			newBuffer.position(buffer.position());
 			return newBuffer;
 		}
 		
@@ -702,8 +703,9 @@ public class PoolManager implements Queuelet,Timer{
 			return buffer.duplicate();
 		}
 		ByteBuffer dupBuffer=arrayLife.getByteBuffer();
-		dupBuffer.position(buffer.position());
+		//limit -> positionの必要がある
 		dupBuffer.limit(buffer.limit());
+		dupBuffer.position(buffer.position());
 		return dupBuffer;
 	}
 

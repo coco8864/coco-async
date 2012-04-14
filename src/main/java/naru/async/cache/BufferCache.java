@@ -143,6 +143,7 @@ public class BufferCache implements Timer{
 		}
 	}
 	
+	/* buffer‚ÍÁ”ï‚³‚ê‚È‚¢ */
 	public void put(FileInfo fileInfo,long filePosition,ByteBuffer[] buffer){
 		if((filePositionCache.size()+pageCache.size())>=max){
 			overFlow++;
