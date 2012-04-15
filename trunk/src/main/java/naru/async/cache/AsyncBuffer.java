@@ -43,7 +43,7 @@ public class AsyncBuffer extends PoolBase implements Timer{
 		asyncFile.useCache=false;//
 		asyncFile.isReadMode=true;//
 		asyncFile.topBuffer=buffer;//
-		asyncFile.dataLength=BuffersUtil.remaining(buffer);
+		asyncFile.length=BuffersUtil.remaining(buffer);
 		return asyncFile;
 	}
 
@@ -72,7 +72,7 @@ public class AsyncBuffer extends PoolBase implements Timer{
 		}else{
 			fileInfo=fileCache.createFileInfo(file);
 		}
-		dataLength=fileInfo.length();
+		length=fileInfo.length();
 	}
 	
 	/* write modeからreadModeに切り替え */
@@ -92,7 +92,7 @@ public class AsyncBuffer extends PoolBase implements Timer{
 			createTmpFile=null;
 		}
 		isReadMode=true;
-		dataLength=position;
+		length=position;
 		position=0;
 	}
 	
@@ -110,7 +110,7 @@ public class AsyncBuffer extends PoolBase implements Timer{
 			fileInfo=null;
 		}
 		inAsyncRead=false;/* asyncReadの再帰呼び出しをチェックするフラグ */
-		dataLength=position=0;
+		length=position=0;
 		isReadMode=false;
 		if(topBuffer!=null){
 			PoolManager.poolBufferInstance(topBuffer);
@@ -132,7 +132,7 @@ public class AsyncBuffer extends PoolBase implements Timer{
 	//write modeからはじめた場合は、topBufferが設定される,データはこれが最後の可能性もある
 	private ByteBuffer[] topBuffer=null;
 	private File createTmpFile=null;
-	private long dataLength;
+	private long length;
 	
 	public FileInfo getFileInfo(){
 		return fileInfo;
@@ -140,6 +140,10 @@ public class AsyncBuffer extends PoolBase implements Timer{
 	
 	public void position(long position){
 		this.position=position;
+	}
+	
+	public long length(){
+		return length;
 	}
 	
 	public ByteBuffer[] popTopBuffer(){
@@ -177,7 +181,7 @@ public class AsyncBuffer extends PoolBase implements Timer{
 		if(!isReadMode||topBuffer==null){
 			return false;
 		}
-		return BuffersUtil.remaining(topBuffer)==dataLength;
+		return BuffersUtil.remaining(topBuffer)==length;
 	}
 	
 	public void putBuffer(ByteBuffer buffer){
@@ -246,7 +250,7 @@ public class AsyncBuffer extends PoolBase implements Timer{
 		}
 		inAsyncRead=true;//このmethodから復帰する際必ずfalseに変更する
 		//終端の判断
-		if(offset>=dataLength){
+		if(offset>=length){
 			callback(TYPE_ONBUFFER_END,bufferGetter,userContext,null,null);
 			return true;
 		}
