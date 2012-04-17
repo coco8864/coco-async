@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import naru.async.AsyncBuffer;
 import naru.async.BufferGetter;
 import naru.async.Timer;
 import naru.async.pool.BuffersUtil;
@@ -24,22 +25,22 @@ import naru.async.timer.TimerManager;
  * @author Owner
  *
  */
-public class AsyncBuffer extends PoolBase implements Timer{
+public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 	private static FileCache fileCache=FileCache.getInstance();
 	private static BufferCache bufferCache=BufferCache.getInstance();
 	private static long BUF_SIZE=PoolManager.getDefaultBufferSize();
 	
 	/* write mode */
-	public static AsyncBuffer open(){
-		AsyncBuffer asyncFile=(AsyncBuffer)PoolManager.getInstance(AsyncBuffer.class);
+	public static CacheBuffer open(){
+		CacheBuffer asyncFile=(CacheBuffer)PoolManager.getInstance(CacheBuffer.class);
 		asyncFile.useCache=true;//
 		asyncFile.isReadMode=false;//
 		return asyncFile;
 	}
 	
 	/* bufferは消費される */
-	public static AsyncBuffer open(ByteBuffer[] buffer){
-		AsyncBuffer asyncFile=(AsyncBuffer)PoolManager.getInstance(AsyncBuffer.class);
+	public static CacheBuffer open(ByteBuffer[] buffer){
+		CacheBuffer asyncFile=(CacheBuffer)PoolManager.getInstance(CacheBuffer.class);
 		asyncFile.useCache=false;//
 		asyncFile.isReadMode=true;//
 		asyncFile.topBuffer=buffer;//
@@ -48,14 +49,14 @@ public class AsyncBuffer extends PoolBase implements Timer{
 	}
 
 	/* read modeでのopen */
-	public static AsyncBuffer open(File file){
+	public static CacheBuffer open(File file){
 		return open(file,true);
 	}
 
 	/* read modeでのopen */
 	/* 再利用の可能性がないファイルはcacheを使わない */
-	public static AsyncBuffer open(File file,boolean useCache){
-		AsyncBuffer asyncFile=(AsyncBuffer)PoolManager.getInstance(AsyncBuffer.class);
+	public static CacheBuffer open(File file,boolean useCache){
+		CacheBuffer asyncFile=(CacheBuffer)PoolManager.getInstance(CacheBuffer.class);
 		asyncFile.init(file, useCache);
 		return asyncFile;
 	}
@@ -142,10 +143,6 @@ public class AsyncBuffer extends PoolBase implements Timer{
 		this.position=position;
 	}
 	
-	public long length(){
-		return length;
-	}
-	
 	public ByteBuffer[] popTopBuffer(){
 		ByteBuffer[] result=topBuffer;
 		topBuffer=null;
@@ -161,7 +158,7 @@ public class AsyncBuffer extends PoolBase implements Timer{
 			case TYPE_ONBUFFER:
 				if(bufferGetter.onBuffer(userContext, buffer)){
 					/* この先でTimer処理になる、推奨しない */
-					asyncGet(bufferGetter,position,userContext);
+					asyncBuffer(bufferGetter,position,userContext);
 				}
 				break;
 			case TYPE_ONBUFFER_END:
@@ -235,12 +232,34 @@ public class AsyncBuffer extends PoolBase implements Timer{
 		}
 	}
 	
-	public synchronized boolean asyncGet(BufferGetter bufferGetter,Object userContext){
-		return asyncGet(bufferGetter,position,userContext);
+	public void close(){
+		if(fileChannel!=null){
+			try {
+				fileChannel.close();
+			} catch (IOException ignore) {
+			}
+			fileChannel=null;
+		}
+		unref();
+	}
+	
+	public void onTimer(Object userContext) {
+		Object[] params=(Object[])userContext;
+		synchronized(this){
+			if(inAsyncRead){//このまま呼ぶと無限ループに落ちる
+				//onBufferが到着しないのにasyncBufferを呼び出した等
+				((BufferGetter)params[0]).onBufferFailure(userContext, new IllegalStateException("AsyncFile secuence"));
+				return;
+			}
+		}
+		asyncBuffer((BufferGetter)params[0],(Long)params[1],params[2]);
 	}
 
-	/* 基本的にBufferGetterイベントからasyncReadは呼び出さない事 */
-	public synchronized boolean asyncGet(BufferGetter bufferGetter,long offset,Object userContext){
+	public boolean asyncBuffer(BufferGetter bufferGetter, Object userContext) {
+		return asyncBuffer(bufferGetter,position,userContext);
+	}
+
+	public boolean asyncBuffer(BufferGetter bufferGetter, long offset,Object userContext) {
 		if(!isReadMode){
 			throw new IllegalStateException("AsyncFile asyncRead");
 		}
@@ -308,27 +327,8 @@ public class AsyncBuffer extends PoolBase implements Timer{
 		callback(TYPE_ONBUFFER,bufferGetter,userContext,buffer,null);
 		return true;
 	}
-	
-	public void close(){
-		if(fileChannel!=null){
-			try {
-				fileChannel.close();
-			} catch (IOException ignore) {
-			}
-			fileChannel=null;
-		}
-		unref();
-	}
-	
-	public void onTimer(Object userContext) {
-		Object[] params=(Object[])userContext;
-		synchronized(this){
-			if(inAsyncRead){//このまま呼ぶと無限ループに落ちる
-				//onBufferが到着しないのにasyncBufferを呼び出した等
-				((BufferGetter)params[0]).onBufferFailure(userContext, new IllegalStateException("AsyncFile secuence"));
-				return;
-			}
-		}
-		asyncGet((BufferGetter)params[0],(Long)params[1],params[2]);
+
+	public long bufferLength() {
+		return length;
 	}
 }
