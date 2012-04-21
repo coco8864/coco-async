@@ -39,11 +39,11 @@ public class FileTest extends TestBase {
 		}
 		public void onBufferEnd(Object userContext) {
 			System.out.println("onBufferEnd");
-			((AsyncBuffer)userContext).close();
+			((CacheBuffer)userContext).close();
 		}
 		public void onBufferFailure(Object userContext, Throwable failure) {
 			System.out.println("onBufferFailure");
-			((AsyncBuffer)userContext).close();
+			((CacheBuffer)userContext).close();
 		}
 	}
 	
@@ -54,7 +54,7 @@ public class FileTest extends TestBase {
 	}
 	
 	public void qtest1() throws Throwable{
-		AsyncBuffer asyncFile=AsyncBuffer.open(new File("pom.xml"));
+		CacheBuffer asyncFile=CacheBuffer.open(new File("pom.xml"));
 		asyncFile.asyncGet(new Getter(), asyncFile);
 	}
 	
@@ -65,9 +65,9 @@ public class FileTest extends TestBase {
 	}
 	
 	public void qtest2() throws Throwable{
-		AsyncBuffer asyncFile=AsyncBuffer.open(new File("pom.xml"));
-		AsyncBuffer asyncFile2=AsyncBuffer.open(new File("pom.xml"));
-		AsyncBuffer asyncFile3=AsyncBuffer.open(new File("pom.xml"));
+		CacheBuffer asyncFile=CacheBuffer.open(new File("pom.xml"));
+		CacheBuffer asyncFile2=CacheBuffer.open(new File("pom.xml"));
+		CacheBuffer asyncFile3=CacheBuffer.open(new File("pom.xml"));
 		asyncFile.asyncGet(new Getter(), asyncFile);
 		asyncFile2.asyncGet(new Getter(), asyncFile2);
 		asyncFile3.asyncGet(new Getter(), asyncFile3);
@@ -80,7 +80,7 @@ public class FileTest extends TestBase {
 		callTest("qtest3",Long.MAX_VALUE);
 	}
 	public void qtest3() throws Throwable{
-		AsyncBuffer asyncFile=AsyncBuffer.open();
+		CacheBuffer asyncFile=CacheBuffer.open();
 		asyncFile.putBuffer(ByteBuffer.wrap("abcdefg".getBytes()));
 		asyncFile.putBuffer(ByteBuffer.wrap("ABCDEFG".getBytes()));
 		asyncFile.flip();

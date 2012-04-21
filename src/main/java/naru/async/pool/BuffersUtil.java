@@ -202,6 +202,17 @@ public class BuffersUtil {
 			buffers[i].reset();
 		}
 	}
+
+	public static void skip(ByteBuffer buffers, long offset) {
+		long remaining=(long)buffers.remaining();
+		if(remaining<=offset){
+			int position=buffers.position();
+			position+=(int)(offset);
+			buffers.position(position);
+			return;
+		}
+		throw new RuntimeException("fail to skip");
+	}
 	
 	/**
 	 * æ“ª‚ðí‚é
@@ -226,10 +237,12 @@ public class BuffersUtil {
 	
 	public static void cut(ByteBuffer buffer,long length){
 		long remaining=(long)buffer.remaining();
-		if(length<remaining){
+		if(length<=remaining){
 			int position=buffer.position();
 			buffer.limit(position+(int)length);
+			return;
 		}
+		throw new RuntimeException("fail to cut");
 	}
 	
 	/**
@@ -388,4 +401,5 @@ public class BuffersUtil {
 			e.printStackTrace();
 		}
 	}
+
 }
