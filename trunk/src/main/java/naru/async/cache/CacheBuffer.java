@@ -44,6 +44,7 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 		asyncFile.useCache=false;//
 		asyncFile.isReadMode=true;//
 		asyncFile.topBuffer=buffer;//
+		asyncFile.isOneBuffer=true;
 		asyncFile.length=BuffersUtil.remaining(buffer);
 		return asyncFile;
 	}
@@ -63,6 +64,7 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 	
 	private void init(File file,boolean useCache){
 		isReadMode=true;
+		isOneBuffer=false;
 		if(useCache && fileCache.useCache()){
 			this.useCache=true;
 		}else{
@@ -87,7 +89,9 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 			} catch (IOException ignore) {
 			}
 			fileChannel=null;
+			isOneBuffer=false;
 		}else{//ファイル出力しなかった
+			isOneBuffer=true;
 		}
 		if(createTmpFile!=null){
 			createTmpFile.delete();
@@ -131,6 +135,7 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 	private boolean inAsyncRead=false;
 	private boolean useCache;
 	private boolean isReadMode=false;
+	private boolean isOneBuffer=false;//1バッファモード
 	//write modeからはじめた場合は、topBufferが設定される,データはこれが最後の可能性もある
 	private ByteBuffer[] topBuffer=null;
 	private File createTmpFile=null;
@@ -145,6 +150,9 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 	}
 	
 	public ByteBuffer[] popTopBuffer(){
+		if(isOneBuffer){
+			return PoolManager.duplicateBuffers(topBuffer);
+		}
 		ByteBuffer[] result=topBuffer;
 		topBuffer=null;
 		return result;
