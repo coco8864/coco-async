@@ -87,6 +87,7 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 			} catch (IOException ignore) {
 			}
 			fileChannel=null;
+		}else{//ファイル出力しなかった
 		}
 		if(createTmpFile!=null){
 			createTmpFile.delete();
@@ -201,9 +202,9 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 				File file=File.createTempFile("AsyncFile","dat");//TODO dir指定
 				fileInfo=fileCache.createFileInfo(file);
 				if(useCache){
-					if(position==BUF_SIZE){
+//					if(position==BUF_SIZE){
 						bufferCache.put(fileInfo,0,topBuffer);
-					}
+//					}
 				}
 				FileOutputStream fos=new FileOutputStream(fileInfo.getFile());
 				fileChannel=fos.getChannel();
@@ -213,9 +214,9 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 				dup=null;
 			}
 			if(useCache){
-				if(position%BUF_SIZE==0){
+//				if(position%BUF_SIZE==0){
 					bufferCache.put(fileInfo,position,buffer);
-				}
+//				}
 			}
 			dup=buffer;
 			fileChannel.write(buffer);
