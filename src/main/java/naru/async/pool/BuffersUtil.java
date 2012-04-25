@@ -205,7 +205,7 @@ public class BuffersUtil {
 
 	public static void skip(ByteBuffer buffers, long offset) {
 		long remaining=(long)buffers.remaining();
-		if(remaining<=offset){
+		if(remaining>=offset){
 			int position=buffers.position();
 			position+=(int)(offset);
 			buffers.position(position);
