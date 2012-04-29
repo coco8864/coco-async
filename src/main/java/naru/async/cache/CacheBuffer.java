@@ -6,6 +6,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.apache.log4j.Logger;
+
 import naru.async.AsyncBuffer;
 import naru.async.BufferGetter;
 import naru.async.Timer;
@@ -26,6 +28,7 @@ import naru.async.timer.TimerManager;
  *
  */
 public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
+	private static Logger logger=Logger.getLogger(CacheBuffer.class);
 	private static FileCache fileCache=FileCache.getInstance();
 	private static BufferCache bufferCache=BufferCache.getInstance();
 	private static long BUF_SIZE=PoolManager.getDefaultBufferSize();
@@ -257,7 +260,7 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 		synchronized(this){
 			if(inAsyncRead){//このまま呼ぶと無限ループに落ちる
 				//onBufferが到着しないのにasyncBufferを呼び出した等
-				((BufferGetter)params[0]).onBufferFailure(userContext, new IllegalStateException("AsyncFile secuence"));
+				((BufferGetter)params[0]).onBufferFailure(params[2], new IllegalStateException("AsyncFile secuence"));
 				return;
 			}
 		}
@@ -273,6 +276,7 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 			throw new IllegalStateException("AsyncFile asyncRead");
 		}
 		if(inAsyncRead){//callbackからasyncReadが呼ばれた、この呼び出しは推奨しない,処理が無意味に遅くなる
+			logger.debug("asyncBuffer isAsyncRead true",new Throwable());
 			TimerManager.setTimeout(0, this, new Object[]{bufferGetter,offset,userContext});
 			return false;
 		}
@@ -282,6 +286,13 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 			callback(TYPE_ONBUFFER_END,bufferGetter,userContext,null,null);
 			return true;
 		}
+		if(isOneBuffer){
+			ByteBuffer[] buffer=PoolManager.duplicateBuffers(topBuffer);
+			BuffersUtil.skip(buffer, offset);
+			callback(TYPE_ONBUFFER,bufferGetter,userContext,buffer,null);
+			return true;
+		}
+		
 		//0 -> 0
 		//1-> 0
 		//1023 -> 0

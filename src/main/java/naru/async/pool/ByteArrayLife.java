@@ -41,11 +41,13 @@ public class ByteArrayLife extends ReferenceLife {
 		synchronized(userLifes){
 //			logger.debug("getOnlyByteBuffer:size:" +byteBufferLifes.size() +":refCounter:"+refCounter);
 			if(freeLifes.size()<1){
-				throw new IllegalStateException("freeLifes.size()="+freeLifes.size());
+				logger.error("fail to getFirstByteBuffer no freeLifes",new IllegalStateException());
+				return null;//pool中が壊れていただけであり、呼び出し者は被害者、インスタンス取得を再試行
 			}
 			searchKey.setByteBuffer(byteBuffer);
 			if(byteBuffer!=freeLifes.remove(searchKey)){
-				throw new IllegalStateException("freeLifes.size()="+freeLifes.size());
+				logger.error("fail to getFirstByteBuffer not in freeLifes:"+freeLifes.size(),new IllegalStateException());
+				return null;//pool中が壊れていただけであり、呼び出し者は被害者、インスタンス取得を再試行
 			}
 			ByteBufferLife byteBufferLife=searchKey.getHit();
 //			Iterator<ByteBufferLife> itr=freeLifes.keySet().iterator();
@@ -175,6 +177,7 @@ public class ByteArrayLife extends ReferenceLife {
 				/* 代表のByteBufferを作る */
 				ByteBuffer byteBuffer=ByteBuffer.wrap(array);
 				byteBufferLife=new ByteBufferLife(byteBuffer,this);
+				freeLifes.put(byteBufferLife,byteBuffer);
 				pool.poolInstance(byteBuffer);//ByteBufferをpoolに戻す
 			}
 		}
