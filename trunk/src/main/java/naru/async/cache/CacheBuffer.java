@@ -271,7 +271,7 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 		return asyncBuffer(bufferGetter,position,userContext);
 	}
 
-	public boolean asyncBuffer(BufferGetter bufferGetter, long offset,Object userContext) {
+	public synchronized boolean asyncBuffer(BufferGetter bufferGetter, long offset,Object userContext) {
 		if(!isReadMode){
 			throw new IllegalStateException("AsyncFile asyncRead");
 		}
