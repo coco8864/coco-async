@@ -275,17 +275,18 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 		if(!isReadMode){
 			throw new IllegalStateException("AsyncFile asyncRead");
 		}
+//		inAsyncRead=true;//このmethodから復帰する際必ずfalseに変更する
+		//終端の判断
+		if(offset>=length){
+			callback(TYPE_ONBUFFER_END,bufferGetter,userContext,null,null);
+			return true;
+		}
 		if(inAsyncRead){//callbackからasyncReadが呼ばれた、この呼び出しは推奨しない,処理が無意味に遅くなる
 			logger.debug("asyncBuffer isAsyncRead true",new Throwable());
 			TimerManager.setTimeout(0, this, new Object[]{bufferGetter,offset,userContext});
 			return false;
 		}
 		inAsyncRead=true;//このmethodから復帰する際必ずfalseに変更する
-		//終端の判断
-		if(offset>=length){
-			callback(TYPE_ONBUFFER_END,bufferGetter,userContext,null,null);
-			return true;
-		}
 		if(isOneBuffer){
 			ByteBuffer[] buffer=PoolManager.duplicateBuffers(topBuffer);
 			BuffersUtil.skip(buffer, offset);
