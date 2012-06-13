@@ -45,6 +45,7 @@ public class PersistenceStore implements Serializable {
 		storeIdSequence=0;
 		int usePageCount=0;
 		int freePageCount=0;
+		System.out.println("recoverPageFile start pageIdMax:"+pageIdSequence);
 		while(true){
 			pageId-=Page.PAGE_SIZE;
 			if(pageId<0){
@@ -69,6 +70,7 @@ public class PersistenceStore implements Serializable {
 			page.unref(true);
 		}
 		setTopFreePageId(nextPageId);
+		System.out.println("recoverPageFile end usePageCount:" +usePageCount + ":freePageCount:"+freePageCount);
 		logger.warn("usePageCount:" +usePageCount + ":freePageCount:"+freePageCount);
 	}
 	
