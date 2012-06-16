@@ -443,9 +443,11 @@ public class StoreManager {
 			logger.info("Dispatcher init");
 			StoreManager.dispatchContext=context;
 			//‹N“®‘O‚ÉStore‚ğcompress‚·‚é,•K{‚Å‚Í‚È‚¢‚ª
-			if(param.get("initCompress")!=null){
-				logger.info("compress store before start");
+			if("true".equals(param.get("initCompress"))){
+				System.out.println("compless store start");
 				forceCompress();
+				logger.info("compress store end");
+				System.out.println("compless store end");
 			}
 			infoStastics();
 			interval=TimerManager.setInterval(compressInterval, this, "StoreManagerTimer");
