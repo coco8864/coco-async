@@ -56,6 +56,7 @@ public class FileCache implements Timer{
 		this.useCache=useCache;
 	}
 	
+	/* –¢ŽÀ‘• */
 	public void setFlushCache(boolean flushCache){
 		this.flushCache=flushCache;
 	}
