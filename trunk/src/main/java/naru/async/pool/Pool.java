@@ -520,8 +520,7 @@ public class Pool {
 			life = getGeneralReferenceLife(obj);
 		}
 		if (life == null || life.get() != obj) {
-			logger.warn("poolArrayGeneralInstance not in pool.obj:" + obj+":" +life,
-					new Exception());
+			logger.warn("poolArrayGeneralInstance not in pool.obj:" + obj+":" +life+":"+length,new Exception());
 			return;// ŠÇ—ŠO
 		}
 		if(life.unref()){//³í‚ÉŠJ•ú‚Å‚«‚½ê‡pool‚É–ß‚·

@@ -81,12 +81,17 @@ public class ByteArrayLife extends ReferenceLife {
 	ByteBuffer getByteBuffer(){
 		synchronized(useLifes){
 			Iterator<ByteBufferLife> itr=freeLifes.keySet().iterator();
-			if(itr.hasNext()){
+			while(itr.hasNext()){
 				ByteBufferLife life=itr.next();
+				ByteBuffer byteBuffer=(ByteBuffer)life.get();
+				if(byteBuffer==null){
+					logger.warn("getByteBuffer .freeLies.size():"+freeLifes.size()+":refCounter:"+refCounter);
+					itr.remove();
+					continue;
+				}
 				itr.remove();
 				useLifes.add(life);
 				life.ref();
-				ByteBuffer byteBuffer=(ByteBuffer)life.get();
 				ref();
 				return byteBuffer;
 			}
