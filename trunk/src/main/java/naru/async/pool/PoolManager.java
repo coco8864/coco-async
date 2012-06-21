@@ -312,6 +312,32 @@ public class PoolManager implements Queuelet,Timer{
 		return pool.getInstance();
 	}
 	
+	public static void checkArrayInstance(Object objs){
+		Class clazz=objs.getClass();
+		int arraySize=Array.getLength(objs);
+		if(arraySize==0){
+			return;
+		}
+		Pool pool=getArrayPool(clazz.getComponentType(), arraySize);
+		if(pool==null){
+			logger.warn("checkArrayInstance isn't pool instance."+clazz.getName()+":length:"+Array.getLength(objs));
+			/* いきなり返してきたパターンは、再利用しない */
+			return;
+		}
+		ReferenceLife life=pool.getArrayLife(objs);
+		if(life==null){
+			logger.error("checkArrayInstance life is null."+clazz.getName()+":length:"+arraySize +":"+objs,new Exception());
+			return;
+		}
+		if(life.get()!=objs){
+			logger.error("checkArrayInstance not equals."+clazz.getName()+":length:"+arraySize +":"+objs +":"+life.get(),new Exception());
+		}
+		if(life.refCounter<=0){
+			logger.error("checkArrayInstance refcount is 0."+clazz.getName()+":length:"+arraySize +":"+objs +":"+life.get(),new Exception());
+		}
+	}
+	
+	
 	public static void poolArrayInstance(Object objs){
 		Class clazz=objs.getClass();
 		int arraySize=Array.getLength(objs);
