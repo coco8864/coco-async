@@ -92,6 +92,8 @@ public class WriteBuffer implements BufferGetter {
 	//アプリから貰ったbufferは、putBuffersで詰め込む
 	public void putBuffer(ByteBuffer[] buffer){
 		logger.debug("putBuffer cid:"+ context.getPoolId()+":store:"+store +":len:"+BuffersUtil.remaining(buffer));
+		//for debug
+		PoolManager.checkArrayInstance(buffer);
 		store.putBuffer(buffer);
 		//write可能になるのを待つ
 		/* 試しに以下をコメントアウト onBufferにあるので必要ないんじゃないか？ */

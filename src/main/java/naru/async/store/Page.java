@@ -419,6 +419,9 @@ public class Page extends PoolBase{
 	}
 	
 	public synchronized boolean putBuffer(ByteBuffer[] buffer,boolean isExpand){
+		//for debug
+		PoolManager.checkArrayInstance(buffer);
+		
 		long length=BuffersUtil.remaining(buffer);
 		logger.debug("putBuffer."+this +":" + bufferLength +":"+length);
 		if(this.buffer==null||this.buffer.length==0){

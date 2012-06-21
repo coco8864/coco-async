@@ -511,6 +511,10 @@ public class Pool {
 //		logger.debug("recycleInstance:" + poolClass.getName() + "#" + sequence + "#" + instanceCount);
 	}
 
+	ReferenceLife getArrayLife(Object obj){
+		return poolLifesMap.get(obj);
+	}
+	
 	// type‚ªARRAY,GENERAL‚Ìê‡ŒÄ‚Ño‚³‚ê‚é
 	void poolArrayGeneralInstance(Object obj) {
 		ReferenceLife life=null;
