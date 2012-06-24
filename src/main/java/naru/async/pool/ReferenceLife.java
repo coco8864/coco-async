@@ -33,7 +33,7 @@ public class ReferenceLife extends WeakReference {
 	protected String threadNameOfPool;
 	protected int countOfGet=0;
 	protected int countOfPool=0;
-	protected int refCounter=0;//参照数(0の状態でのみpoolInstance可能
+	protected volatile int refCounter=0;//参照数(0の状態でのみpoolInstance可能
 
 	public ReferenceLife(Object referent) {
 		super(referent,PoolManager.getReferenceQueue());

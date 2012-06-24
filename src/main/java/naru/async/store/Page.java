@@ -186,6 +186,8 @@ public class Page extends PoolBase{
 		page.filePosition=filePosition;
 		page.fileId=fileId;
 		page.buffer=PoolManager.duplicateBuffers(buffer);
+		//for debug
+		//PoolManager.checkArrayInstance(buffer);
 		return store.getPutLength();
 	}
 	
@@ -419,13 +421,13 @@ public class Page extends PoolBase{
 	}
 	
 	public synchronized boolean putBuffer(ByteBuffer[] buffer,boolean isExpand){
-		//for debug
-		PoolManager.checkArrayInstance(buffer);
-		
 		long length=BuffersUtil.remaining(buffer);
 		logger.debug("putBuffer."+this +":" + bufferLength +":"+length);
 		if(this.buffer==null||this.buffer.length==0){
 			this.buffer=buffer;
+			//for debug
+			//PoolManager.checkArrayInstance(buffer);
+			
 			checkLastBuffer();
 			this.bufferLength+=length;
 			logger.debug("putBuffer org buffer null. result length"+this.bufferLength);
@@ -458,6 +460,9 @@ public class Page extends PoolBase{
 		PoolManager.poolArrayInstance(this.buffer);
 		PoolManager.poolArrayInstance(buffer);
 		this.buffer=newBuffer;
+		//for debug
+		//PoolManager.checkArrayInstance(buffer);
+		
 		checkLastBuffer();
 		this.bufferLength+=length;
 		return true;
@@ -483,6 +488,9 @@ public class Page extends PoolBase{
 			}
 			buf.flip();
 			this.buffer=BuffersUtil.toByteBufferArray(buf);
+			//for debug
+			//PoolManager.checkArrayInstance(buffer);
+			
 			this.bufferLength+=length;
 			return true;
 		}
@@ -503,6 +511,9 @@ public class Page extends PoolBase{
 		System.arraycopy(this.buffer, 0, newBuffer, 0, this.buffer.length);
 		PoolManager.poolArrayInstance(this.buffer);
 		this.buffer=newBuffer;
+		//for debug
+		//PoolManager.checkArrayInstance(buffer);
+		
 		
 		long defaultBufferSize=PoolManager.getDefaultBufferSize();
 		int allocBufferSize=(int)defaultBufferSize;
@@ -537,6 +548,9 @@ public class Page extends PoolBase{
 	public synchronized void fillBuffer(StoreFile bufferFile) throws IOException{
 		logger.debug("fillBuffer."+this);
 		buffer=BuffersUtil.prepareBuffers(bufferLength);
+		//for debug
+		//PoolManager.checkArrayInstance(buffer);
+		
 		bufferFile.read(buffer, filePosition);
 		BuffersUtil.flipBuffers(buffer);
 	}

@@ -45,7 +45,8 @@ public class ByteArrayLife extends ReferenceLife {
 				return null;//pool中が壊れていただけであり、呼び出し者は被害者、インスタンス取得を再試行
 			}
 			searchKey.setByteBuffer(byteBuffer);
-			if(byteBuffer!=freeLifes.remove(searchKey)){
+			ByteBuffer wk=freeLifes.remove(searchKey);
+			if(byteBuffer!=wk){
 				logger.error("fail to getFirstByteBuffer not in freeLifes:"+freeLifes.size(),new IllegalStateException());
 				return null;//pool中が壊れていただけであり、呼び出し者は被害者、インスタンス取得を再試行
 			}
@@ -113,13 +114,26 @@ public class ByteArrayLife extends ReferenceLife {
 			ByteBufferLife byteBufferLife=removeByteBuffer(buffer);
 			if(byteBufferLife==null){
 				//2重poolBufferInstance()..
-				logger.error("poolByteBuffer...",new Throwable());//TODO
+				logger.error("poolByteBuffer duplicate pool,useLies.size:"+useLifes.size()+":freeLifes.size:"+freeLifes.size(),new Exception());//TODO
+				buffer.position(0);
+				buffer.limit(128);
+				logger.error(BuffersUtil.toStringFromBuffer(buffer, "utf-8"));
+				Iterator<ByteBufferLife> itr=freeLifes.keySet().iterator();
+				while(itr.hasNext()){
+					ByteBufferLife l=itr.next();
+					ByteBuffer b=freeLifes.get(l);
+					if(b==buffer){
+						logger.error("prev poolByteBuffer."+new Date(l.timeOfPool),l.stackOfPool);//TODO
+					}
+				}
+				
 				return;
 			}
 			byteBufferLife.unref();
 			if(unref()){
 				if(useLifes.size()!=0){
-					throw new IllegalStateException("byteBufferLifes.size()="+useLifes.size());
+					logger.error("poolByteBuffer no useLifes,useLies.size:"+useLifes.size()+":freeLifes.size:"+freeLifes.size(),new Exception());//TODO
+					return;
 				}
 				//代表のByteBufferをpoolに戻す
 				//poolが溢れた場合この延長でreleaseLifeメソッドが呼び出される
@@ -135,7 +149,7 @@ public class ByteArrayLife extends ReferenceLife {
 			}
 			if(getRef()==0){//pool中にいる
 				//2重poolBufferInstance()..
-				logger.error("poolByteBuffer...getRef()==0",new Throwable());//TODO
+				logger.error("poolByteBuffer...getRef()==0",new Exception());//TODO
 				return;
 			}
 		}

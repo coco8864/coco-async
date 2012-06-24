@@ -91,8 +91,6 @@ public class ReadBuffer implements BufferGetter {
 	
 	//回線からreadしたbufferは、putBuffersメソッドで詰め込む
 	public void putBuffer(ByteBuffer[] buffer){
-		//for debug
-		PoolManager.checkArrayInstance(buffer);
 		if(store==null || store.isCloseReceived()){
 			logger.warn("store closed.cid:"+context.getPoolId()+":store:"+store);
 			PoolManager.poolBufferInstance(buffer);
