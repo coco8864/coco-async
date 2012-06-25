@@ -114,7 +114,7 @@ public class ByteArrayLife extends ReferenceLife {
 			ByteBufferLife byteBufferLife=removeByteBuffer(buffer);
 			if(byteBufferLife==null){
 				//2èdpoolBufferInstance()..
-				logger.error("poolByteBuffer duplicate pool,useLies.size:"+useLifes.size()+":freeLifes.size:"+freeLifes.size(),new Exception());//TODO
+				logger.error("poolByteBuffer duplicate pool,useLies.size:"+useLifes.size()+":freeLifes.size:"+freeLifes.size()+":this.refCount:"+this.refCounter,new Exception());//TODO
 				buffer.position(0);
 				buffer.limit(128);
 				logger.error(BuffersUtil.toStringFromBuffer(buffer, "utf-8"));
@@ -123,7 +123,10 @@ public class ByteArrayLife extends ReferenceLife {
 					ByteBufferLife l=itr.next();
 					ByteBuffer b=freeLifes.get(l);
 					if(b==buffer){
-						logger.error("prev poolByteBuffer."+new Date(l.timeOfPool),l.stackOfPool);//TODO
+						logger.error("prev get. refcount"+l.refCounter +":"+l.threadNameOfGet+":"+ReferenceLife.fomatLogDate(new Date(l.timeOfGet))+":" +b,l.stackOfGet);//TODO
+						logger.error("prev poolByteBuffer."+l.threadNameOfPool+":"+ReferenceLife.fomatLogDate(new Date(l.timeOfPool))+":" +b+":"+System.identityHashCode(b),l.stackOfPool);//TODO
+					}else{
+						logger.error("other poolByteBuffer."+l.threadNameOfPool+":"+ReferenceLife.fomatLogDate(new Date(l.timeOfPool))+":" +b+":"+System.identityHashCode(b),l.stackOfPool);//TODO
 					}
 				}
 				

@@ -40,6 +40,7 @@ public class BufferCache implements Timer{
 	public void setCacheSize(int min){
 		this.min=min;
 		this.max=min*2;
+//		this.max=-1;
 	}
 	
 	private boolean check(BufferInfo bufferInfo,long now){
@@ -114,6 +115,7 @@ public class BufferCache implements Timer{
 		return cacheInfo.duplicateBuffers();
 	}
 	
+	/* buffer‚ÍÁ”ï‚³‚ê‚È‚¢ */
 	public void put(Page page,ByteBuffer[] buffer){
 		if((filePositionCache.size()+pageCache.size())>=max){
 			overFlow++;

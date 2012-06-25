@@ -22,7 +22,7 @@ public class Page extends PoolBase{
 	
 	private static StoreFile pageFile;
 	private static PersistenceStore persistenceStore;
-	private static BufferCache bufferCache=BufferCache.getInstance();
+//	private static BufferCache bufferCache=BufferCache.getInstance();
 	
 	public static void init(PersistenceStore persistenceStore,StoreFile pageFile){
 		Page.persistenceStore=persistenceStore;
@@ -608,7 +608,8 @@ public class Page extends PoolBase{
 	
 	public void pageIn(){
 		logger.debug("pageIn."+this);
-		ByteBuffer[] buffer=bufferCache.get(this);
+//		ByteBuffer[] buffer=bufferCache.get(this);
+		ByteBuffer[] buffer=null;
 		if(buffer!=null){
 			this.buffer=buffer;
 			if(store!=null){
@@ -634,10 +635,10 @@ public class Page extends PoolBase{
 	
 	public void onPageIn(){
 //		logger.debug("onPageIn.storeId:"+storeId +":pageId:"+pageId+":digest:"+BuffersUtil.digestString(buffer));
-		if( store.getKind()==Store.Kind.GET ){
-			bufferCache.put(this,buffer);
-		}
 		if(store!=null){
+			if( store.getKind()==Store.Kind.GET ){
+//				bufferCache.put(this,buffer);
+			}
 			store.onPageIn(this);
 		}else{
 			logger.error("onPageIn.store=null",new Exception());

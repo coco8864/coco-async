@@ -15,6 +15,7 @@ public class ByteBufferLife extends ReferenceLife {
 		}
 		public void setByteBuffer(ByteBuffer byteBuffer) {
 			this.byteBuffer = byteBuffer;
+			this.hit=null;
 		}
 		public ByteBufferLife getHit() {
 			return hit;
