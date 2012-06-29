@@ -288,10 +288,6 @@ public class PoolManager implements Queuelet,Timer{
 	 * poolにあるかもしれないObjectを取得する場合に呼び出すメソッド
 	 */
 	public static Object getArrayInstance(Class clazz,int size){
-		if(true){
-			return Array.newInstance(clazz, size);			
-		}
-		
 //		System.out.println("logger:"+logger.getClass().getClassLoader().toString());
 //		Thread.dumpStack();
 		if(size==0){
@@ -343,9 +339,6 @@ public class PoolManager implements Queuelet,Timer{
 	
 	
 	public static void poolArrayInstance(Object objs){
-		if(true){
-			return;
-		}
 		Class clazz=objs.getClass();
 		int arraySize=Array.getLength(objs);
 		if(arraySize==0){
@@ -747,6 +740,7 @@ public class PoolManager implements Queuelet,Timer{
 	}
 	
 	public static ByteBuffer[] duplicateBuffers(ByteBuffer buffer[],boolean isNewBuffer) {
+		isNewBuffer=true;
 		ByteBuffer[] dupBuffers=BuffersUtil.newByteBufferArray(buffer.length);
 		for(int i=0;i<buffer.length;i++){
 			dupBuffers[i]=duplicateBuffer(buffer[i],isNewBuffer);

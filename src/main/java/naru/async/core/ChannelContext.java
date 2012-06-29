@@ -505,6 +505,10 @@ public class ChannelContext extends PoolBase{
 				return false;
 			}
 			ByteBuffer[] buffers=writeOrder.popBuffers();
+			for(ByteBuffer b:buffers){
+				logger.info("writeOrder this:"+System.identityHashCode(this)+":bufid:"+System.identityHashCode(b));
+			}
+			
 			long writeLength=BuffersUtil.remaining(buffers);
 //			if(writeLength==0){
 //				logger.warn("write buffer length 0.cid:"+getPoolId()+":buffers:"+buffers,new Throwable());

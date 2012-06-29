@@ -114,7 +114,7 @@ public class ByteArrayLife extends ReferenceLife {
 			ByteBufferLife byteBufferLife=removeByteBuffer(buffer);
 			if(byteBufferLife==null){
 				//2èdpoolBufferInstance()..
-				logger.error("poolByteBuffer duplicate pool,useLies.size:"+useLifes.size()+":freeLifes.size:"+freeLifes.size()+":this.refCount:"+this.refCounter,new Exception());//TODO
+				logger.error("poolByteBuffer duplicate pool,bufid:"+System.identityHashCode(buffer) + ":useLies.size:"+useLifes.size()+":freeLifes.size:"+freeLifes.size()+":this.refCount:"+this.refCounter,new Exception());//TODO
 				buffer.position(0);
 				buffer.limit(128);
 				logger.error(BuffersUtil.toStringFromBuffer(buffer, "utf-8"));
