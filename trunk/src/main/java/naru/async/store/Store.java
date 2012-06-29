@@ -701,6 +701,7 @@ public class Store extends PoolBase {
 		}
 		//”ñ“¯Šú onBufferŒÄ‚Ño‚µ
 		StoreCallback storeCallback=(StoreCallback)PoolManager.getInstance(StoreCallback.class);
+//		StoreCallback storeCallback=new StoreCallback();
 		storeCallback.asyncBuffer(this,bufferGetter,userContext,buffer);
 		bufferGetter=null;
 		return true;

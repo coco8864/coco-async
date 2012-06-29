@@ -23,6 +23,7 @@ public class StoreCallback extends PoolBase{
 	@Override
 	public void recycle() {
 		setStore(null);
+		callbackBuffer=null;
 		super.recycle();
 	}
 	
@@ -84,6 +85,7 @@ public class StoreCallback extends PoolBase{
 				isEnd=false;
 				store.countCallbackBuffer(BuffersUtil.remaining(callbackBuffer));
 				onBufferReturn=callbackBufferGetter.onBuffer(callbackUserContext, callbackBuffer);
+				callbackBuffer=null;
 				break;
 			case END:
 				store.countCallbackEnd();

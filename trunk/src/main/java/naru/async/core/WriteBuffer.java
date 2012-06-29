@@ -89,8 +89,24 @@ public class WriteBuffer implements BufferGetter {
 		}
 	}
 	
+//	private static int prevId=0;
+	private static boolean prevIsTimerThread=false;
+	private static Throwable prevT;
 	//アプリから貰ったbufferは、putBuffersで詰め込む
 	public void putBuffer(ByteBuffer[] buffer){
+		for(ByteBuffer b:buffer){
+			int bufid=System.identityHashCode(b);
+			String tname=Thread.currentThread().getName();
+			if(tname.startsWith("thread-timer")){
+				//logger.info("pubBuffer this:"+System.identityHashCode(this)+":bufid:"+bufid);
+				//if(prevIsTimerThread==false){
+				//	logger.error("pubBuffer change to timerThread",new Exception());
+				//}
+				prevIsTimerThread=true;
+			}else{
+				prevIsTimerThread=false;
+			}
+		}
 		logger.debug("putBuffer cid:"+ context.getPoolId()+":store:"+store +":len:"+BuffersUtil.remaining(buffer));
 		store.putBuffer(buffer);
 		//write可能になるのを待つ
@@ -141,6 +157,8 @@ public class WriteBuffer implements BufferGetter {
 				if( buffer.hasRemaining() ){
 					break;
 				}
+//				int bufid=System.identityHashCode(buffer);
+//				logger.info("doneWrite this:"+System.identityHashCode(this)+":bufid:"+bufid);
 				itr.remove();
 				PoolManager.poolBufferInstance(buffer);
 			}
@@ -170,6 +188,8 @@ public class WriteBuffer implements BufferGetter {
 				isQueueSelect=true;
 			}
 			for(int i=0;i<buffer.length;i++){
+//				int bufid=System.identityHashCode(buffer[i]);
+//				logger.info("onBuffer this:"+System.identityHashCode(this)+":bufid:"+bufid);
 				workBuffer.add(buffer[i]);
 			}
 			//配列を返却
