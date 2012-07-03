@@ -554,8 +554,7 @@ public class Page extends PoolBase{
 	public synchronized void fillBuffer(StoreFile bufferFile) throws IOException{
 		logger.debug("fillBuffer."+this);
 		buffer=BuffersUtil.prepareBuffers(bufferLength);
-		
-		logger.info("fillBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
+//		logger.info("fillBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
 		//for debug
 		//PoolManager.checkArrayInstance(buffer);
 		
