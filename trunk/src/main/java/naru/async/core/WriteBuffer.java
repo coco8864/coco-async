@@ -90,10 +90,12 @@ public class WriteBuffer implements BufferGetter {
 	}
 	
 //	private static int prevId=0;
-	private static boolean prevIsTimerThread=false;
-	private static Throwable prevT;
+//	private static boolean prevIsTimerThread=false;
+//	private static Throwable prevT;
 	//アプリから貰ったbufferは、putBuffersで詰め込む
 	public void putBuffer(ByteBuffer[] buffer){
+		/*
+		logger.info("putBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
 		for(ByteBuffer b:buffer){
 			int bufid=System.identityHashCode(b);
 			String tname=Thread.currentThread().getName();
@@ -107,6 +109,7 @@ public class WriteBuffer implements BufferGetter {
 				prevIsTimerThread=false;
 			}
 		}
+		*/
 		logger.debug("putBuffer cid:"+ context.getPoolId()+":store:"+store +":len:"+BuffersUtil.remaining(buffer));
 		store.putBuffer(buffer);
 		//write可能になるのを待つ
@@ -177,6 +180,7 @@ public class WriteBuffer implements BufferGetter {
 	}
 	
 	public boolean onBuffer(Object userContext, ByteBuffer[] buffer) {
+//		logger.info("onBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
 		if(store!=userContext){//callbackされる前にcloseされた場合
 			return false;
 		}

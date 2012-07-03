@@ -740,7 +740,6 @@ public class PoolManager implements Queuelet,Timer{
 	}
 	
 	public static ByteBuffer[] duplicateBuffers(ByteBuffer buffer[],boolean isNewBuffer) {
-		isNewBuffer=true;
 		ByteBuffer[] dupBuffers=BuffersUtil.newByteBufferArray(buffer.length);
 		for(int i=0;i<buffer.length;i++){
 			dupBuffers[i]=duplicateBuffer(buffer[i],isNewBuffer);

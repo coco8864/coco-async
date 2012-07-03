@@ -129,7 +129,6 @@ public class ByteArrayLife extends ReferenceLife {
 						logger.error("other poolByteBuffer."+l.threadNameOfPool+":"+ReferenceLife.fomatLogDate(new Date(l.timeOfPool))+":" +b+":"+System.identityHashCode(b),l.stackOfPool);//TODO
 					}
 				}
-				
 				return;
 			}
 			byteBufferLife.unref();
