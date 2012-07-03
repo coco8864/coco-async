@@ -70,6 +70,15 @@ public class BuffersUtil {
 		return b;
 	}
 	
+	public static ByteBuffer[] toByteBufferArray(List<ByteBuffer> buffers){
+		int size=buffers.size();
+		ByteBuffer[] b=newByteBufferArray(size);
+		for(int i=0;i<size;i++){
+			b[i]=buffers.get(i);
+		}
+		return b;
+	}
+	
 	/* length•ª‚Ìbuffers‚ðŠm•Û‚·‚é */
 	public static ByteBuffer[] prepareBuffers(long length){
 		if(length<=0){
@@ -116,7 +125,7 @@ public class BuffersUtil {
 	}
 	
 	public static ByteBuffer[] buffers(byte[] src, int offset, int length){
-		ArrayList list=new ArrayList();
+		ArrayList<ByteBuffer> list=new ArrayList<ByteBuffer>();
 		int position=offset;
 		int leftLength=length;
 		while(leftLength>0){
@@ -131,9 +140,9 @@ public class BuffersUtil {
 			position+=len;
 			list.add(buf);
 		}
-		return (ByteBuffer[])list.toArray(newByteBufferArray(list.size()));
+		return toByteBufferArray(list);
 	}
-
+	
 	public static long compactBuffers(ByteBuffer[] buffers){
 		long total =0;
 		for(int i=0;i<buffers.length;i++){

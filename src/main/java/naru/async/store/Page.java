@@ -22,7 +22,7 @@ public class Page extends PoolBase{
 	
 	private static StoreFile pageFile;
 	private static PersistenceStore persistenceStore;
-//	private static BufferCache bufferCache=BufferCache.getInstance();
+	private static BufferCache bufferCache=BufferCache.getInstance();
 	
 	public static void init(PersistenceStore persistenceStore,StoreFile pageFile){
 		Page.persistenceStore=persistenceStore;
@@ -421,6 +421,8 @@ public class Page extends PoolBase{
 	}
 	
 	public synchronized boolean putBuffer(ByteBuffer[] buffer,boolean isExpand){
+//		logger.info("putBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
+		
 		long length=BuffersUtil.remaining(buffer);
 		logger.debug("putBuffer."+this +":" + bufferLength +":"+length);
 		if(this.buffer==null||this.buffer.length==0){
@@ -488,6 +490,7 @@ public class Page extends PoolBase{
 			}
 			buf.flip();
 			this.buffer=BuffersUtil.toByteBufferArray(buf);
+//			logger.info("putBytes this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
 			//for debug
 			//PoolManager.checkArrayInstance(buffer);
 			
@@ -509,6 +512,7 @@ public class Page extends PoolBase{
 		}
 		ByteBuffer[] newBuffer=BuffersUtil.newByteBufferArray(this.buffer.length+1);
 		System.arraycopy(this.buffer, 0, newBuffer, 0, this.buffer.length);
+//		logger.info("putBytes this:"+System.identityHashCode(this)+":org bufsid:"+System.identityHashCode(buffer)+":new bufsid:"+System.identityHashCode(newBuffer));
 		PoolManager.poolArrayInstance(this.buffer);
 		this.buffer=newBuffer;
 		//for debug
@@ -535,6 +539,8 @@ public class Page extends PoolBase{
 		logger.debug("getBuffer."+this +":" + bufferLength);
 		ByteBuffer[] buffer=this.buffer;
 		this.bufferLength=0;
+		
+//		logger.info("getBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
 		this.buffer=null;
 		return buffer;
 	}
@@ -548,6 +554,8 @@ public class Page extends PoolBase{
 	public synchronized void fillBuffer(StoreFile bufferFile) throws IOException{
 		logger.debug("fillBuffer."+this);
 		buffer=BuffersUtil.prepareBuffers(bufferLength);
+		
+		logger.info("fillBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
 		//for debug
 		//PoolManager.checkArrayInstance(buffer);
 		
@@ -570,6 +578,8 @@ public class Page extends PoolBase{
 			}
 		}
 		this.fileId=fileId;
+		
+//		logger.info("flushBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
 		this.filePosition=bufferFile.write(buffer);
 		this.buffer=null;
 	}
@@ -603,13 +613,14 @@ public class Page extends PoolBase{
 //			return;
 //		}
 //		logger.debug("pageOut.storeId:"+storeId +":pageId:"+pageId+":digest:"+BuffersUtil.digestString(buffer));
+//		logger.info("pageOut this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
 		StoreManager.asyncWritePage(this);
 	}
 	
 	public void pageIn(){
 		logger.debug("pageIn."+this);
-//		ByteBuffer[] buffer=bufferCache.get(this);
-		ByteBuffer[] buffer=null;
+		ByteBuffer[] buffer=bufferCache.get(this);
+//		ByteBuffer[] buffer=null;
 		if(buffer!=null){
 			this.buffer=buffer;
 			if(store!=null){
@@ -637,7 +648,7 @@ public class Page extends PoolBase{
 //		logger.debug("onPageIn.storeId:"+storeId +":pageId:"+pageId+":digest:"+BuffersUtil.digestString(buffer));
 		if(store!=null){
 			if( store.getKind()==Store.Kind.GET ){
-//				bufferCache.put(this,buffer);
+				bufferCache.put(this,buffer);
 			}
 			store.onPageIn(this);
 		}else{

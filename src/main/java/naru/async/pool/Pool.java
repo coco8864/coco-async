@@ -422,8 +422,10 @@ public class Pool {
 			referenceLife = getGeneralReferenceLife(obj);
 			referenceLife.ref();
 			break;
-			
 		}
+//		if(type==TYPE_ARRAY&&poolClass==ByteBuffer.class&&length==1){
+//			logger.info("getInstance:bufsid:"+System.identityHashCode(obj));
+//		}		
 		return obj;
 	}
 
@@ -528,6 +530,9 @@ public class Pool {
 			return;// ŠÇ—ŠO
 		}
 		if(life.unref()){//³í‚ÉŠJ•ú‚Å‚«‚½ê‡pool‚É–ß‚·
+//			if(type==TYPE_ARRAY&&poolClass==ByteBuffer.class&&length==1){
+//				logger.info("poolArrayGeneralInstance:bufsid:"+System.identityHashCode(obj));
+//			}
 			poolInstance(obj);
 		}
 	}

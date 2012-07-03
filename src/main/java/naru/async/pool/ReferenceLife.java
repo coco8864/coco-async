@@ -90,7 +90,7 @@ public class ReferenceLife extends WeakReference {
 		*/
 		if(refCounter==0){
 			//2èdäJï˙
-			logger.error("unref duplicate pool poolClassName:"+poolClassName);
+			logger.error("unref duplicate pool poolClassName:"+poolClassName +":"+System.identityHashCode(get()));
 			logger.error("getInstance date:"+fomatLogDate(new Date(timeOfGet))+":thread:"+threadNameOfGet,stackOfGet);
 			logger.error("poolInstance date:"+fomatLogDate(new Date(timeOfPool))+":thread:"+threadNameOfPool,stackOfPool);
 			logger.error("this call date:"+fomatLogDate(new Date()),new Throwable(poolClassName));

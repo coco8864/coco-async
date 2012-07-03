@@ -115,7 +115,10 @@ public class ReadBuffer implements BufferGetter {
 		synchronized(workBuffer){//workBuffer‚ðŽç‚é
 			int size=workBuffer.size();
 			if(size!=0){
-				ByteBuffer[] buffer=(ByteBuffer[])workBuffer.toArray(BuffersUtil.newByteBufferArray(size));
+				ByteBuffer[] buffer=BuffersUtil.toByteBufferArray(workBuffer);
+				//(ByteBuffer[])workBuffer.toArray(BuffersUtil.newByteBufferArray(size));
+//				logger.info("callback1 this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
+				
 				long bufSize=BuffersUtil.remaining(buffer);
 				if(context.ordersDoneRead(buffer)){
 					logger.debug("callback.ordersDoneRead.cid:" + context.getPoolId()+ ":bufSize:" + bufSize +":hashCode:"+buffer.hashCode());
@@ -161,7 +164,10 @@ public class ReadBuffer implements BufferGetter {
 			//”z—ñ‚ð•Ô‹p
 			PoolManager.poolArrayInstance(buffer);
 			int size=workBuffer.size();
-			ByteBuffer[] readBuffer=(ByteBuffer[])workBuffer.toArray(BuffersUtil.newByteBufferArray(size));
+			ByteBuffer[] readBuffer=BuffersUtil.toByteBufferArray(workBuffer);
+			//(ByteBuffer[])workBuffer.toArray(BuffersUtil.newByteBufferArray(size));
+//			logger.info("onBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(readBuffer));
+			
 			long bufSize=BuffersUtil.remaining(readBuffer);
 			if(context.ordersDoneRead(readBuffer)){
 				workBuffer.clear();
