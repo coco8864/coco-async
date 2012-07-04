@@ -1,10 +1,12 @@
 package naru.async.pool;
 
+import java.awt.image.VolatileImage;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -19,14 +21,14 @@ public class Pool {
 	private static int DEFAULT_POOL_LIMIT = 16;
 	/* このpoolに属するlifeを集める */
 	// TYPE_BYTE_BUFFERで使用
-	private Map<byte[], ByteArrayLife> byteArrayLifes = new HashMap<byte[], ByteArrayLife>();
+	private volatile Map<byte[], ByteArrayLife> byteArrayLifes = Collections.synchronizedMap(new HashMap<byte[], ByteArrayLife>());
 	// TYPE_POOL_BASE,TYPE_GENERAL,で使用
-	private Set<ReferenceLife> poolLifes = new HashSet<ReferenceLife>();
+	private volatile Set<ReferenceLife> poolLifes = Collections.synchronizedSet(new HashSet<ReferenceLife>());
 	// TYPE_ARRAYで使用
 	//キーに当該オブジェクトそのものを使うので、一般classとarrayはGCされることはない。
 	//equals,hashcodeが変化しないオブジェクトに有効
 	//開放が漏れるとリーク現象になる
-	private Map<Object, ReferenceLife> poolLifesMap = new HashMap<Object, ReferenceLife>();
+	private volatile Map<Object, ReferenceLife> poolLifesMap = Collections.synchronizedMap(new HashMap<Object, ReferenceLife>());
 
 	ReferenceLife getGeneralReferenceLife(Object obj){
 		return getGeneralReferenceLife(obj,false);
@@ -526,7 +528,10 @@ public class Pool {
 			life = getGeneralReferenceLife(obj);
 		}
 		if (life == null || life.get() != obj) {
-			logger.warn("poolArrayGeneralInstance not in pool.obj:" + obj+":" +life+":"+length,new Exception());
+			logger.warn("poolArrayGeneralInstance not in pool.obj:" + obj+":" +life+":"+length +":"+System.identityHashCode(obj),new Exception());
+			/*
+			 * poolLifesMapの排他をとらないとpoolLifesMap.getがnullを返却する事がある。
+			life = poolLifesMap.get(obj);
 			if(obj instanceof ByteBuffer[] && length==1){
 				ByteBuffer b=((ByteBuffer[])obj)[0];
 				if(b!=null){
@@ -536,6 +541,7 @@ public class Pool {
 					BuffersUtil.peekBuffer((ByteBuffer[])obj);
 				}
 			}
+			*/
 			return;// 管理外
 		}
 		if(life.unref()){//正常に開放できた場合poolに戻す
