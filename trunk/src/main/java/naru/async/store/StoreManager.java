@@ -436,7 +436,7 @@ public class StoreManager {
 					return;//•K—v‚ª–³‚¢ê‡‚Ícompress‚µ‚È‚¢
 				}
 			}
-			//compressBufferFile(compressFileId);
+			compressBufferFile(compressFileId);
 		}
 		
 		public void init(QueueletContext context, Map param) {

@@ -301,7 +301,8 @@ public class BuffersUtil {
 			}else{
 				int position=workBuf.position();
 				workBuf.limit(position+(int)length);
-				return (ByteBuffer[])result.toArray(new ByteBuffer[result.size()]);
+				return toByteBufferArray(result);
+//				return (ByteBuffer[])result.toArray(new ByteBuffer[result.size()]);
 			}
 			i++;
 		}
@@ -320,7 +321,8 @@ public class BuffersUtil {
 				break;
 			}
 		}
-		return (ByteBuffer[])result.toArray(new ByteBuffer[result.size()]);
+		return toByteBufferArray(result);
+//		return (ByteBuffer[])result.toArray(new ByteBuffer[result.size()]);
 	}
 	
 	public static ByteBuffer[] concatenate(ByteBuffer[] part1,ByteBuffer[] part2){
@@ -331,40 +333,44 @@ public class BuffersUtil {
 			return part1;
 		}
 		int length=part1.length+part2.length;
-		ByteBuffer[] result=newByteBufferArray(length);
 		int i=0;
-		for(int j=0;j<part1.length;j++){
-			result[i]=part1[j];
-			i++;
-		}
+		ByteBuffer[] result=newByteBufferArray(length);
+		System.arraycopy(part1, 0, result, i, part1.length);
+		i+=part1.length;
 		PoolManager.poolArrayInstance(part1);
-		for(int j=0;j<part2.length;j++){
-			result[i]=part2[j];
-			i++;
-		}
+		System.arraycopy(part2, 0, result, i, part2.length);
 		PoolManager.poolArrayInstance(part2);
 		return result;
 	}
 
 	public static ByteBuffer[] concatenate(ByteBuffer[] part1,ByteBuffer buffer,ByteBuffer[] part2){
-		int length=part1.length+part2.length+1;
+		int length=0;
+		if(part1!=null){
+			length+=part1.length;
+		}
+		if(buffer!=null){
+			length++;
+		}
+		if(part2!=null){
+			length+=part2.length;
+		}
 		ByteBuffer[] result=newByteBufferArray(length);
 		int i=0;
-		for(int j=0;j<part1.length;j++){
-			result[i]=part1[j];
+		if(part1!=null){
+			System.arraycopy(part1, 0, result, i, part1.length);
+			i+=part1.length;
+			PoolManager.poolArrayInstance(part1);
+		}
+		if(buffer!=null){
+			result[i]=buffer;
 			i++;
 		}
-		PoolManager.poolArrayInstance(part1);
-		result[i]=buffer;
-		i++;
-		for(int j=0;j<part2.length;j++){
-			result[i]=part2[j];
-			i++;
+		if(part2!=null){
+			System.arraycopy(part2, 0, result, i, part2.length);
+			PoolManager.poolArrayInstance(part2);
 		}
-		PoolManager.poolArrayInstance(part2);
 		return result;
 	}
-	
 	
 	public static ByteBuffer[] concatenate(ByteBuffer head,ByteBuffer[] contents,ByteBuffer tail){
 		int length=0;
@@ -384,11 +390,9 @@ public class BuffersUtil {
 			i++;
 		}
 		if(contents!=null){
-			for(int j=0;j<contents.length;j++){
-				result[i]=contents[j];
-				i++;
-			}
+			System.arraycopy(contents, 0, result, i, contents.length);
 			PoolManager.poolArrayInstance(contents);
+			i+=contents.length;
 		}
 		if(tail!=null){
 			result[i]=tail;

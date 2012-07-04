@@ -177,6 +177,7 @@ public class Page extends PoolBase{
 	private long filePosition;
 	private int fileId;
 	private ByteBuffer[] buffer;
+	private boolean isLastBufferWrite;//最終バッファが書き込み可能か否か
 
 	public long setupCachePage(Page page){
 		page.storeId=storeId;
@@ -202,6 +203,7 @@ public class Page extends PoolBase{
 			PoolManager.poolBufferInstance(buffer);
 			buffer=null;
 		}
+		isLastBufferWrite=false;
 		super.recycle();
 	}
 	
@@ -249,6 +251,7 @@ public class Page extends PoolBase{
 		page.storeId=pageBuffer.getLong();//8
 		page.fileId=pageBuffer.getInt();//4
 		page.buffer=null;
+		page.isLastBufferWrite=false;
 //		page.isInFile=true;
 		PoolManager.poolBufferInstance(pageBuffer);
 		if(store!=null && page.storeId!=store.getStoreId()){
@@ -303,6 +306,7 @@ public class Page extends PoolBase{
 		page.nextPageId=FREE_ID;
 		page.bufferLength=0;
 		page.buffer=null;
+		page.isLastBufferWrite=false;
 		page.setStore(store);
 		if(prev!=null){
 			prev.nextPageId=page.pageId;
@@ -357,6 +361,7 @@ public class Page extends PoolBase{
 			PoolManager.poolBufferInstance(buffer);
 			buffer=null;
 		}
+		isLastBufferWrite=false;
 		if(isPageFile){
 			synchronized(pageFile){
 				//ここでPageがたまりすぎる
@@ -388,6 +393,7 @@ public class Page extends PoolBase{
 	}
 	
 	//小さすぎるBufferを排除する
+	/*
 	private void checkLastBuffer(){
 		ByteBuffer lastBuffer=getLastBuffer();
 		if(lastBuffer==null){//0長のbuffer配列が入っている
@@ -406,6 +412,7 @@ public class Page extends PoolBase{
 		setLastBuffer(buf);
 //		this.buffer[this.buffer.length-1]=buf;
 	}
+	*/
 	
 	public synchronized boolean putBuffer(ByteBuffer[] buffer){
 		return putBuffer(buffer,false);
@@ -422,22 +429,21 @@ public class Page extends PoolBase{
 	
 	public synchronized boolean putBuffer(ByteBuffer[] buffer,boolean isExpand){
 //		logger.info("putBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
-		
 		long length=BuffersUtil.remaining(buffer);
 		logger.debug("putBuffer."+this +":" + bufferLength +":"+length);
 		if(this.buffer==null||this.buffer.length==0){
 			this.buffer=buffer;
+			this.isLastBufferWrite=false;//もらったbufferは変更してはだめ
 			//for debug
 			//PoolManager.checkArrayInstance(buffer);
-			
-			checkLastBuffer();
+//			checkLastBuffer();小さなbufferは削除しようとしたが、中止
 			this.bufferLength+=length;
 			logger.debug("putBuffer org buffer null. result length"+this.bufferLength);
 			return true;
 		}
 		ByteBuffer lastBuffer=getLastBuffer();
 //		logger.warn("concat lastBuffer."+lastBuffer.capacity(),new Throwable());
-		if((lastBuffer.capacity()-lastBuffer.limit())>=length){
+		if(isLastBufferWrite && (lastBuffer.capacity()-lastBuffer.limit())>=length){
 //			lastBuffer.compact();arrayを破壊するので使えない
 			int orgPosition=lastBuffer.position();
 			lastBuffer.position(lastBuffer.limit());
@@ -450,22 +456,25 @@ public class Page extends PoolBase{
 			lastBuffer.flip();
 			lastBuffer.position(orgPosition);
 			this.bufferLength+=length;
-			logger.debug("putBuffer concat buffer. result length:"+this.bufferLength);
+			//logger.debug("putBuffer concat buffer. result length:"+this.bufferLength);
 			return true;
 		}
 		if(!isExpand){
 			return false;
 		}
+		this.buffer=BuffersUtil.concatenate(this.buffer, buffer);
+		this.isLastBufferWrite=false;
+		/*
 		ByteBuffer[] newBuffer=(ByteBuffer[])PoolManager.getArrayInstance(ByteBuffer.class, this.buffer.length+buffer.length);
 		System.arraycopy(this.buffer, 0, newBuffer, 0, this.buffer.length);
 		System.arraycopy(buffer, 0, newBuffer, this.buffer.length, buffer.length);
 		PoolManager.poolArrayInstance(this.buffer);
 		PoolManager.poolArrayInstance(buffer);
 		this.buffer=newBuffer;
+		*/
 		//for debug
 		//PoolManager.checkArrayInstance(buffer);
-		
-		checkLastBuffer();
+		//checkLastBuffer();
 		this.bufferLength+=length;
 		return true;
 	}
@@ -490,6 +499,7 @@ public class Page extends PoolBase{
 			}
 			buf.flip();
 			this.buffer=BuffersUtil.toByteBufferArray(buf);
+			this.isLastBufferWrite=true;//自分で作ったbufferだから書き込んでよい
 //			logger.info("putBytes this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
 			//for debug
 			//PoolManager.checkArrayInstance(buffer);
@@ -499,7 +509,7 @@ public class Page extends PoolBase{
 		}
 		ByteBuffer lastBuffer=getLastBuffer();
 //		if((lastBuffer.capacity()-lastBuffer.remaining())>=length){
-		if((lastBuffer.capacity()-lastBuffer.limit())>=length){
+		if(isLastBufferWrite && (lastBuffer.capacity()-lastBuffer.limit())>=length){
 //			lastBuffer.compact();arrayを破壊するので使えない
 			int orgPosition=lastBuffer.position();
 			lastBuffer.position(lastBuffer.limit());
@@ -510,14 +520,15 @@ public class Page extends PoolBase{
 			this.bufferLength+=length;
 			return true;
 		}
+		/*
 		ByteBuffer[] newBuffer=BuffersUtil.newByteBufferArray(this.buffer.length+1);
 		System.arraycopy(this.buffer, 0, newBuffer, 0, this.buffer.length);
 //		logger.info("putBytes this:"+System.identityHashCode(this)+":org bufsid:"+System.identityHashCode(buffer)+":new bufsid:"+System.identityHashCode(newBuffer));
 		PoolManager.poolArrayInstance(this.buffer);
 		this.buffer=newBuffer;
+		*/
 		//for debug
 		//PoolManager.checkArrayInstance(buffer);
-		
 		
 		long defaultBufferSize=PoolManager.getDefaultBufferSize();
 		int allocBufferSize=(int)defaultBufferSize;
@@ -526,11 +537,11 @@ public class Page extends PoolBase{
 			allocBufferSize=length;
 		}
 		buf=PoolManager.getBufferInstance((int)allocBufferSize);
-		
 		buf.put(bytes,offset,length);
 		buf.flip();
-		newBuffer[newBuffer.length-1]=buf;//最後に追加する
-		checkLastBuffer();
+		//checkLastBuffer();
+		this.buffer=BuffersUtil.concatenate(this.buffer, buf,null);
+		this.isLastBufferWrite=true;//自分で作ったbufferだから書き込んでよい
 		this.bufferLength+=length;
 		return true;
 	}
@@ -542,6 +553,7 @@ public class Page extends PoolBase{
 		
 //		logger.info("getBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
 		this.buffer=null;
+		this.isLastBufferWrite=false;
 		return buffer;
 	}
 	
@@ -554,6 +566,7 @@ public class Page extends PoolBase{
 	public synchronized void fillBuffer(StoreFile bufferFile) throws IOException{
 		logger.debug("fillBuffer."+this);
 		buffer=BuffersUtil.prepareBuffers(bufferLength);
+		this.isLastBufferWrite=true;//自分で作ったbufferだから書き込んでよい
 //		logger.info("fillBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
 		//for debug
 		//PoolManager.checkArrayInstance(buffer);
@@ -581,6 +594,7 @@ public class Page extends PoolBase{
 //		logger.info("flushBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
 		this.filePosition=bufferFile.write(buffer);
 		this.buffer=null;
+		this.isLastBufferWrite=false;
 	}
 	
 	public long getPageId() {
@@ -619,9 +633,9 @@ public class Page extends PoolBase{
 	public void pageIn(){
 		logger.debug("pageIn."+this);
 		ByteBuffer[] buffer=bufferCache.get(this);
-//		ByteBuffer[] buffer=null;
 		if(buffer!=null){
 			this.buffer=buffer;
+			this.isLastBufferWrite=false;//cacheは書き換えてはだめ
 			if(store!=null){
 				store.onPageIn(this);
 			}else{

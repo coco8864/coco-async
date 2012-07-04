@@ -527,6 +527,15 @@ public class Pool {
 		}
 		if (life == null || life.get() != obj) {
 			logger.warn("poolArrayGeneralInstance not in pool.obj:" + obj+":" +life+":"+length,new Exception());
+			if(obj instanceof ByteBuffer[] && length==1){
+				ByteBuffer b=((ByteBuffer[])obj)[0];
+				if(b!=null){
+					logger.warn("poolArrayGeneralInstance peekBuffer ByteBuffer:"+ b);
+					b.position(0);
+					b.limit(b.capacity());
+					BuffersUtil.peekBuffer((ByteBuffer[])obj);
+				}
+			}
 			return;// ŠÇ—ŠO
 		}
 		if(life.unref()){//³í‚ÉŠJ•ú‚Å‚«‚½ê‡pool‚É–ß‚·
