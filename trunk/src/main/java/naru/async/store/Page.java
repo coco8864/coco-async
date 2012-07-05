@@ -11,6 +11,7 @@ import naru.async.cache.BufferCache;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
+import naru.queuelet.QueueletContext;
 
 import org.apache.log4j.Logger;
 
@@ -24,12 +25,12 @@ public class Page extends PoolBase{
 	private static PersistenceStore persistenceStore;
 	private static BufferCache bufferCache=BufferCache.getInstance();
 	
-	public static void init(PersistenceStore persistenceStore,StoreFile pageFile){
+	public static void init(QueueletContext context,PersistenceStore persistenceStore,StoreFile pageFile){
 		Page.persistenceStore=persistenceStore;
 		Page.pageFile=pageFile;
 		
 		//前回ダウンした場合、pageが汚れている,必要な場合リカバリする
-		persistenceStore.recoverPageFile(pageFile);
+		persistenceStore.recoverPageFile(context,pageFile);
 		
 		for(int i=0;i<INIT_FREE_PAGE;i++){
 			Page freePage=getSafeFreePage(persistenceStore.getTopFreePageId());
