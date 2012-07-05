@@ -14,6 +14,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import naru.queuelet.QueueletContext;
+
 import org.apache.log4j.Logger;
 
 public class PersistenceStore implements Serializable {
@@ -22,7 +24,7 @@ public class PersistenceStore implements Serializable {
 	
 	private File persistenceStoreFile;
 	
-	public void recoverPageFile(StoreFile pageStoreFile){
+	public void recoverPageFile(QueueletContext context,StoreFile pageStoreFile){
 		if(isNomalEnd){
 			isNomalEnd=false;
 			return;
@@ -32,12 +34,12 @@ public class PersistenceStore implements Serializable {
 		 *topFreePageId
 		 *storeIdSequence
 		 */
-		logger.warn("recoverPageFile");
 		long pageId=pageStoreFile.length();
 		if(pageId==0){
 			setTopFreePageId(0);
 			return;
 		}
+		logger.warn("recoverPageFile");
 		pageIdSequence=pageId/(long)Page.PAGE_SIZE;
 		pageId=pageIdSequence*(long)Page.PAGE_SIZE;
 		Page page=null;
@@ -45,8 +47,18 @@ public class PersistenceStore implements Serializable {
 		storeIdSequence=0;
 		int usePageCount=0;
 		int freePageCount=0;
-		System.out.println("recoverPageFile start pageIdMax:"+pageIdSequence);
+		
+		System.out.println("recoverPageFile pageIdMax:"+pageIdSequence);
+		for(int i=0;i<pageIdSequence;i+=1000){
+			System.out.print('-');
+		}
+		System.out.println('+');
 		while(true){
+			if( ((usePageCount+freePageCount)%1000)==0 ){
+				System.out.print('*');
+				/*　recovery中にタイム監視にかからないようにheatBeatを定期的に呼び出す */
+				context.heatBeat();
+			}
 			pageId-=Page.PAGE_SIZE;
 			if(pageId<0){
 				break;
@@ -70,6 +82,7 @@ public class PersistenceStore implements Serializable {
 			page.unref(true);
 		}
 		setTopFreePageId(nextPageId);
+		System.out.println('+');
 		System.out.println("recoverPageFile end usePageCount:" +usePageCount + ":freePageCount:"+freePageCount);
 		logger.warn("usePageCount:" +usePageCount + ":freePageCount:"+freePageCount);
 	}
