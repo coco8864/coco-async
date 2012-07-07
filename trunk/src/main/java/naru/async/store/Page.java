@@ -566,6 +566,13 @@ public class Page extends PoolBase{
 	 */
 	public synchronized void fillBuffer(StoreFile bufferFile) throws IOException{
 		logger.debug("fillBuffer."+this);
+		/* ÀÛ‚É“Ç‚Ş‘O‚Écache‚ğŒŸõ */
+		ByteBuffer[] cacheBuffer=bufferCache.get(this);
+		if(cacheBuffer!=null){
+			this.buffer=cacheBuffer;
+			this.isLastBufferWrite=false;//cache‚Í‘‚«Š·‚¦‚Ä‚Í‚¾‚ß
+			return;
+		}
 		buffer=BuffersUtil.prepareBuffers(bufferLength);
 		this.isLastBufferWrite=true;//©•ª‚Åì‚Á‚½buffer‚¾‚©‚ç‘‚«‚ñ‚Å‚æ‚¢
 //		logger.info("fillBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
@@ -574,6 +581,11 @@ public class Page extends PoolBase{
 		
 		bufferFile.read(buffer, filePosition);
 		BuffersUtil.flipBuffers(buffer);
+		
+		/* ÀÛ‚É“Ç‚ñ‚¾ê‡‚É‚Ícache‚É“o˜^ */
+		if( store!=null && store.getKind()==Store.Kind.GET ){
+			bufferCache.put(this,buffer);
+		}
 	}
 	
 	/**
@@ -633,17 +645,6 @@ public class Page extends PoolBase{
 	
 	public void pageIn(){
 		logger.debug("pageIn."+this);
-		ByteBuffer[] buffer=bufferCache.get(this);
-		if(buffer!=null){
-			this.buffer=buffer;
-			this.isLastBufferWrite=false;//cache‚Í‘‚«Š·‚¦‚Ä‚Í‚¾‚ß
-			if(store!=null){
-				store.onPageIn(this);
-			}else{
-				logger.error("pageIn.store=null",new Exception());
-			}
-			return;
-		}
 		StoreManager.asyncReadPage(this);
 	}
 	
@@ -661,9 +662,6 @@ public class Page extends PoolBase{
 	public void onPageIn(){
 //		logger.debug("onPageIn.storeId:"+storeId +":pageId:"+pageId+":digest:"+BuffersUtil.digestString(buffer));
 		if(store!=null){
-			if( store.getKind()==Store.Kind.GET ){
-				bufferCache.put(this,buffer);
-			}
 			store.onPageIn(this);
 		}else{
 			logger.error("onPageIn.store=null",new Exception());
