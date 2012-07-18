@@ -2,9 +2,11 @@ package naru.async.ssl;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 import javax.net.ssl.SSLEngine;
@@ -19,8 +21,12 @@ import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
 
 import org.apache.log4j.Logger;
+/*
+import org.eclipse.jetty.npn.NextProtoNego;
+import org.eclipse.jetty.npn.NextProtoNego.ServerProvider;
+*/
 
-public class SslAdapter extends PoolBase {
+public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 	public static final String SSLCTX_READ_NETWORK = "readNetwork";
 	public static final String SSLCTX_WRITE_NETWORK = "writeNetwork";
 	public static final String SSLCTX_CLOSE_NETWORK = "CloseNetwork";
@@ -29,7 +35,6 @@ public class SslAdapter extends PoolBase {
 
 	private static Logger logger = Logger.getLogger(SslAdapter.class);
 	private static ByteBuffer dmmyBuffer = ByteBuffer.allocate(0);
-//	private static ByteBuffer[] dmmyBuffers = new ByteBuffer[] { dmmyBuffer };
 	private static ByteBuffer[] dmmyBuffers = new ByteBuffer[0];// { dmmyBuffer };
 
 	private SSLEngine sslEngine;
@@ -44,7 +49,6 @@ public class SslAdapter extends PoolBase {
 		sslResult = null;
 		handler = null;
 		PoolManager.poolBufferInstance(networkBuffers);
-//		networkBuffers.clear();
 		isHandshake = false;
 		onWrittenCounter = networkWriteCounter = 0;
 		onWrittenMap.clear();
@@ -79,6 +83,7 @@ public class SslAdapter extends PoolBase {
 		this.handler = handler;
 
 		sslEngine = handler.getSSLEngine();// Setting.getSslEngine(null, 443);
+//		NextProtoNego.put(sslEngine,this);
 		sslEngine.setUseClientMode(isClientMode);
 		SSLSession session = sslEngine.getSession();
 		packetSize = session.getPacketBufferSize();
@@ -247,6 +252,9 @@ public class SslAdapter extends PoolBase {
 		// logger.info("wrap:"+sslResult.getStatus() +
 		// ":"+sslResult.getHandshakeStatus());
 		dst.flip();
+		if(buffers==dmmyBuffers){
+			BuffersUtil.hexDump("ssl handshake wrap write.cid:"+handler.getChannelId(),dst);
+		}
 		return dst;
 	}
 
@@ -261,6 +269,7 @@ public class SslAdapter extends PoolBase {
 					return false;
 				}
 				ByteBuffer src = nextUnwrapBuffer();
+				BuffersUtil.hexDump("ssl handshake read.cid:"+handler.getChannelId(),src);
 				ByteBuffer dst = unwrap(src);
 				if (dst == null) {
 					Status sslStatus = sslResult.getStatus();
@@ -379,6 +388,7 @@ public class SslAdapter extends PoolBase {
 		if (isHandshake == false) {
 			if (sslResult == null) {// wrapÇ‡unwarpÇ‡åƒÇÒÇ≈Ç¢Ç»Ç≠Çƒ,handshakeÇ™èIÇÌÇ¡ÇƒÇ»Ç¢=>ServerÇÃç≈èâÇÃèàóù
 				ByteBuffer src = nextUnwrapBuffer();
+				BuffersUtil.hexDump("ssl handshake read.cid:"+handler.getChannelId(),src);
 				ByteBuffer dst = unwrap(src);
 				// handshakeíÜÇÕunwrapåãâ ÇÃïKóvÇ»Çµ;
 				if (dst != null) {
@@ -394,7 +404,7 @@ public class SslAdapter extends PoolBase {
 			}
 		}
 
-		ArrayList list = null;
+		List<ByteBuffer> list = null;
 		while (true) {
 			ByteBuffer src = nextUnwrapBuffer();
 			if (src == null) {
@@ -405,7 +415,7 @@ public class SslAdapter extends PoolBase {
 				break;
 			}
 			if (list == null) {
-				list = new ArrayList();
+				list = new ArrayList<ByteBuffer>();
 			}
 			list.add(byteBuffer);
 		}
@@ -415,10 +425,7 @@ public class SslAdapter extends PoolBase {
 			handler.asyncRead(userContext);
 			return;
 		}
-		ByteBuffer[] plainBuffers = (ByteBuffer[]) list.toArray(BuffersUtil
-				.newByteBufferArray(list.size()));
-		// TODO readTraceèàóù
-		// handler.onRead(SSLCTX_PLAIN_DATA, plainBuffers);
+		ByteBuffer[] plainBuffers=BuffersUtil.toByteBufferArray(list);
 		handler.callbackReadPlain(userContext, plainBuffers);
 	}
 
@@ -482,13 +489,22 @@ public class SslAdapter extends PoolBase {
 	}
 
 	/*
-	 * void print(){ SSLSession session=sslEngine.getSession();
-	 * logger.info("getCipherSuite" + session.getCipherSuite()); try {
-	 * Certificate[] pccs =session.getPeerCertificates(); for(int i=0;i<pccs.length;i++){
-	 * logger.info("getPeerCertificates" + pccs[i]); } } catch
-	 * (SSLPeerUnverifiedException e) { // TODO Auto-generated catch block
-	 * e.printStackTrace(); } Certificate[] pccs
-	 * =session.getLocalCertificates(); for(int i=0;i<pccs.length;i++){
-	 * logger.info("getLocalCertificates" + pccs[i]); } }
-	 */
+	 * SPDYëŒâû
+	//http://wiki.eclipse.org/Jetty/Feature/NPN
+	private String npnSelectedProtocol;
+	public void protocolSelected(String protocol) {
+		npnSelectedProtocol=protocol;
+	}
+	
+	//http://tools.ietf.org/html/draft-agl-tls-nextprotoneg-04#page-2
+	private static List<String> NPN_PROTOCOLS=Arrays.asList("http/1.1","spdy/2");
+
+	public List<String> protocols() {
+		return NPN_PROTOCOLS;
+	}
+
+	public void unsupported() {
+		logger.debug("npn unsupported");
+	}
+	*/
 }

@@ -1,6 +1,5 @@
 package naru.async.pool;
 
-import java.awt.image.VolatileImage;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -542,6 +541,15 @@ public class Pool {
 				}
 			}
 			*/
+			if(obj instanceof ByteBuffer[] && length==1){
+				ByteBuffer b=((ByteBuffer[])obj)[0];
+				if(b!=null){
+					logger.warn("poolArrayGeneralInstance peekBuffer ByteBuffer:"+ b);
+					b.position(0);
+					b.limit(b.capacity());
+					BuffersUtil.peekBuffer((ByteBuffer[])obj);
+				}
+			}
 			return;// ŠÇ—ŠO
 		}
 		if(life.unref()){//³í‚ÉŠJ•ú‚Å‚«‚½ê‡pool‚É–ß‚·
