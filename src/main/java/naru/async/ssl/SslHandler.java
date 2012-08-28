@@ -39,7 +39,13 @@ public abstract class SslHandler extends ChannelHandler {
 		super.recycle();
 	}
 
-	public abstract SSLEngine getSSLEngine();
+	/**
+	 * accept‚ðŽó‚¯•t‚¯‚éhandler‚ÅOverride‚·‚é
+	 * @return
+	 */
+	public SSLEngine getSSLEngine(){
+		return null;
+	}
 	
 //	public void setSslAdapter(SslAdapter sslAdapter){
 //		this.sslAdapter=sslAdapter;

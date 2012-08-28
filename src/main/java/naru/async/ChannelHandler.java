@@ -148,11 +148,11 @@ public abstract class ChannelHandler extends PoolBase{
 	}
 	
 	/* handler単位の属性 */
-	public final Object getHandlerAttribute(String name){
+	public Object getHandlerAttribute(String name){
 		return attribute.get(name);
 	}
 	
-	public final void setHandlerAttribute(String name, Object value) {
+	public void setHandlerAttribute(String name, Object value) {
 		if(name==SelectorContext.ATTR_ACCEPTED_CONTEXT){
 			logger.debug("setContext() call.context"+value);
 			//accept channelは、Selectorで作られる。context設定メソッドを隠蔽するための処理
@@ -164,12 +164,12 @@ public abstract class ChannelHandler extends PoolBase{
 		}
 	}
 	
-	public final Iterator getHandlerAttributeNames(){
+	public Iterator getHandlerAttributeNames(){
 		return attribute.keySet().iterator();
 	}
 	
 	/* channelContext単位の属性 */
-	public final Object getAttribute(String name){
+	public Object getAttribute(String name){
 		if(context==null){
 			logger.error("getAttribute error.context is null.name:"+name+":" +this.getClass().getName(),new Exception());
 			return null;
@@ -177,7 +177,7 @@ public abstract class ChannelHandler extends PoolBase{
 		return context.getAttribute(name);
 	}
 	
-	public final void setAttribute(String name, Object value) {
+	public void setAttribute(String name, Object value) {
 		if(context==null){
 			logger.error("setAttribute error.context is null.name:"+name+":value:"+value+":" +this.getClass().getName(),new Exception());
 			return;
@@ -185,23 +185,23 @@ public abstract class ChannelHandler extends PoolBase{
 		context.setAttribute(name, value);
 	}
 	
-	public final String getRemoteIp(){
+	public String getRemoteIp(){
 		return	context.getRemoteIp();
 	}
 	
-	public final int getRemotePort(){
+	public int getRemotePort(){
 		return	context.getRemotePort();
 	}
 	
-	public final String getLocalIp(){
+	public String getLocalIp(){
 		return	context.getLocalIp();
 	}
 	
-	public final int getLocalPort(){
+	public int getLocalPort(){
 		return	context.getLocalPort();
 	}
 	
-	public final void handlerClosed(){
+	public void handlerClosed(){
 		if(isClosed==false){
 			isClosed=true;
 			dump();
@@ -210,7 +210,7 @@ public abstract class ChannelHandler extends PoolBase{
 			}
 		}
 	}
-	public final boolean isHandlerClosed(){
+	public boolean isHandlerClosed(){
 		return isClosed;
 	}
 	
