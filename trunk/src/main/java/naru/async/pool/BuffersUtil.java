@@ -456,7 +456,7 @@ public class BuffersUtil {
 		long base=0;
 		StringBuffer buffer = new StringBuffer(74);
 		for (int i = pos; i < (pos+length); i += 16) {
-			int chars_read = data.length - i;
+			int chars_read = (pos+length) - i;
 			if (chars_read > 16) {
 				chars_read = 16;
 			}

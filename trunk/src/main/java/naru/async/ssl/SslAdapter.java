@@ -2,7 +2,6 @@ package naru.async.ssl;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -53,7 +52,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 		onWrittenCounter = networkWriteCounter = 0;
 		onWrittenMap.clear();
 	}
-
+	
 	/* 先頭４バイトを見て、コントロール文字が含まれていればSSL通信と判断 */
 	public static boolean isSsl(ByteBuffer byteBuffer) {
 		int n = 4;
@@ -487,7 +486,10 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 		}
 		return true;
 	}
-
+	
+	public boolean isSpdyAvailable() {
+		return false;
+	}
 	/*
 	 * SPDY対応
 	//http://wiki.eclipse.org/Jetty/Feature/NPN
