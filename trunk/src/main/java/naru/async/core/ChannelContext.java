@@ -15,7 +15,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -136,6 +135,15 @@ public class ChannelContext extends PoolBase{
 			dummyContext=context;
 		}
 		return dummyContext;
+	}
+	
+	public static ChannelContext childContext(ChannelContext orgContext){
+		ChannelContext context=(ChannelContext)PoolManager.getInstance(ChannelContext.class);
+		context.remoteIp=orgContext.remoteIp;
+		context.remotePort=orgContext.remotePort;
+		context.localIp=orgContext.localIp;
+		context.localPort=orgContext.localPort;
+		return context;
 	}
 	
 	public static ChannelContext create(ChannelHandler handler,SelectableChannel channel){
@@ -1034,6 +1042,32 @@ java.nio.channels.ClosedChannelException
 	//アプリケーションから受け取った通算write長,実writeとは若干差異がある
 	public long getTotalWriteLength(){
 		return writeBuffer.getPutLength();
+	}
+	
+	public void finishChildContext(){
+		logger.debug("finishChildChannel.cid:"+getPoolId());
+		//ほぼ同時に２threadから呼び出される事がある、その場合、走行中にhandlerがnullになる
+		synchronized(ioLock){
+			if(isFinished){//既にfinishを呼びだしている
+				logger.debug("aleady call finishChildChannel.cid:"+getPoolId());
+				return;
+			}
+			isFinished=true;//以降Orderを受けつけない
+		}
+		setIoStatus(IO.CLOSED);
+		if(handler==null){//TODO なんてこった
+			logger.warn("finishChildChannel.cid="+getPoolId()+":"+this);
+			return;
+		}
+		//handler.handlerClosed();//applicationからの命令を拒否
+		//readOrderがあって、readも完了しているが、まだreadBufferに通知がないタイミングがある。
+		//if( orders.isReadOrder()){
+		//	readBuffer.waitForLastCallback();
+		//}
+		//全Orderをclosedで返却
+		//closable(false);
+		Order finishOrder=Order.create(handler, Order.TYPE_FINISH, null);
+		orders.closed(finishOrder);
 	}
 	
 	/*

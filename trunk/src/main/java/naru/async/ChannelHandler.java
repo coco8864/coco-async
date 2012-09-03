@@ -686,4 +686,23 @@ public abstract class ChannelHandler extends PoolBase{
 		return context.getTotalWriteLength();
 	}
 	
+	/* spdyópÇÃcontextÇçÏê¨ */
+	public ChannelHandler allocChaildHandler(Class childHandlerClass){
+		if(!ChannelHandler.class.isAssignableFrom(childHandlerClass)){
+			throw new IllegalArgumentException("illegal handlerClass");
+		}
+		ChannelContext childContext=ChannelContext.childContext(context);
+		ChannelHandler child=(ChannelHandler)PoolManager.getInstance(childHandlerClass);
+		childContext.setHandler(child);
+		child.setContext(childContext);
+		return child;
+	}
+	
+	public void finishChildHandler(){
+		if(context==null){
+			return;
+		}
+		context.finishChildContext();
+	}
+	
 }

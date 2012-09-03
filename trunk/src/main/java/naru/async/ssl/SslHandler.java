@@ -47,10 +47,6 @@ public abstract class SslHandler extends ChannelHandler {
 		return null;
 	}
 	
-//	public void setSslAdapter(SslAdapter sslAdapter){
-//		this.sslAdapter=sslAdapter;
-//	}
-	
 	public ChannelHandler forwardHandler(SslHandler handler){
 		SslAdapter sslAdapter=this.sslAdapter;
 		Store readPeekStore=this.readPeekStore;
