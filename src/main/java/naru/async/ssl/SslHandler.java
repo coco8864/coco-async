@@ -54,7 +54,13 @@ public abstract class SslHandler extends ChannelHandler {
 		this.sslAdapter=null;
 		this.readPeekStore=null;
 		this.writePeekStore=null;
-		super.forwardHandler(handler);
+		handler=(SslHandler)super.forwardHandler(handler);
+		if(handler==null){
+			this.sslAdapter=sslAdapter;
+			this.readPeekStore=readPeekStore;
+			this.writePeekStore=writePeekStore;
+			return null;
+		}
 		handler.sslAdapter=sslAdapter;
 		handler.readPeekStore=readPeekStore;
 		handler.writePeekStore=writePeekStore;
