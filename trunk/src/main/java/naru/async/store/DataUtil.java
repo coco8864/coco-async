@@ -22,10 +22,12 @@ public class DataUtil {
 	private static Logger logger=Logger.getLogger(DataUtil.class);
 	private static MessageDigest messageDigestMD5;
 	private static MessageDigest messageDigestSHA1;
+	private static MessageDigest messageDigestSHA256;
 	static{
 		try {
 			messageDigestMD5=MessageDigest.getInstance("MD5");
 			messageDigestSHA1=MessageDigest.getInstance("SHA1");
+			messageDigestSHA256=MessageDigest.getInstance("SHA-256");
 		} catch (NoSuchAlgorithmException e) {
 			logger.error("MessageDigest.getInstance error.",e);
 		}
@@ -79,6 +81,18 @@ public class DataUtil {
 		synchronized(messageDigestSHA1){
 			messageDigestSHA1.reset();
 			digestByte=messageDigestSHA1.digest(data);
+		}
+		return byteToString(digestByte);
+	}
+	
+	public static String digestHexSha256(byte[] data){
+		if( data==null ){
+			return null;
+		}
+		byte[] digestByte;
+		synchronized(messageDigestSHA256){
+			messageDigestSHA1.reset();
+			digestByte=messageDigestSHA256.digest(data);
 		}
 		return byteToString(digestByte);
 	}
