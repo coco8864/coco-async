@@ -369,7 +369,7 @@ public class Page extends PoolBase{
 //				logger.debug("$$$2 in:"+pageId);
 				Page prevPage=freePages.put(pageId,this);
 				if(prevPage!=null){
-					logger.error("duplicate free Page.pageId:"+pageId);
+					logger.error("duplicate free Page.pageId:"+pageId,new Exception());
 					freePages.remove(pageId);
 				}
 			}
