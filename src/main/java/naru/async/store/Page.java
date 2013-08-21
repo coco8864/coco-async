@@ -314,6 +314,7 @@ public class Page extends PoolBase{
 		}
 		addPlainPage(page);
 		logger.debug("allocPage.page:"+page);
+//		logger.warn("allocPage.page.pageId:"+page.pageId);
 		return page;
 	}
 	
@@ -368,6 +369,7 @@ public class Page extends PoolBase{
 				//‚±‚±‚ÅPage‚ª‚½‚Ü‚è‚·‚¬‚é
 //				logger.debug("$$$2 in:"+pageId);
 				Page prevPage=freePages.put(pageId,this);
+//				logger.warn("pageFile in.pageId:"+pageId,new Exception());
 				if(prevPage!=null){
 					logger.error("duplicate free Page.pageId:"+pageId,new Exception());
 					freePages.remove(pageId);
