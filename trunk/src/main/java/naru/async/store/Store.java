@@ -595,7 +595,7 @@ public class Store extends PoolBase {
 	 * PUTGETの場合、このpageIdを再利用してよいが、
 	 * GETの場合は、persistenceデータが入っているので再利用できない
 	 */
-	private void freeGettingPage(){
+	private synchronized void freeGettingPage(){
 		if(kind==Kind.GET){
 			gettingPage.free(false);
 		}else{//PUTGET
