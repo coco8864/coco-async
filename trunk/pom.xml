@@ -18,6 +18,24 @@
           <target>1.5</target>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>2.9.1</version>
+        <configuration>
+                    <show>public</show>
+                    <nohelp>true</nohelp>
+                    <nodeprecated>true</nodeprecated>
+                    <nodeprecatedlist>true</nodeprecatedlist>
+                    <sourceFileIncludes>
+			<include>AsyncBuffer.java</include>
+			<include>ChannelHandler.java</include>
+			<include>cache/CacheBuffer.java</include>
+			<include>cache/FileInfo.java</include>
+                    </sourceFileIncludes>
+		<sourcepath>${basedir}/src/main/java/naru/async</sourcepath>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
   <dependencies>
