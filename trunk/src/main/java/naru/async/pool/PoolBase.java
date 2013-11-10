@@ -6,7 +6,7 @@ public class PoolBase {
 	private static Logger logger=Logger.getLogger(PoolBase.class);
 	
 	//関係するオブジェクト群を格納し、プールに戻すタイミングの同期をとる
-	private long poolId;//プール管理から割り当てる、そのオブジェクトライフサイクルに対する一意な番号
+	private long poolId=-1;//プール管理から割り当てる、そのオブジェクトライフサイクルに対する一意な番号
 	private ReferenceLife life=new ReferenceLife(this);
 	
 	public ReferenceLife getLife(){
