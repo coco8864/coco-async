@@ -63,8 +63,10 @@ public class BuffersUtil {
 	}
 
 	public static ByteBuffer[] newByteBufferArray(int count) {
-		return (ByteBuffer[]) PoolManager.getArrayInstance(ByteBuffer.class,
-				count);
+		if(count>=24){
+			logger.debug("newByteBufferArray:"+count,new Throwable());
+		}
+		return (ByteBuffer[]) PoolManager.getArrayInstance(ByteBuffer.class,count);
 	}
 
 	public static ByteBuffer[] toByteBufferArray(ByteBuffer buffer) {
@@ -91,8 +93,7 @@ public class BuffersUtil {
 		// List<ByteBuffer> bufList=new ArrayList<ByteBuffer>();
 		int bufferSize = PoolManager.getDefaultBufferSize();
 		int bufferCount = (int) (((length - 1) / (long) bufferSize) + 1);
-		ByteBuffer[] result = (ByteBuffer[]) PoolManager.getArrayInstance(
-				ByteBuffer.class, bufferCount);
+		ByteBuffer[] result = newByteBufferArray(bufferCount);
 		long lenSum = 0;
 		for (int i = 0; i < bufferCount; i++) {
 			ByteBuffer buf = PoolManager.getBufferInstance();
