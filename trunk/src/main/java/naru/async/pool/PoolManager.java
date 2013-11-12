@@ -76,9 +76,10 @@ public class PoolManager implements Queuelet,Timer{
 	}
 	
 	public static void setupBufferPool(int size,int limit){
-		Pool pool=getBufferPool(size);
+		int actualBufferSize=(((size-1)/(BUFFER_SIZE_UNIT))+1)*BUFFER_SIZE_UNIT;//1024ÇÃî{êîÇ…í≤êÆÇ∑ÇÈ
+		Pool pool=getBufferPool(actualBufferSize);
 		if(pool==null){
-			pool=addBufferPool(size);
+			pool=addBufferPool(actualBufferSize);
 		}
 		setupPool(pool,limit);
 	}
