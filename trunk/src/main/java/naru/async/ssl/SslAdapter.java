@@ -101,7 +101,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 		} else if (networkBuffers.size() > 0) {
 			try {
 				ByteBuffer src = nextUnwrapBuffer();
-				ByteBuffer dst = unwrap(src);
+				ByteBuffer dst = unwrap(src,null);
 				// handshake中はunwrap結果の必要なし
 				if (dst != null) {
 					PoolManager.poolBufferInstance(dst);
@@ -200,7 +200,8 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 		return result;
 	}
 
-	private ByteBuffer unwrap(ByteBuffer src) throws SSLException {
+	/* 復帰バッファは、writeモード ,orgDstもwriteモード */
+	private ByteBuffer unwrap(ByteBuffer src,ByteBuffer orgDst) throws SSLException {
 		logger.debug("unwrap");
 		if(sslEngine==null){
 			RuntimeException re=new IllegalStateException("unwrap sslEngine is null");
@@ -210,7 +211,14 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 		ByteBuffer dst = PoolManager.getBufferInstance(packetSize);
 		int srcremain=src.remaining();
 		try {
-			sslResult = sslEngine.unwrap(src, dst);
+			if(orgDst==null){
+				sslResult = sslEngine.unwrap(src, dst);
+			}else{
+				ByteBuffer[] dsts=new ByteBuffer[2];
+				dsts[0]=orgDst;
+				dsts[1]=dst;
+				sslResult = sslEngine.unwrap(src, dsts);
+			}
 		} catch (SSLException e) {
 			logger.warn("unwrap error.sslResult:"+sslResult + " srcremain:"+srcremain +" packetSize:"+packetSize);
 			PoolManager.poolBufferInstance(dst);
@@ -240,7 +248,6 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 			PoolManager.poolBufferInstance(dst);
 			throw new RuntimeException("unwrap error.sslStatus:" + sslStatus);
 		}
-		dst.flip();
 		return dst;
 	}
 
@@ -269,7 +276,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 				}
 				ByteBuffer src = nextUnwrapBuffer();
 				BuffersUtil.hexDump("ssl handshake read.cid:"+handler.getChannelId(),src);
-				ByteBuffer dst = unwrap(src);
+				ByteBuffer dst = unwrap(src,null);
 				if (dst == null) {
 					Status sslStatus = sslResult.getStatus();
 					if (sslStatus == Status.BUFFER_UNDERFLOW) {
@@ -388,7 +395,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 			if (sslResult == null) {// wrapもunwarpも呼んでいなくて,handshakeが終わってない=>Serverの最初の処理
 				ByteBuffer src = nextUnwrapBuffer();
 				BuffersUtil.hexDump("ssl handshake read.cid:"+handler.getChannelId(),src);
-				ByteBuffer dst = unwrap(src);
+				ByteBuffer dst = unwrap(src,null);
 				// handshake中はunwrap結果の必要なし;
 				if (dst != null) {
 					PoolManager.poolBufferInstance(dst);
@@ -402,21 +409,25 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 				return;
 			}
 		}
-
+		ByteBuffer dst = PoolManager.getBufferInstance(packetSize);
 		List<ByteBuffer> list = null;
 		while (true) {
 			ByteBuffer src = nextUnwrapBuffer();
 			if (src == null) {
+				list=addByteBuffer(list,dst);
 				break;
 			}
-			ByteBuffer byteBuffer = unwrap(src);
+			ByteBuffer byteBuffer = unwrap(src,dst);
 			if (byteBuffer == null) {
+				list=addByteBuffer(list,dst);
 				break;
 			}
-			if (list == null) {
-				list = new ArrayList<ByteBuffer>();
+			if(byteBuffer.position()==0){
+				PoolManager.poolBufferInstance(byteBuffer);
+				continue;
 			}
-			list.add(byteBuffer);
+			list=addByteBuffer(list,dst);
+			dst=byteBuffer;
 		}
 		if (list == null) {
 			// 中途半端なデータしかないのだから、次のデータを読み込む
@@ -426,6 +437,19 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 		}
 		ByteBuffer[] plainBuffers=BuffersUtil.toByteBufferArray(list);
 		handler.callbackReadPlain(userContext, plainBuffers);
+	}
+	
+	private List<ByteBuffer> addByteBuffer(List<ByteBuffer> list,ByteBuffer byteBuffer){
+		if(byteBuffer.position()==0){
+			PoolManager.poolBufferInstance(byteBuffer);
+			return list;
+		}
+		if(list==null){
+			list = new ArrayList<ByteBuffer>();
+		}
+		byteBuffer.flip();
+		list.add(byteBuffer);
+		return list;
 	}
 
 	private long onWrittenCounter = 0;
