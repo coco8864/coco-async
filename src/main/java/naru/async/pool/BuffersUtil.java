@@ -84,7 +84,7 @@ public class BuffersUtil {
 		return b;
 	}
 
-	/* length•ª‚Ìbuffers‚ðŠm•Û‚·‚é */
+	/* length byte•ª‚Ìbuffers‚ðŠm•Û‚·‚é */
 	public static ByteBuffer[] prepareBuffers(long length) {
 		if (length <= 0) {
 			return (ByteBuffer[]) PoolManager.getArrayInstance(

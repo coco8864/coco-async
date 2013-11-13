@@ -256,7 +256,7 @@ public class Order extends PoolBase{
 //			logger.warn("handler event return exception.handler:"+handler,t);
 		}finally{
 			logger.debug("callbacked.cid:"+handler.getChannelId()+":type:"+orderType);
-			unref(true);//orderは通知したら寿命が切れる
+			unref(true);//orderは通知したら寿命が切れる,orderは、handlerを所有しているのでorderの開放と共にhandlerの参照は減算される
 		}
 	}
 
