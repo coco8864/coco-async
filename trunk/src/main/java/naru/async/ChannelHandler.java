@@ -375,7 +375,7 @@ public abstract class ChannelHandler extends PoolBase{
 	}
 	
 	public boolean asyncRead(Object userContext){
-		if(isClosed){
+		if(context==null ||isClosed){
 			logger.debug("fail to asyncRead aleady closed.cid:"+getChannelId());
 			return false;
 		}
@@ -389,7 +389,7 @@ public abstract class ChannelHandler extends PoolBase{
 	}
 	
 	public boolean asyncWrite(Object userContext,ByteBuffer[] buffers){
-		if(isClosed){
+		if(context==null || isClosed){
 			PoolManager.poolBufferInstance(buffers);//é∏îsÇµÇΩèÍçáÇ‡buffersÇÕè¡îÔÇ∑ÇÈ
 			logger.debug("fail to asyncWrite aleady closed.cid:"+getChannelId());
 			return false;
@@ -399,7 +399,7 @@ public abstract class ChannelHandler extends PoolBase{
 			logger.debug("asyncWrite.cid:"+getChannelId()+":this:"+this +":length:"+BuffersUtil.remaining(buffers));
 		}
 		Order order=Order.create(this, Order.TYPE_WRITE, userContext,buffers);
-		if(context==null || context.writeOrder(order)==false){
+		if(context.writeOrder(order)==false){
 			logger.debug("fail to asyncWrite writeOrder error.id:"+getPoolId());
 			return false;
 		}
@@ -426,7 +426,7 @@ public abstract class ChannelHandler extends PoolBase{
 	}
 	
 	public boolean asyncCancel(Object userContext){
-		if(isClosed){
+		if(context==null ||isClosed){
 			logger.debug("fail to asyncCancel aleady closed.");
 			return false;
 		}

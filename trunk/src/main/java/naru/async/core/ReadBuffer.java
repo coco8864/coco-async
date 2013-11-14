@@ -132,7 +132,8 @@ public class ReadBuffer implements BufferGetter {
 					//現在callback中だけどまたasyncReadしていないタイミングで回線が切れる事がある
 					//doneDisconnect=true;
 				}
-//				return false;
+				/* 重要 　asyncReadリクエストがないのに、store.asyncBuffer(this, store);を呼び出すとどんどんbufferが溜まっちゃう */
+				return false;
 			}else if(store==null||(store.getPutLength()==onBufferLength && isDisconnect)){
 				//回線が切れている、かつ受信したすべてのデータを通知した
 				logger.debug("doneDisconnect.cid:"+context.getPoolId());
