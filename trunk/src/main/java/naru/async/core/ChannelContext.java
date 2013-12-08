@@ -150,10 +150,12 @@ public class ChannelContext extends PoolBase{
 		ChannelContext context=(ChannelContext)PoolManager.getInstance(ChannelContext.class);
 		context.setHandler(handler);
 		context.channel=channel;
+		context.selector=IOManager.getSelectorContext(context);
 		context.readBuffer.setup();
 		context.writeBuffer.setup();
 		logger.debug("ChannelContext#create cid:"+context.getPoolId()+":ioStatus:"+context.ioStatus +":handler:"+handler.getPoolId()+":"+channel);
 		if(channel instanceof SocketChannel){
+			context.setIoStatus(IO.SELECT);
 			context.socket=((SocketChannel)channel).socket();
 			InetAddress inetAddress=context.socket.getInetAddress();
 			context.remotePort=context.socket.getPort();
@@ -328,9 +330,9 @@ public class ChannelContext extends PoolBase{
 	}
 	
 	private void putSelector(){
-		if(selector==null){
-			selector=IOManager.getSelectorContext(this);
-		}
+		//if(selector==null){
+		//	selector=IOManager.getSelectorContext(this);
+		//}
 //		logger.info("putSelector cid:"+getPoolId()+":selector:"+selector);
 		selector.putContext(this);
 		if(orders.orderCount()!=0){
