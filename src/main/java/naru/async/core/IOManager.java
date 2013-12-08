@@ -105,11 +105,11 @@ public class IOManager implements Queuelet {
 			//logger.debug(new String(buffer.array(),0,buffer.limit()));
 			//logger.debug("%%%%%%%%%%%%");
 		} catch (IOException e) {
+			failure=e;
 			logger.warn("fail to read.cid:"+context.getPoolId() +":channel:"+ channel,failure);
-			failure=e;
 		} catch (Throwable e) {
-			logger.warn("fail to read Throwable.cid:"+context.getPoolId() +":channel:"+ channel,failure);
 			failure=e;
+			logger.warn("fail to read Throwable.cid:"+context.getPoolId() +":channel:"+ channel,failure);
 		}
 		if(failure!=null){
 			PoolManager.poolBufferInstance(buffer);

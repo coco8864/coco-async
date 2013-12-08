@@ -48,16 +48,10 @@ public class SelectorContext implements Runnable {
 	public void putContext(ChannelContext context){
 		synchronized(contexts){
 			stastics.inQueue();
+			context.ref();
 			contexts.add(context);
 		}
 	}
-	/*
-	public void removeContext(ChannelContext context){
-		synchronized(contexts){
-			contexts.remove(context);
-		}
-	}
-	*/
 	public void wakeup(){
 		if(isWakeup==false){
 			//複数スレッドから同時に呼び出された場合、selector.wakeup()が複数呼び出される
@@ -101,16 +95,13 @@ public class SelectorContext implements Runnable {
 	private long selectAll(long nextWakeup){
 		Set nextContexts=new HashSet();
 		Set<SelectionKey> keys=selector.keys();
-//		stastics.setSelectCount(keys.size());
 		Iterator<SelectionKey> itr=keys.iterator();
 		while(itr.hasNext()){
 			SelectionKey key=itr.next();
-//			System.out.println(Thread.currentThread().getName() + ":key:"+key);
 			if(key.isValid()==false){
 				continue;
 			}
 			ChannelContext context=(ChannelContext)key.attachment();
-			//logger.debug("$"+context.getPoolId());
 			long contextNextWakeup=context.select(this,nextWakeup);
 			if(contextNextWakeup<0){//参加したかったが、参加させられなかった。
 				nextContexts.add(context);
@@ -129,12 +120,14 @@ public class SelectorContext implements Runnable {
 			logger.debug("selectAll cid:"+context.getPoolId());
 			if(nextContexts.contains(context)){
 				//一回のselectで同じcontextのselectを複数回呼ぶのを防ぐ、弊害はないとは思うが
+				context.unref();
 				continue;
 			}
 			long contextNextWakeup=context.select(this,nextWakeup);
 			if(contextNextWakeup<0){//参加したかったが、参加させられなかった。
 				nextContexts.add(context);
 			}else{
+				context.unref();
 				nextWakeup=contextNextWakeup;
 			}
 		}
@@ -200,11 +193,11 @@ public class SelectorContext implements Runnable {
 				handler.setHandlerAttribute(ATTR_ACCEPTED_CONTEXT, acceptContext);
 				Object userAcceptContext=context.getAcceptUserContext();
 				acceptContext.accepted(userAcceptContext);
-				//wakeupがもったいないので、このままこのSelectorで処理を続けたいと思ったが・・・
-				//putContext(acceptContext);
-				//acceptContext.select(this);
-				//・・・制御がややこしくなるので、やめて専用のselectorへ
-				acceptContext.queueuSelect();
+				//2013/12/8 acceptContextとりあえず読んでみる(for perfomance)
+				//acceptContext.queueuSelect();
+				stastics.read();
+				//acceptContext.setIoStatus(ChannelContext.IO.SELECT);
+				acceptContext.queueIO(ChannelContext.IO.READABLE);
 			} else if (key.isReadable()) {//READを優先的に判断
 //				context.readable(true);
 				stastics.read();
