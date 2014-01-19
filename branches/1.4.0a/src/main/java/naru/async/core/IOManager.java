@@ -9,6 +9,7 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 
 import naru.async.pool.BuffersUtil;
+import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
 import naru.queuelet.Queuelet;
 import naru.queuelet.QueueletContext;
@@ -27,27 +28,47 @@ public class IOManager implements Queuelet {
 		return stastics;
 	}
 	
-	/**
-	 * queuelet　terminalへのキューイング
-	 * @author Naru
-	 *
-	 */
-	public static void enqueue(Object obj){
-		if(obj==null){
-			return;
-		}
-		if(obj instanceof ChannelContext){
-			//IOが完了するまでChannelContextが再利用されないようにする
-			ChannelContext channelContext=(ChannelContext)obj;
-			channelContext.ref();
-			logger.debug("IOManager enqueue.cid:"+((ChannelContext)obj).getPoolId());
-		}
-		queueletContext.enque(obj);
+	private enum EnqueueType {
+		Read,
+		Connect,
+		Write,
+		Close,
+		StopQueue
 	}
 	
-	private static String STOP_REQUEST="stop";
+	public static class Enqueue extends PoolBase{
+		private EnqueueType type;
+		private ChannelContext context;
+	}
+	
+	private static void enqueue(EnqueueType type,ChannelContext context){
+		Enqueue enqueue=(Enqueue)PoolManager.getInstance(Enqueue.class);
+		enqueue.type=type;
+		enqueue.context=context;
+		if(context!=null){
+			context.ref();
+		}
+		queueletContext.enque(enqueue);
+	}
+	
+	public static void enqueueRead(Object obj){
+		enqueue(EnqueueType.Read,(ChannelContext)obj);
+	}
+	
+	public static void enqueueWrite(Object obj){
+		enqueue(EnqueueType.Write,(ChannelContext)obj);
+	}
+	
+	public static void enqueueClose(Object obj){
+		enqueue(EnqueueType.Close,(ChannelContext)obj);
+	}
+	
+	public static void enqueueConnect(Object obj){
+		enqueue(EnqueueType.Connect,(ChannelContext)obj);
+	}
+	
 	public static void stop(){
-		enqueue(STOP_REQUEST);
+		enqueue(EnqueueType.StopQueue,null);
 	}
 	
 	/* (非 Javadoc)
@@ -197,40 +218,38 @@ public class IOManager implements Queuelet {
 	}
 	
 	public boolean service(Object req) {
-		if(req==STOP_REQUEST){
-			logger.info("recive stop request");
-			for(int i=0;i<selectors.length;i++){
-				selectors[i].stop();
-				selectors[i].wakeup();
-			}
-			return false;
-		}
-		ChannelContext context=(ChannelContext)req;
+		Enqueue enqueue=(Enqueue)req;
+		ChannelContext context=enqueue.context;
 		try{
-			ChannelContext.IO io=context.getIoStatus();
-			logger.debug("IOManager service.cid:"+context.getPoolId()+":io:"+io);
-			switch(io){
-			case CONNECTABLE:
-				executeConnect(context);
-				break;
-			case READABLE:
+			switch(enqueue.type){
+			case StopQueue:
+				logger.info("recive stop request");
+				for(int i=0;i<selectors.length;i++){
+					selectors[i].stop();
+					selectors[i].wakeup();
+				}
+				return false;
+			case Read:
 				executeRead(context);
 				break;
-			case WRITABLE:
+			case Connect:
+				executeConnect(context);
+				break;
+			case Write:
 				executeWrite(context);
 				break;
-			case CLOSEABLE:
+			case Close:
 				context.prepareIO(ChannelContext.IO.CLOSEING);
 				context.doneClosed(false);//要求によりcloseする場合
 				break;
-			default:
-				logger.error("IOManager.service error.io:"+io+":cid:"+context.getPoolId());
 			}
-			return false;
 		}finally{
 			//IOが完了するまでChannelContextが再利用されないようにする
-			context.unref();
+			if(context!=null){
+				context.unref();
+			}
 		}
+		return false;
 	}
 	
 }
