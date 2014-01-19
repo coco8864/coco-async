@@ -13,7 +13,6 @@ import naru.async.store.Store;
 
 public class ReadBuffer implements BufferGetter {
 	private static Logger logger=Logger.getLogger(ReadBuffer.class);
-	private static final String STORE_CREANUP="storeCreanup";
 	
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private ChannelContext context;
@@ -27,19 +26,6 @@ public class ReadBuffer implements BufferGetter {
 	/* 0長を受信した場合は、今までputBufferされた全bufferを返却した後、
 	 * その次のasyncReadをonCloseで復帰させる。*/
 	private boolean isDisconnect=false;//回線が切れた場合
-	
-	private synchronized void setStore(Store store){
-		if(store!=null){
-			context.ref();
-			store.ref();
-		}
-		Store orgStore=this.store;
-		this.store=store;
-		if(orgStore!=null){
-			context.unref();
-			orgStore.unref();
-		}
-	}
 	
 	public ReadBuffer(ChannelContext context){
 		this.context=context;
@@ -78,14 +64,12 @@ public class ReadBuffer implements BufferGetter {
 		store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
 		context.ref();//storeが生きている間contextを確保する
 		isContextUnref=false;
-//		setStore(Store.open(false));
 	}
 	
 	public void cleanup(){
 		logger.debug("cleanup.cid:"+context.getPoolId());
 		if(store!=null){
 			store.close(this,store);
-//			setStore(null);
 		}
 	}
 	
@@ -164,10 +148,10 @@ public class ReadBuffer implements BufferGetter {
 			}
 			//配列を返却
 			PoolManager.poolArrayInstance(buffer);
-			int size=workBuffer.size();
+			//int size=workBuffer.size();
 			ByteBuffer[] readBuffer=BuffersUtil.toByteBufferArray(workBuffer);
 			//(ByteBuffer[])workBuffer.toArray(BuffersUtil.newByteBufferArray(size));
-//			logger.info("onBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(readBuffer));
+			//logger.info("onBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(readBuffer));
 			
 			long bufSize=BuffersUtil.remaining(readBuffer);
 			if(context.ordersDoneRead(readBuffer)){
@@ -202,15 +186,12 @@ public class ReadBuffer implements BufferGetter {
 		synchronized(this){
 			if(isContextUnref){
 				logger.error("duplicate ReadBuffer#onBufferEnd",new Throwable());
-//				logger.error("duplicate ReadBuffer#onBufferEnd prev",unrefStack);
 				return;
 			}
 			isContextUnref=true;
-//			unrefStack=new Throwable();
-//			ContextOrders orders=(ContextOrders)userContext;
 			logger.debug("onBufferEnd.cid:"+context.getPoolId());//こないと思う
-//			setStore(null);
 			context.unref();//storeが終了したのでcontextは開放してもよい
+			context=null;
 		}
 	}
 	
@@ -221,17 +202,14 @@ public class ReadBuffer implements BufferGetter {
 		synchronized(this){
 			if(isContextUnref){
 				logger.error("duplicate ReadBuffer#onBufferFailure",new Throwable());
-//				logger.error("duplicate ReadBuffer#onBufferFailure prev",unrefStack);
 				return;
 			}
 			isContextUnref=true;
-//			unrefStack=new Throwable();
-//			ContextOrders orders=(ContextOrders)userContext;
 			logger.warn("onBufferFailure falure",falure);//こないと思う
 			logger.warn("onBufferFailure now",new Exception());
 			context.failure(falure);
 			context.unref();//storeが終了したのでcontextは開放してもよい
-//			setStore(null);
+			context=null;
 		}
 	}
 

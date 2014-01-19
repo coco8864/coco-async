@@ -532,7 +532,7 @@ public class Store extends PoolBase {
 	}
 	
 	/**
-	 * 
+	 * すでにasyncBufferが同じパラメタで呼び出されているのであれば、副作用なく１回の呼び出しとする
 	 * @param bufferGetter
 	 * @param userContext
 	 * @return methodの中でcallbackした場合

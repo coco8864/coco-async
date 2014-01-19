@@ -181,6 +181,17 @@ public class BuffersUtil {
 		}
 		return total;
 	}
+	
+	public static long remaining(List<ByteBuffer> buffers) {
+		if (buffers == null) {
+			return 0;
+		}
+		long total = 0;
+		for (ByteBuffer buffer:buffers) {
+			total += buffer.remaining();
+		}
+		return total;
+	}
 
 	public static long remaining(ByteBuffer[] buffers) {
 		if (buffers == null) {

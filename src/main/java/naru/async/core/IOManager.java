@@ -5,7 +5,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.log4j.Logger;
 
