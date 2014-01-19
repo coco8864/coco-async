@@ -91,14 +91,13 @@ public class ChannelContext extends PoolBase{
 	private SelectorContext selector;
 	private SelectionKey selectionKey;//IO_SELECTの場合有効
 	private ChannelHandler handler;
-//	private long writeOrderLength;
 	private boolean isFinished;
 	
 	/**
 	 * callbackOrdersとioLockをsynchronizedする可能性があるが、両方が必要な場合は、
 	 * ioLockからsynchronizedする
 	 */
-	private LinkedList callbackOrders=new LinkedList();
+	private LinkedList<Order> callbackOrders=new LinkedList<Order>();
 	private boolean inCallback=false;
 	
 	private Object ioLock=new Object();
@@ -123,7 +122,6 @@ public class ChannelContext extends PoolBase{
 	private IpBlockType ipBlockType;
 	private Pattern blackList;
 	private Pattern whiteList;
-//	private Set acceptIps;
 	
 	private static ChannelContext dummyContext=new ChannelContext();
 	public static ChannelContext getDummyContext(){
@@ -230,7 +228,6 @@ public class ChannelContext extends PoolBase{
 		connectTimeoutTime=Long.MAX_VALUE;
 		readTimeoutTime=Long.MAX_VALUE;
 		writeTimeoutTime=Long.MAX_VALUE;
-//		readLength=writeLength=writeOrderLength=0;
 		isFinished=false;
 		selector=null;
 		selectionKey=null;
@@ -292,20 +289,6 @@ public class ChannelContext extends PoolBase{
 		return	localPort;
 	}
 	
-	/*
-	public boolean readable(){
-		return isReadable;
-	}
-	public void readable(boolean isReadable){
-		this.isReadable=isReadable;
-	}
-	public boolean writable(){
-		return isWritable;
-	}
-	public void writable(boolean isWritable){
-		this.isWritable=isWritable;
-	}
-	*/
 	public boolean closable(){
 		return isClosable;
 	}
@@ -330,9 +313,6 @@ public class ChannelContext extends PoolBase{
 	}
 	
 	private void putSelector(){
-		//if(selector==null){
-		//	selector=IOManager.getSelectorContext(this);
-		//}
 //		logger.info("putSelector cid:"+getPoolId()+":selector:"+selector);
 		selector.putContext(this);
 		if(orders.orderCount()!=0){
@@ -430,9 +410,7 @@ public class ChannelContext extends PoolBase{
 			if(orderCount!=0){
 				logger.debug("left order foward.orderCount:"+orderCount +":handler:" + handler);
 			}
-//			ChannelHandler orgHandler=this.handler;
 			setHandler(handler);
-//			orgHandler.unref();
 		}
 		return true;
 	}
@@ -515,16 +493,9 @@ public class ChannelContext extends PoolBase{
 				return false;
 			}
 			ByteBuffer[] buffers=writeOrder.popBuffers();
-//			for(ByteBuffer b:buffers){
-//				logger.info("writeOrder this:"+System.identityHashCode(this)+":bufid:"+System.identityHashCode(b));
-//			}
 			
 			long writeLength=BuffersUtil.remaining(buffers);
-//			if(writeLength==0){
-//				logger.warn("write buffer length 0.cid:"+getPoolId()+":buffers:"+buffers,new Throwable());
-//			}
 			long asyncWriteLength=stastics.addAsyncWriteLength(writeLength);
-//			writeOrderLength+=writeLength;
 			logger.debug("writeOrder."+writeLength+":"+asyncWriteLength + ":cid:"+ getPoolId());
 			writeOrder.setWriteEndOffset(asyncWriteLength);
 			if(writeLength==0){
@@ -584,28 +555,6 @@ public class ChannelContext extends PoolBase{
 		if(handler==null){
 			logger.debug("setHandler(null) cid:" +getPoolId()+":orgHandler:"+ this.handler);
 		}
-//		if(handler==null){
-//			logger.debug("setHandler(null) called.this:"+this,new Throwable());
-//		}
-		/*
-		if(handler==null && this.handler!=null){
-			logger.debug("setHandler(null) called.this:"+this,new Throwable());
-			dump();
-			logger.debug("setHandler(null) called.this.handler:"+this.handler);
-			this.handler.dump();
-		}
-		*/
-		/*
-		if(handler!=null){
-			handler.ref();
-		}
-		if(this.handler!=null){
-			//unrefからrecycle経由でここが呼び出される可能性あり
-			ChannelHandler tmpHandler=this.handler;
-			this.handler=null;
-			tmpHandler.unref();
-		}
-		*/
 		this.handler=handler;
 	}
 	
@@ -826,11 +775,6 @@ java.nio.channels.ClosedChannelException
 			return;
 		}
 		handler.handlerClosed();//applicationからの命令を拒否
-		//readOrderがあって、readも完了しているが、まだreadBufferに通知がないタイミングがある。
-		//if( orders.isReadOrder()){
-		//	readBuffer.waitForLastCallback();
-		//}
-		//全Orderをclosedで返却
 		closable(false);
 		Order finishOrder=Order.create(handler, Order.TYPE_FINISH, null);
 		if(selectionKey!=null){
@@ -855,10 +799,8 @@ java.nio.channels.ClosedChannelException
 					channel.close();
 					if(socket!=null){
 						socket.close();
-//						socket=null;
 					}else if(serverSocket!=null){
 						serverSocket.close();
-//						serverSocket=null;
 					}
 					
 				}
@@ -869,12 +811,10 @@ java.nio.channels.ClosedChannelException
 					if(socket.isConnected()){
 						logger.debug("order getOutputStream.close().cid:"+getPoolId());
 						socket.shutdownOutput();
-//						socket.getOutputStream().close();
 					}
 				}else if(serverSocket!=null){
 					if( !serverSocket.isClosed() ){
 						serverSocket.close();
-//						serverSocket=null;
 					}
 				}else{
 					if(channel!=null && channel.isOpen()){
@@ -886,8 +826,6 @@ java.nio.channels.ClosedChannelException
 		} catch (IOException e) {
 			//peerから切られるなどcloseが失敗することはある、closeに失敗しても後処理はない
 			logger.debug("close erroe.",e);
-//			serverSocket=null;
-//			socket=null;
 		}
 		finishChannel();
 	}
@@ -906,16 +844,6 @@ java.nio.channels.ClosedChannelException
 	public boolean acceptable(Socket socket){
 		String clietnIp=socket.getInetAddress().getHostAddress();
 		switch(ipBlockType){
-		/*
-		case black://blackになければ許可
-			if( matchPattern(blackList,clietnIp) ){
-				return false;
-			}
-		case white://whiteになければ拒否
-			if( !matchPattern(whiteList,clietnIp) ){
-				return false;
-			}
-		*/
 		case blackWhite://blackを見てなければwhiteを見てなければ拒否
 			if( matchPattern(blackList,clietnIp) ){
 				return false;
@@ -943,8 +871,6 @@ java.nio.channels.ClosedChannelException
 		}
 		Order order=Order.create(handler, Order.TYPE_ACCEPT, userContext);
 		synchronized(ioLock){
-//			ioStatus=IO_QUEUE_SELECT;//acceptしたらそのままselectループに入る
-			/*ioStatus=IO_IDLE;*/
 			queueCallback(order);
 		}
 	}
@@ -1009,8 +935,6 @@ java.nio.channels.ClosedChannelException
 				setIoStatus(IO.WRITING);
 			}else{
 //				dump();
-				//setIoStatus(IO.WAIT_WRITE_BUFFER);
-				//queueuSelect();
 			}
 			return buffers;
 		}
@@ -1061,13 +985,6 @@ java.nio.channels.ClosedChannelException
 			logger.warn("finishChildChannel.cid="+getPoolId()+":"+this);
 			return;
 		}
-		//handler.handlerClosed();//applicationからの命令を拒否
-		//readOrderがあって、readも完了しているが、まだreadBufferに通知がないタイミングがある。
-		//if( orders.isReadOrder()){
-		//	readBuffer.waitForLastCallback();
-		//}
-		//全Orderをclosedで返却
-		//closable(false);
 		Order finishOrder=Order.create(handler, Order.TYPE_FINISH, null);
 		orders.closed(finishOrder);
 	}
