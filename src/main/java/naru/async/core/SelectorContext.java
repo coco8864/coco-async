@@ -51,6 +51,7 @@ public class SelectorContext implements Runnable {
 			context.ref();
 			contexts.add(context);
 		}
+		wakeup();
 	}
 	public void wakeup(){
 		if(isWakeup==false){
@@ -83,7 +84,7 @@ public class SelectorContext implements Runnable {
 				continue;
 			}
 			ChannelContext context=(ChannelContext)key.attachment();
-			context.queueIO(ChannelContext.IO.CLOSEABLE);
+			context.queueIO(ChannelContext.SelectState.CLOSEABLE);
 		}
 	}
 	
@@ -197,19 +198,19 @@ public class SelectorContext implements Runnable {
 				//acceptContext.queueuSelect();
 				stastics.read();
 				//acceptContext.setIoStatus(ChannelContext.IO.SELECT);
-				acceptContext.queueIO(ChannelContext.IO.READABLE);
+				acceptContext.queueIO(ChannelContext.SelectState.READABLE);
 			} else if (key.isReadable()) {//READÇóDêÊìIÇ…îªíf
 //				context.readable(true);
 				stastics.read();
-				context.queueIO(ChannelContext.IO.READABLE);
+				context.queueIO(ChannelContext.SelectState.READABLE);
 			}else if(key.isWritable()){
 //				context.writable(true);
 				stastics.write();
-				context.queueIO(ChannelContext.IO.WRITABLE);
+				context.queueIO(ChannelContext.SelectState.WRITABLE);
 			}else if(key.isConnectable()){
 				// ê⁄ë±â¬î\Ç…Ç»Ç¡ÇΩèÍçá
 				stastics.connect();
-				context.queueIO(ChannelContext.IO.CONNECTABLE);
+				context.queueIO(ChannelContext.SelectState.CONNECTABLE);
 			}
 		}
 	}
