@@ -75,13 +75,15 @@ public class ReadBuffer implements BufferGetter {
 	
 	//回線からreadしたbufferは、putBuffersメソッドで詰め込む
 	public void putBuffer(ByteBuffer[] buffer){
-		if(store==null || store.isCloseReceived()){
+		long len=BuffersUtil.remaining(buffer);
+		if(store==null || store.isCloseReceived()||len==0){
 			logger.warn("store closed.cid:"+context.getPoolId()+":store:"+store);
 			PoolManager.poolBufferInstance(buffer);
 			return;
 		}
-		logger.debug("pubBuffer.cid:"+context.getPoolId()+":bufSize:"+BuffersUtil.remaining(buffer));
+		logger.debug("pubBuffer.cid:"+context.getPoolId()+":len:"+len);
 		store.putBuffer(buffer);
+		callback();
 	}
 	
 	public void disconnect(){

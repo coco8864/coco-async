@@ -111,8 +111,8 @@ public class IOManager implements Queuelet {
 		}
 	}
 	
-	private boolean executeRead(ChannelContext context) {
-		context.prepareIO(ChannelContext.IO.READING);
+	private void executeRead(ChannelContext context) {
+		context.prepareRead();
 		ReadableByteChannel channel=(ReadableByteChannel)context.getChannel();
 		ByteBuffer buffer=PoolManager.getBufferInstance();
 		long length=0;
@@ -138,20 +138,18 @@ public class IOManager implements Queuelet {
 				logger.warn("fail to read closable");
 			}
 			context.dump();
-			return false;
+			return;
 		}
 		
+		ByteBuffer[] buffers=null;
 		if(length<=0){
 			logger.debug("executeRead cid:"+context.getPoolId()+":length:"+length+":channel:"+channel+":buffer:"+buffer);
 			context.dump();
 			PoolManager.poolBufferInstance(buffer);
-			context.disconnect();
-//			context.doneClosed(true);
-			return false;
 		}else{
-			context.doneRead(BuffersUtil.toByteBufferArray(buffer));
+			buffers=BuffersUtil.toByteBufferArray(buffer);
 		}
-		return true;
+		context.doneRead(buffers);
 	}
 	
 	private boolean executeWrite(ChannelContext context) {
@@ -205,7 +203,7 @@ public class IOManager implements Queuelet {
 	}
 	
 	private boolean executeConnect(ChannelContext context) {
-		context.prepareIO(ChannelContext.IO.CONNECTING);
+		context.prepareIO(ChannelContext.SelectState.CONNECTING);
 		try {
 			context.finishConnect();
 			context.queueuSelect();//queueselect‚É’u‚­
@@ -239,7 +237,7 @@ public class IOManager implements Queuelet {
 				executeWrite(context);
 				break;
 			case Close:
-				context.prepareIO(ChannelContext.IO.CLOSEING);
+				context.prepareIO(ChannelContext.SelectState.CLOSEING);
 				context.doneClosed(false);//—v‹‚É‚æ‚èclose‚·‚éê‡
 				break;
 			}
