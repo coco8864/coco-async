@@ -63,16 +63,10 @@ public class ChannelContext extends PoolBase{
 		IDLE,//IOループに入っていない
 		QUEUE_SELECT,//select queueのみが参照　->SELECT
 		SELECT,//read可能になるのを待っている　select　threadのみが参照　->IOST_QUEUE_READ or IOST_QUEUE_WRITE
-//		QUEUE_IO,//read queueのみが参照 ->　IOST_READ
 		CONNECTABLE,
 		READABLE,
-		//WRITABLE,
-		//CLOSEABLE,
-//		IO,//read queueがread完了時に-> IOST_IDLE or IOST_QUEUE_SELECT
 		CONNECTING,
 		READING,
-		//WRITING,
-		//CLOSEING,
 		CLOSED//一旦このステータスになった場合、recycleまで値の設定は不可
 	}
 	
@@ -109,8 +103,8 @@ public class ChannelContext extends PoolBase{
 	private boolean inCallback=false;
 	
 	private Object ioLock=new Object();
-	private SelectState selectStatus=SelectState.IDLE;
-	private WriteState writeStatus=WriteState.IDLE;
+	private SelectState selectState=SelectState.IDLE;
+	private WriteState writeState=WriteState.IDLE;
 	
 	private ContextOrders orders=new ContextOrders(this);
 	private ReadBuffer readBuffer=new ReadBuffer(this);
@@ -123,8 +117,6 @@ public class ChannelContext extends PoolBase{
 	private long readTimeout;
 	private long writeTimeout;
 	
-//	private boolean isReadable=false;
-//	private boolean isWritable=false;
 	private boolean isClosable=false;
 	
 	private Class acceptClass;
@@ -138,7 +130,7 @@ public class ChannelContext extends PoolBase{
 		if(dummyContext==null){
 			//同時に来たら2個作るのは許容する
 			ChannelContext context=new ChannelContext();
-			context.selectStatus=SelectState.CLOSED;
+			context.selectState=SelectState.CLOSED;
 			context.isFinished=true;
 			dummyContext=context;
 		}
@@ -154,14 +146,19 @@ public class ChannelContext extends PoolBase{
 		return context;
 	}
 	
+	/*
+	 * serverとして動作、clientが接続に来た時に呼び出される
+	 */
 	public static ChannelContext create(ChannelHandler handler,SelectableChannel channel){
 		ChannelContext context=(ChannelContext)PoolManager.getInstance(ChannelContext.class);
 		context.setHandler(handler);
+		context.selectState=SelectState.IDLE;
+		context.writeState=WriteState.IDLE;
 		context.channel=channel;
 		context.selector=IOManager.getSelectorContext(context);
 		context.readBuffer.setup();
 		context.writeBuffer.setup();
-		logger.debug("ChannelContext#create cid:"+context.getPoolId()+":ioStatus:"+context.selectStatus +":handler:"+handler.getPoolId()+":"+channel);
+		logger.debug("ChannelContext#create cid:"+context.getPoolId()+":ioStatus:"+context.selectState +":handler:"+handler.getPoolId()+":"+channel);
 		if(channel instanceof SocketChannel){
 			context.setIoStatus(SelectState.SELECT);
 			context.socket=((SocketChannel)channel).socket();
@@ -187,13 +184,13 @@ public class ChannelContext extends PoolBase{
 	
 	private void setIoStatus(SelectState ioStatus){
 		if(logger.isDebugEnabled()){
-			logger.debug("setIoStatus cid:"+getPoolId() + ":org:" +this.selectStatus+":new:"+ioStatus);
+			logger.debug("setIoStatus cid:"+getPoolId() + ":org:" +this.selectState+":new:"+ioStatus);
 		}
-		this.selectStatus=ioStatus;
+		this.selectState=ioStatus;
 	}
 	
 	public SelectState getIoStatus(){
-		return selectStatus;
+		return selectState;
 	}
 	
 	public Object getAttribute(String name){
@@ -233,7 +230,8 @@ public class ChannelContext extends PoolBase{
 		}
 		remoteIp=localIp=null;
 		remotePort=localPort=-1;
-		setIoStatus(SelectState.IDLE);
+		selectState=SelectState.CLOSED;
+		writeState=WriteState.CLOSED;
 		setHandler(null);
 		connectTimeoutTime=Long.MAX_VALUE;
 		readTimeoutTime=Long.MAX_VALUE;
@@ -256,10 +254,10 @@ public class ChannelContext extends PoolBase{
 		StringBuffer sb=new StringBuffer("[");
 		sb.append("cid:");
 		sb.append(getPoolId());
-		sb.append(":selectStatus:");
-		sb.append(selectStatus);
-		sb.append(":writeStatus:");
-		sb.append(writeStatus);
+		sb.append(":selectState:");
+		sb.append(selectState);
+		sb.append(":writeState:");
+		sb.append(writeState);
 		sb.append(":handler:");
 		sb.append(handler);
 		if(selector!=null){
@@ -453,7 +451,7 @@ public class ChannelContext extends PoolBase{
 			}
 			//回線が切断されていて、かつreadBufferにデータが残っていた場合、callbackされる契機がなくなる
 			//readBufferがない場合は、finishが呼び出される
-			if(isFinished==false && selectStatus==SelectState.CLOSED){
+			if(isFinished==false && selectState==SelectState.CLOSED){
 				finishChannel();
 			}
 		}
@@ -493,7 +491,7 @@ public class ChannelContext extends PoolBase{
 				writeOrder.unref(true);
 				return false;
 			}
-			if(selectStatus==SelectState.CLOSED){
+			if(selectState==SelectState.CLOSED){
 				logger.debug("writeOrder aleady CLOSED.cid:"+getPoolId());
 				writeOrder.unref(true);
 				return false;
@@ -597,7 +595,7 @@ public class ChannelContext extends PoolBase{
 		synchronized(ioLock){
 			//今受け付けているclose以外のorderをすべてfailureでcallback queueに
 			orders.failure(e);
-			if(selectStatus!=SelectState.CLOSED){
+			if(selectState!=SelectState.CLOSED){
 				setIoStatus(SelectState.IDLE);
 			}
 			if(orders.isCloseable()){
@@ -612,7 +610,7 @@ public class ChannelContext extends PoolBase{
 	 */
 	public void queueuSelect(){
 		synchronized(ioLock){
-			switch(selectStatus){
+			switch(selectState){
 			case IDLE:
 			case CONNECTING:
 //			case READING:
@@ -620,7 +618,6 @@ public class ChannelContext extends PoolBase{
 //			case CLOSEING:
 				setIoStatus(SelectState.QUEUE_SELECT);
 				selector.putContext(this);
-				break;
 			case QUEUE_SELECT:
 			case SELECT:
 				selector.wakeup();
@@ -630,7 +627,7 @@ public class ChannelContext extends PoolBase{
 				readBuffer.callback();
 				break;
 			default:
-				logger.debug("queueuSelect.cid:"+getPoolId()+":io:"+selectStatus);
+				logger.debug("queueuSelect.cid:"+getPoolId()+":io:"+selectState);
 			}
 		}
 	}
@@ -646,9 +643,9 @@ public class ChannelContext extends PoolBase{
 	public long select(SelectorContext selector,long nextWakeup){
 		long now=System.currentTimeMillis();
 		synchronized(ioLock){
-			if(selectStatus!=SelectState.QUEUE_SELECT && selectStatus!=SelectState.SELECT ){
+			if(selectState!=SelectState.QUEUE_SELECT && selectState!=SelectState.SELECT ){
 				if(selectionKey!=null){
-					logger.debug("select#1 selectionKey.cancel().ioStatus:"+selectStatus);
+					logger.debug("select#1 selectionKey.cancel().ioStatus:"+selectState);
 					selectionKey.cancel();
 					selectionKey=null;
 				}
@@ -693,11 +690,11 @@ public class ChannelContext extends PoolBase{
 			}
 			
 			int ops=operations();
-			if(selectStatus==SelectState.SELECT){
+			if(selectState==SelectState.SELECT){
 				if(selectionKey.interestOps()!=ops){
 					selectionKey.interestOps(ops);
 				}
-			}else if (selectStatus==SelectState.QUEUE_SELECT){
+			}else if (selectState==SelectState.QUEUE_SELECT){
 				try {
 					if(channel.isRegistered()){
 						logger.debug("IO_QUEUE_SELECT and isRegistered.cid:" + getPoolId() +":selectionKey:"+selectionKey);
@@ -746,7 +743,7 @@ java.nio.channels.ClosedChannelException
 	 */
 	public boolean queueIO(SelectState io){
 		synchronized(ioLock){
-			if(selectStatus==SelectState.SELECT){
+			if(selectState==SelectState.SELECT){
 				if(selectionKey!=null){
 					selectionKey.cancel();
 					selectionKey=null;
@@ -755,11 +752,11 @@ java.nio.channels.ClosedChannelException
 				IOManager.enqueue(this);
 				return true;
 			}
-			if(selectStatus==SelectState.READABLE){
+			if(selectState==SelectState.READABLE){
 				logger.debug("queueIO status IO.READABLE.cid:"+getPoolId()+":io:"+io);
 				return false;
 			}
-			if(selectStatus==SelectState.WRITABLE && io==SelectState.WRITABLE){
+			if(selectState==SelectState.WRITABLE && io==SelectState.WRITABLE){
 				logger.debug("queueIO status IO.WRITABLE.cid:"+getPoolId()+":io:"+io);
 				IOManager.enqueue(this);
 				return true;
@@ -898,10 +895,10 @@ java.nio.channels.ClosedChannelException
 	/* read ioの直前に呼び出される */
 	public void prepareRead(){
 		synchronized(ioLock){
-			if(selectStatus==SelectState.READABLE){
-				selectStatus=SelectState.READING;
+			if(selectState==SelectState.READABLE){
+				selectState=SelectState.READING;
 			}else{
-				throw new RuntimeException("selectStatus error:"+selectStatus);
+				throw new RuntimeException("selectStatus error:"+selectState);
 			}
 		}
 	}
@@ -914,19 +911,19 @@ java.nio.channels.ClosedChannelException
 	public void doneRead(ByteBuffer[] buffers){
 		stastics.addOnReadLength(BuffersUtil.remaining(buffers));
 		synchronized(ioLock){
-			logger.debug("doneRead.cid:"+getPoolId()+":"+ selectStatus);
+			logger.debug("doneRead.cid:"+getPoolId()+":"+ selectState);
 			readBuffer.putBuffer(buffers);
 			//読み込み完了
 			readTimeoutTime=Long.MAX_VALUE;
-			if(selectStatus==SelectState.READING){
+			if(selectState==SelectState.READING){
 				if(buffers==null){//0長read
-					selectStatus=SelectState.CLOSED;
+					selectState=SelectState.CLOSED;
 				}else{
-					selectStatus=SelectState.QUEUE_SELECT;
+					selectState=SelectState.QUEUE_SELECT;
 					selector.putContext(this);
 				}
 			}else{
-				throw new RuntimeException("selectStatus error:"+selectStatus);
+				throw new RuntimeException("selectStatus error:"+selectState);
 			}
 		}
 	}
@@ -935,10 +932,10 @@ java.nio.channels.ClosedChannelException
 	public ByteBuffer[] prepareWrite(){
 		ByteBuffer[] buffers=writeBuffer.prepareWrite();
 		synchronized(ioLock){
-			if(writeStatus==WriteState.WRITABLE){
-				writeStatus=WriteState.WRITING;
+			if(writeState==WriteState.WRITABLE){
+				writeState=WriteState.WRITING;
 			}else{
-				throw new RuntimeException("writeStateus error:"+writeStatus);
+				throw new RuntimeException("writeStateus error:"+writeState);
 			}
 			return buffers;
 		}
@@ -948,7 +945,7 @@ java.nio.channels.ClosedChannelException
 	public void doneWrite(ByteBuffer[] prepareBuffers,long length){
 		long writeLength=stastics.addWriteLength(length);
 		long lestLength=BuffersUtil.remaining(prepareBuffers);
-		logger.debug("doneWrite.cid:"+getPoolId()+":"+length+":"+writeLength + ":"+ selectStatus + ":"+ channel);
+		logger.debug("doneWrite.cid:"+getPoolId()+":"+length+":"+writeLength + ":"+ selectState + ":"+ channel);
 		writeBuffer.doneWrite(prepareBuffers);
 		synchronized(ioLock){
 			//callback可能になったら=>putCallbackOrder()
@@ -960,14 +957,14 @@ java.nio.channels.ClosedChannelException
 			}else{
 				writeTimeoutTime=Long.MAX_VALUE;
 			}
-			if(writeStatus==WriteState.WRITING){
+			if(writeState==WriteState.WRITING){
 				if(lestLength==0){
-					writeStatus=WriteState.WRITABLE;
+					writeState=WriteState.WRITABLE;
 				}else{
-					writeStatus=WriteState.BLOCK;
+					writeState=WriteState.BLOCK;
 				}
 			}else{
-				throw new RuntimeException("writeStateus error:"+writeStatus);
+				throw new RuntimeException("writeStateus error:"+writeState);
 			}
 		}
 	}
@@ -981,6 +978,66 @@ java.nio.channels.ClosedChannelException
 	public long getTotalWriteLength(){
 		return writeBuffer.getPutLength();
 	}
+	
+	private void cancelSelect(){
+		if(selectionKey==null){
+			return;
+		}
+		selectionKey.cancel();
+		selectionKey=null;
+	}
+	
+	public void onReadable(){
+		cancelSelect();
+		
+		IOManager.enqueueClose(this);
+	}
+	
+	public void onConnectable(){
+		cancelSelect();
+		
+		IOManager.enqueueConnect(this);
+	}
+	
+	public void onWritable(){
+		cancelSelect();
+		
+		selector.putContext(this);
+		IOManager.enqueueWrite(this);
+	}
+
+	public void onPreRead(){
+	}
+	
+	public void onPostRead(){
+	}
+	
+	public void onPreConnect(){
+	}
+	
+	public void onPostConnect(){
+	}
+	
+	public ByteBuffer[] onPreWrite(){
+		return null;
+	}
+	
+	public void onPostWrite(ByteBuffer[] bufs){
+	}
+	
+	public void onPreClose(){
+	}
+	
+	public void onPostClose(){
+	}
+	
+	/*   preRead
+	 *   postRead
+	 *   preWrite
+	 *   postWrite
+	 *   preConnect
+	 *   postConnect
+	*/
 	
 	private void finishChannel(){
 		logger.debug("finishChannel.cid:"+getPoolId());
@@ -1048,3 +1105,27 @@ java.nio.channels.ClosedChannelException
 	}
 	*/
 }
+/*
+ * +command
+ *  read
+ *  write
+ *  close
+ *  
+ *  +buffer
+ *   writeBuffer
+ *  
+ *  +io
+ *   preSelect
+ *   
+ *   readable
+ *   writable
+ *   connectable
+ *   
+ *   preRead
+ *   postRead
+ *   preWrite
+ *   postWrite
+ *   preConnect
+ *   postConnect
+ * 
+ */ 
