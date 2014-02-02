@@ -194,23 +194,20 @@ public class SelectorContext implements Runnable {
 				handler.setHandlerAttribute(ATTR_ACCEPTED_CONTEXT, acceptContext);
 				Object userAcceptContext=context.getAcceptUserContext();
 				acceptContext.accepted(userAcceptContext);
-				//2013/12/8 acceptContextÇ∆ÇËÇ†Ç¶Ç∏ì«ÇÒÇ≈Ç›ÇÈ(for perfomance)
-				//acceptContext.queueuSelect();
-				stastics.read();
+				acceptContext.queueuSelect();
+				//stastics.read();
 				//acceptContext.setIoStatus(ChannelContext.IO.SELECT);
-				acceptContext.queueIO(ChannelContext.SelectState.READABLE);
+				//acceptContext.queueIO(ChannelContext.SelectState.READABLE);
 			} else if (key.isReadable()) {//READÇóDêÊìIÇ…îªíf
-//				context.readable(true);
 				stastics.read();
-				context.queueIO(ChannelContext.SelectState.READABLE);
+				context.onReadable();
 			}else if(key.isWritable()){
-//				context.writable(true);
 				stastics.write();
-				context.queueIO(ChannelContext.SelectState.WRITABLE);
+				context.onWritable();
 			}else if(key.isConnectable()){
 				// ê⁄ë±â¬î\Ç…Ç»Ç¡ÇΩèÍçá
 				stastics.connect();
-				context.queueIO(ChannelContext.SelectState.CONNECTABLE);
+				context.onConnectable();
 			}
 		}
 	}
