@@ -94,6 +94,7 @@ public class SelectorContext implements Runnable {
 	 * @return
 	 */
 	private long selectAll(long nextWakeup){
+		isWakeup=false;
 		Set nextContexts=new HashSet();
 		Set<SelectionKey> keys=selector.keys();
 		Iterator<SelectionKey> itr=keys.iterator();
@@ -171,12 +172,13 @@ public class SelectorContext implements Runnable {
 			// セレクトされた SelectionKey の状態に応じて処理を決める
 			if(!key.isValid()){
 				logger.warn("dispatch key is aleardy canceled");
-			}else if (key.isAcceptable()) {//ここからjava.nio.channels.CancelledKeyExceptionが発生する？
+			}
+			if (key.isAcceptable()) {//ここからjava.nio.channels.CancelledKeyExceptionが発生する？
 				ServerSocketChannel serverSocketChannel =(ServerSocketChannel) selectableChannel;
 				try {
 					socketChannel = serverSocketChannel.accept();
 					Socket s=socketChannel.socket();
-					if( !context.acceptable(s) ){
+					if( !context.onAcceptable(s) ){
 						logger.debug("refuse socketChannel:"+socketChannel);
 						s.close();//接続拒否
 						stastics.acceptRefuse();
@@ -193,21 +195,22 @@ public class SelectorContext implements Runnable {
 				
 				handler.setHandlerAttribute(ATTR_ACCEPTED_CONTEXT, acceptContext);
 				Object userAcceptContext=context.getAcceptUserContext();
-				acceptContext.accepted(userAcceptContext);
+				acceptContext.onAccepted(userAcceptContext);
 				acceptContext.queueuSelect();
 				//stastics.read();
 				//acceptContext.setIoStatus(ChannelContext.IO.SELECT);
 				//acceptContext.queueIO(ChannelContext.SelectState.READABLE);
-			} else if (key.isReadable()) {//READを優先的に判断
+			}else if (key.isReadable()) {//READを優先的に判断
 				stastics.read();
 				context.onReadable();
-			}else if(key.isWritable()){
-				stastics.write();
-				context.onWritable();
 			}else if(key.isConnectable()){
 				// 接続可能になった場合
 				stastics.connect();
 				context.onConnectable();
+			}
+			if(key.isWritable()){
+				stastics.write();
+				context.onWritable();
 			}
 		}
 	}
@@ -255,7 +258,7 @@ public class SelectorContext implements Runnable {
 				Set<SelectionKey> keys=selector.keys();
 				stastics.setSelectCount(keys.size());
 				selectCount=selector.select(interval);
-				isWakeup=false;//排他してないので、若干余分にwakeupが呼び出されるのは許容する
+				isWakeup=true;//排他してないので、若干余分にwakeupが呼び出されるのは許容する
 //				System.out.println(Thread.currentThread().getName() + ":out:"+interval);
 				if(selectCount<0){
 					logger.info("select out break.selectCount:"+selectCount+":this:"+this);

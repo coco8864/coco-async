@@ -105,6 +105,7 @@ public class ChannelContext extends PoolBase{
 	private Object ioLock=new Object();
 	private SelectState selectState=SelectState.IDLE;
 	private WriteState writeState=WriteState.IDLE;
+	private boolean isWriteBuffer;//writeBufferにすぐ払いだせるbufferが存在するか否か?
 	
 	private ContextOrders orders=new ContextOrders(this);
 	private ReadBuffer readBuffer=new ReadBuffer(this);
@@ -147,20 +148,23 @@ public class ChannelContext extends PoolBase{
 	}
 	
 	/*
-	 * serverとして動作、clientが接続に来た時に呼び出される
+	 * 3箇所から呼び出される
+	 * 1)serverとして動作、listenポート作成時
+	 * 2)serverとして動作、clientが接続に来た時に呼び出される
+	 * 3)clientとして動作、connect時
 	 */
 	public static ChannelContext create(ChannelHandler handler,SelectableChannel channel){
 		ChannelContext context=(ChannelContext)PoolManager.getInstance(ChannelContext.class);
 		context.setHandler(handler);
-		context.selectState=SelectState.IDLE;
-		context.writeState=WriteState.IDLE;
 		context.channel=channel;
 		context.selector=IOManager.getSelectorContext(context);
 		context.readBuffer.setup();
 		context.writeBuffer.setup();
+		context.isWriteBuffer=false;
 		logger.debug("ChannelContext#create cid:"+context.getPoolId()+":ioStatus:"+context.selectState +":handler:"+handler.getPoolId()+":"+channel);
+		context.selectState=SelectState.IDLE;
 		if(channel instanceof SocketChannel){
-			context.setIoStatus(SelectState.SELECT);
+			context.writeState=WriteState.WRITABLE;
 			context.socket=((SocketChannel)channel).socket();
 			InetAddress inetAddress=context.socket.getInetAddress();
 			context.remotePort=context.socket.getPort();
@@ -174,6 +178,7 @@ public class ChannelContext extends PoolBase{
 			}
 			context.serverSocket=null;
 		}else if(channel instanceof ServerSocketChannel){
+			context.writeState=WriteState.CLOSED;//write要求されることはない
 			context.serverSocket=((ServerSocketChannel)channel).socket();
 			context.localIp=context.remoteIp=null;
 			context.localPort=context.remotePort=-1;
@@ -213,7 +218,6 @@ public class ChannelContext extends PoolBase{
 			}
 		}
 		attribute.clear();
-		
 		if(socket!=null){
 			try {
 				socket.close();
@@ -241,6 +245,7 @@ public class ChannelContext extends PoolBase{
 		selectionKey=null;
 		callbackOrders.clear();
 		writeBuffer.recycle();
+		isWriteBuffer=false;
 		readBuffer.recycle();
 		orders.recycle();
 		stastics.recycle();
@@ -333,7 +338,11 @@ public class ChannelContext extends PoolBase{
 	 * @return
 	 */
 	private int operations(){
-		return orders.operations();
+		int ops=orders.operations();
+		if(writeState==WriteState.BLOCK){
+			ops|=SelectionKey.OP_WRITE;
+		}
+		return ops;
 	}
 	
 	/* callback関連 */
@@ -548,13 +557,6 @@ public class ChannelContext extends PoolBase{
 		return false;
 	}
 	
-	//readBufferがswapinしてきた場合
-	public boolean onSwapinReadBuffer(){
-		synchronized(ioLock){
-			return readBuffer.callback();
-		}
-	}
-	
 	public void setConnectTimeoutTime(long connectTimeoutTime){
 		this.connectTimeoutTime=connectTimeoutTime;
 	}
@@ -566,6 +568,7 @@ public class ChannelContext extends PoolBase{
 		this.handler=handler;
 	}
 	
+	/* accept用メソッド群 */
 	public void setAcceptClass(Class acceptClass){
 		this.acceptClass=acceptClass;
 	}
@@ -606,29 +609,12 @@ public class ChannelContext extends PoolBase{
 	}
 	
 	/**
-	 * IOを開始したい状況の場合呼び出す
+	 * Selectを開始したい状況の場合呼び出す
 	 */
 	public void queueuSelect(){
 		synchronized(ioLock){
-			switch(selectState){
-			case IDLE:
-			case CONNECTING:
-//			case READING:
-//			case WRITING:
-//			case CLOSEING:
-				setIoStatus(SelectState.QUEUE_SELECT);
-				selector.putContext(this);
-			case QUEUE_SELECT:
-			case SELECT:
-				selector.wakeup();
-				break;
-			case CLOSED:
-				logger.debug("disconnect and close request ioStatus==IO.CLOSED.cid:"+getPoolId());
-				readBuffer.callback();
-				break;
-			default:
-				logger.debug("queueuSelect.cid:"+getPoolId()+":io:"+selectState);
-			}
+			setIoStatus(SelectState.QUEUE_SELECT);
+			selector.putContext(this);
 		}
 	}
 	
@@ -821,40 +807,6 @@ java.nio.channels.ClosedChannelException
 		return matcher.matches();
 	}
 	
-	public boolean acceptable(Socket socket){
-		String clietnIp=socket.getInetAddress().getHostAddress();
-		switch(ipBlockType){
-		case blackWhite://blackを見てなければwhiteを見てなければ拒否
-			if( matchPattern(blackList,clietnIp) ){
-				return false;
-			}
-			if( !matchPattern(whiteList,clietnIp) ){
-				return false;
-			}
-		case whiteBlack://whiteを見てなければblackを見てなければ許可
-			if( !matchPattern(whiteList,clietnIp) ){
-				if( matchPattern(blackList,clietnIp) ){
-					return false;
-				}
-			}
-		}
-		Order order=Order.create(handler, Order.TYPE_SELECT, acceptUserContext);
-		synchronized(ioLock){
-			queueCallback(order);
-		}
-		return true;
-	}
-	public void accepted(Object userContext){
-		if(handler==null){
-			logger.error("accepted error handler=null.this:"+toString());
-			return;
-		}
-		Order order=Order.create(handler, Order.TYPE_ACCEPT, userContext);
-		synchronized(ioLock){
-			queueCallback(order);
-		}
-	}
-	
 	public void finishConnect() throws IOException{
 		((SocketChannel)channel).finishConnect();//リモートが止まっている場合は、ここでConnectExceptionとなる。
 		synchronized(ioLock){
@@ -987,6 +939,40 @@ java.nio.channels.ClosedChannelException
 		selectionKey=null;
 	}
 	
+	/* acceptしていたcontext側でaccept後に呼び出される */
+	/* acceptされたsocketを許可するか否かを返却 */
+	public boolean onAcceptable(Socket socket){
+		String clietnIp=socket.getInetAddress().getHostAddress();
+		switch(ipBlockType){
+		case blackWhite://blackを見てなければwhiteを見てなければ拒否
+			if( matchPattern(blackList,clietnIp) ){
+				return false;
+			}
+			if( !matchPattern(whiteList,clietnIp) ){
+				return false;
+			}
+		case whiteBlack://whiteを見てなければblackを見てなければ許可
+			if( !matchPattern(whiteList,clietnIp) ){
+				if( matchPattern(blackList,clietnIp) ){
+					return false;
+				}
+			}
+		}
+		Order order=Order.create(handler, Order.TYPE_SELECT, acceptUserContext);
+		synchronized(ioLock){
+			queueCallback(order);
+		}
+		return true;
+	}
+	
+	/* acceptで生まれたcontextに対して、直後に通知される */
+	public void onAccepted(Object userContext){
+		Order order=Order.create(handler, Order.TYPE_ACCEPT, userContext);
+		synchronized(ioLock){
+			queueCallback(order);
+		}
+	}
+	
 	public void onReadable(){
 		cancelSelect();
 		
@@ -1001,12 +987,17 @@ java.nio.channels.ClosedChannelException
 	
 	public void onWritable(){
 		cancelSelect();
-		
-		selector.putContext(this);
+		synchronized(ioLock){
+			writeState=WriteState.WRITABLE;
+			if(selectState==SelectState.SELECT){
+				selector.putContext(this);
+			}
+		}
 		IOManager.enqueueWrite(this);
 	}
 
 	public void onPreRead(){
+		
 	}
 	
 	public void onPostRead(){
@@ -1023,6 +1014,9 @@ java.nio.channels.ClosedChannelException
 	}
 	
 	public void onPostWrite(ByteBuffer[] bufs){
+	}
+	
+	public void onWriteBuffer(){
 	}
 	
 	public void onPreClose(){

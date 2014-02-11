@@ -85,7 +85,8 @@ public class WriteBuffer implements BufferGetter {
 	}
 	
 	//書き込み後、全部書いたbufferはリサイクルにまわす
-	public void doneWrite(ByteBuffer[] prepareBuffers){
+	//復帰値:bufferにデータ残っている場合、true,全bufferを書き込んだ場合false
+	public boolean doneWrite(ByteBuffer[] prepareBuffers){
 		logger.debug("doneWrite cid:"+ context.getPoolId() +":store:"+store+":size:"+workBuffer.size());
 		PoolManager.poolArrayInstance(prepareBuffers);//prepareで準備したBuffer配列は返却
 		synchronized(this){
@@ -99,13 +100,18 @@ public class WriteBuffer implements BufferGetter {
 				PoolManager.poolBufferInstance(buffer);
 			}
 			curBufferLength=BuffersUtil.remaining(workBuffer);
+			return (curBufferLength!=0);
 		}
 	}
 	
 	public boolean onBuffer(Object userContext, ByteBuffer[] buffer) {
 		boolean next=false;
+		boolean onWriteBuffer=false;
 		long len=BuffersUtil.remaining(buffer);
 		synchronized(this){
+			if(curBufferLength==0 && len!=0){
+				onWriteBuffer=true;
+			}
 			onBufferLength+=len;
 			curBufferLength+=len;
 			for(int i=0;i<buffer.length;i++){
@@ -117,7 +123,9 @@ public class WriteBuffer implements BufferGetter {
 				next=true;
 			}
 		}
-		//TODO writeがblockしていなければ,writeQに
+		if(onWriteBuffer){
+			context.onWriteBuffer();
+		}
 		if(next){
 			return true;
 		}else{
