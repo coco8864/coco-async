@@ -160,22 +160,11 @@ public class ContextOrders {
 	public int operations(){
 		if(connectOrder!=null){
 			return SelectionKey.OP_CONNECT;
-		}
-		if(acceptOrder!=null){
+		}else if(acceptOrder!=null){
 			return SelectionKey.OP_ACCEPT;
+		}else{
+			return SelectionKey.OP_READ;
 		}
-		int op=0;
-		if(writeOrders.size()!=0){
-			op|=SelectionKey.OP_WRITE;
-		}
-		if(readOrder!=null){
-			op|=SelectionKey.OP_READ;
-		}
-		if(op==0){
-			op=SelectionKey.OP_READ;
-		}
-//		logger.debug("operations:0x"+Integer.toHexString(op));
-		return op;
 	}
 	
 	public int orderCount(){
