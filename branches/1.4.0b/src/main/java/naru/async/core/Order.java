@@ -10,7 +10,7 @@ import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
 
 public class Order extends PoolBase{
-	static private Logger logger=Logger.getLogger(Order.class);
+	private static Logger logger=Logger.getLogger(Order.class);
 	
 	public static final int TYPE_NON=0;
 	public static final int TYPE_SELECT=1;

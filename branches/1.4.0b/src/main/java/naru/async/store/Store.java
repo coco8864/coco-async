@@ -17,11 +17,11 @@ import naru.async.store.StoreCallback;
 import naru.async.store.PersistenceStore.StoreEntry;
 
 public class Store extends PoolBase {
-	public static final long FREE_ID=-1;
 	private static Logger logger=Logger.getLogger(Store.class);
-	
 	//persistenceStoreŒQ‚ğŠÇ—‚·‚é(“¯ˆêstoerId‚É‘Î‚µ‚Ä•¡”open‚·‚éê‡‚ª‚ ‚é)
 	private static PersistenceStore persistenceStore;
+	public static final long FREE_ID=-1;
+	
 	public static void init(PersistenceStore persistenceStore){
 		Store.persistenceStore=persistenceStore;
 	}

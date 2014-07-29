@@ -13,11 +13,11 @@ import naru.async.store.Store;
 public class ReadBuffer implements BufferGetter {
 	private static Logger logger=Logger.getLogger(ReadBuffer.class);
 	
+	private Store store;
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private ChannelContext context;
 	private boolean isContextUnref=false;
 	
-	private Store store;
 	private long onBufferLength;
 	
 	/* 0長を受信した場合は、今までputBufferされた全bufferを返却した後、

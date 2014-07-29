@@ -14,12 +14,12 @@ import naru.async.store.Store;
 public class WriteBuffer implements BufferGetter {
 	private static Logger logger=Logger.getLogger(WriteBuffer.class);
 	
-	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
-	private ChannelContext context;
-	private boolean isContextUnref=false;
-	
 	//setupÇ≈ê›íËÇ≥ÇÍrecycleÇ≥ÇÍÇÈÇ‹Ç≈ï€éùÇ∑ÇÈ
+	private ChannelContext context;
 	private Store store;
+	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
+	
+	private boolean isContextUnref=false;
 	private long onBufferLength;
 	
 	public WriteBuffer(ChannelContext context){
