@@ -2,7 +2,6 @@ package naru.async.core;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Iterator;
 
 import org.apache.log4j.Logger;
 
@@ -13,13 +12,10 @@ import naru.async.store.Store;
 
 public class ReadBuffer implements BufferGetter {
 	private static Logger logger=Logger.getLogger(ReadBuffer.class);
-	private static final String STORE_CREANUP="storeCreanup";
 	
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private ChannelContext context;
-	//setupで設定されrecycleされるまで保持する
 	private boolean isContextUnref=false;
-//	private Throwable unrefStack=null;//TODO 削除 debug用,
 	
 	private Store store;
 	private long onBufferLength;
@@ -27,19 +23,6 @@ public class ReadBuffer implements BufferGetter {
 	/* 0長を受信した場合は、今までputBufferされた全bufferを返却した後、
 	 * その次のasyncReadをonCloseで復帰させる。*/
 	private boolean isDisconnect=false;//回線が切れた場合
-	
-	private synchronized void setStore(Store store){
-		if(store!=null){
-			context.ref();
-			store.ref();
-		}
-		Store orgStore=this.store;
-		this.store=store;
-		if(orgStore!=null){
-			context.unref();
-			orgStore.unref();
-		}
-	}
 	
 	public ReadBuffer(ChannelContext context){
 		this.context=context;
@@ -58,12 +41,7 @@ public class ReadBuffer implements BufferGetter {
 	}
 	
 	public void recycle() {
-		Iterator<ByteBuffer> itr=workBuffer.iterator();
-		while(itr.hasNext()){
-			ByteBuffer buf=itr.next();
-			PoolManager.poolBufferInstance(buf);
-			itr.remove();
-		}
+		PoolManager.poolBufferInstance(workBuffer);
 		if(store!=null){
 			store.unref();
 			store=null;
@@ -78,14 +56,12 @@ public class ReadBuffer implements BufferGetter {
 		store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
 		context.ref();//storeが生きている間contextを確保する
 		isContextUnref=false;
-//		setStore(Store.open(false));
 	}
 	
 	public void cleanup(){
 		logger.debug("cleanup.cid:"+context.getPoolId());
 		if(store!=null){
 			store.close(this,store);
-//			setStore(null);
 		}
 	}
 	

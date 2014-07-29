@@ -13,32 +13,14 @@ import naru.async.store.Store;
 
 public class WriteBuffer implements BufferGetter {
 	private static Logger logger=Logger.getLogger(WriteBuffer.class);
-	private static final String STORE_CREANUP="storeCreanup";
-//	private Object isBufReqLock=new Object();
-//	private boolean isBufReq=false;
 	
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private ChannelContext context;
 	private boolean isContextUnref=false;
-//	private Throwable unrefStack=null;//TODO 削除 debug用,
 	
 	//setupで設定されrecycleされるまで保持する
 	private Store store;
 	private long onBufferLength;
-//	private MessageDigest messageDigest;
-
-	private synchronized void setStore(Store store){
-		if(store!=null){
-			context.ref();
-			store.ref();
-		}
-		Store orgStore=this.store;
-		this.store=store;
-		if(orgStore!=null){
-			context.unref();
-			orgStore.unref();
-		}
-	}
 	
 	public WriteBuffer(ChannelContext context){
 		this.context=context;
@@ -57,12 +39,7 @@ public class WriteBuffer implements BufferGetter {
 	}
 	
 	public void recycle() {
-		Iterator<ByteBuffer> itr=workBuffer.iterator();
-		while(itr.hasNext()){
-			ByteBuffer buf=itr.next();
-			PoolManager.poolBufferInstance(buf);
-			itr.remove();
-		}
+		PoolManager.poolBufferInstance(workBuffer);
 		if(store!=null){
 			store.unref();
 			store=null;
@@ -74,7 +51,6 @@ public class WriteBuffer implements BufferGetter {
 		logger.debug("setup().cid:"+context.getPoolId()+":workBuffer:"+workBuffer);
 		onBufferLength=0;
 		isContextUnref=false;
-//		setStore(Store.open(false));
 		store=Store.open(false);//storeはここでしか設定しない
 		store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
 		context.ref();//storeが生きている間contextを確保する
@@ -85,31 +61,11 @@ public class WriteBuffer implements BufferGetter {
 		logger.debug("cleanup.cid:"+context.getPoolId());
 		if(store!=null){
 			store.close(this,store);
-//			setStore(null);
 		}
 	}
 	
-//	private static int prevId=0;
-//	private static boolean prevIsTimerThread=false;
-//	private static Throwable prevT;
 	//アプリから貰ったbufferは、putBuffersで詰め込む
 	public void putBuffer(ByteBuffer[] buffer){
-		/*
-		logger.info("putBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
-		for(ByteBuffer b:buffer){
-			int bufid=System.identityHashCode(b);
-			String tname=Thread.currentThread().getName();
-			if(tname.startsWith("thread-timer")){
-				//logger.info("pubBuffer this:"+System.identityHashCode(this)+":bufid:"+bufid);
-				//if(prevIsTimerThread==false){
-				//	logger.error("pubBuffer change to timerThread",new Exception());
-				//}
-				prevIsTimerThread=true;
-			}else{
-				prevIsTimerThread=false;
-			}
-		}
-		*/
 		logger.debug("putBuffer cid:"+ context.getPoolId()+":store:"+store +":len:"+BuffersUtil.remaining(buffer));
 		store.putBuffer(buffer);
 		//write可能になるのを待つ
@@ -236,13 +192,10 @@ java.nio.BufferOverflowException
 		synchronized(this){
 			if(isContextUnref){
 				logger.error("duplicate WriterBuffer#onBufferEnd",new Throwable());
-//				logger.error("duplicate WriterBuffer#onBufferEnd prev",unrefStack);
 				return;
 			}
 			isContextUnref=true;
-//			unrefStack=new Throwable();
 			logger.debug("onBufferEnd.cid:"+context.getPoolId());//こないと思う
-//			setStore(null);
 			context.unref();//storeが終了したのでcontextは開放してもよい
 		}
 	}
@@ -262,7 +215,6 @@ java.nio.BufferOverflowException
 			logger.warn("onBufferFailure falure.cid:"+context.getPoolId(),falure);//こないと思う
 			logger.warn("onBufferFailure now",new Exception());
 			context.failure(falure);
-//			setStore(null);
 			context.unref();//storeが終了したのでcontextは開放してもよい
 		}
 	}
