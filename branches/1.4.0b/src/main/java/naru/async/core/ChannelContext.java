@@ -127,13 +127,6 @@ public class ChannelContext extends PoolBase{
 	
 	private static ChannelContext dummyContext=new ChannelContext();
 	public static ChannelContext getDummyContext(){
-		if(dummyContext==null){
-			//“¯‚É—ˆ‚½‚ç2ŒÂì‚é‚Ì‚Í‹–—e‚·‚é
-			ChannelContext context=new ChannelContext();
-			context.ioStatus=IO.CLOSED;
-			context.isFinished=true;
-			dummyContext=context;
-		}
 		return dummyContext;
 	}
 	

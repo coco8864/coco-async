@@ -14,6 +14,16 @@ import naru.async.store.Store;
 public class WriteBuffer implements BufferGetter {
 	private static Logger logger=Logger.getLogger(WriteBuffer.class);
 	
+	public enum ST {
+		block,
+		writable,
+		io_queue,
+		writing,
+		close
+	}
+	private ST st=ST.writable;
+	
+	
 	//setupÇ≈ê›íËÇ≥ÇÍrecycleÇ≥ÇÍÇÈÇ‹Ç≈ï€éùÇ∑ÇÈ
 	private ChannelContext context;
 	private Store store;

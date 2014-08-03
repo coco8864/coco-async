@@ -38,13 +38,11 @@ public abstract class ChannelHandler extends PoolBase{
 	public static int ORDER_READ=3;
 	public static int ORDER_WRITE=4;
 	public static int ORDER_CLOSE=5;
-	public static int ORDER_CANCEL=6;
 	
 	private ChannelContext context;
 	private long totalReadLength=0;//contextが無くなった後,context情報を保持
 	private long totalWriteLength=0;//contextが無くなった後,context情報を保持
 	
-//	private ChannelHandlerStastices stastics=new ChannelHandlerStastices();
 	private boolean isClosed=false;//クローズを受け付けた後、次の要求を受けないため
 	private Map attribute=new HashMap();//handlerに付随する属性
 	
@@ -282,8 +280,6 @@ public abstract class ChannelHandler extends PoolBase{
 	}
 	
 	public enum IpBlockType{
-//		black,//blackListを見てなければ許可
-//		white,//whiteLsitを見てなければブロック
 		blackWhite,//blackListを見てなければ、whiteLsitを見てなければブロック
 		whiteBlack//whiteLsitを見てなければ、blackListを見てなければ許可
 	}
@@ -293,7 +289,7 @@ public abstract class ChannelHandler extends PoolBase{
 	}
 	
 	public boolean asyncAccept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass,IpBlockType ipBlockType,Pattern blackList,Pattern whiteList){
-		if(isClosed){
+		if(context!=null){
 			return false;
 		}
 		/* contextを作る */
@@ -361,18 +357,6 @@ public abstract class ChannelHandler extends PoolBase{
 		}
 		return true;
 	}
-
-	private boolean order(Order order){
-		if(context==null){
-			logger.error("order error.this:"+this,new Exception());
-			order.unref(true);
-			return false;
-		}
-		if(context.order(order)==false){
-			return false;
-		}
-		return true;
-	}
 	
 	public boolean asyncRead(Object userContext){
 		if(context==null ||isClosed){
@@ -425,17 +409,6 @@ public abstract class ChannelHandler extends PoolBase{
 		return true;
 	}
 	
-	public boolean asyncCancel(Object userContext){
-		if(context==null ||isClosed){
-			logger.debug("fail to asyncCancel aleady closed.");
-			return false;
-		}
-		logger.debug("asyncCancel.cid:"+getChannelId()+":this:"+this);
-		Order order=Order.create(this, Order.TYPE_CANCEL, userContext);
-		boolean result=order(order);
-		handlerClosed();
-		return result;
-	}
 	
 	/* 出力をoutputStreamやwriter経由で指定するメソッド */
 	private OutputStream outputStream;
@@ -635,39 +608,6 @@ public abstract class ChannelHandler extends PoolBase{
 	}
 	public void onConnectTimeout(Object userContext){
 		onTimeout(userContext);
-	}
-	
-	/**
-	 * 要求が、asyncCancel要求により取り消された事を通知
-	 * orderにORDER_CANCELが渡されてきたらcancel完了
-	 * @param order
-	 * @param userContexts
-	 */
-	public void onCanceled(){
-		logger.debug("#canceled.cid:"+getChannelId());
-	}
-	public void onCanceled(Object userContext){
-		onCanceled();
-	}
-	public void onWriteCanceled(Object[] userContexts){
-		onCanceled(userContexts[0]);
-	}
-	public void onReadCanceled(Object userContext){
-		onCanceled(userContext);
-	}
-	public void onAcceptCanceled(Object userContext){
-		onCanceled(userContext);
-	}
-	public void onConnectCanceled(Object userContext){
-		onCanceled(userContext);
-	}
-	//closeを先に処理する関係で発生しない
-	public void onCloseCanceled(Object userContext){
-		onCanceled(userContext);
-	}
-	//asyncCancel処理でcancelされた場合...正常系で呼び出される
-	public void onCancelCanceled(Object userContext){
-		onCanceled(userContext);
 	}
 	
 	//contextがアプリケーションに通知した通算read長
