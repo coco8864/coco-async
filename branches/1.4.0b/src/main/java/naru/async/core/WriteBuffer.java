@@ -17,7 +17,6 @@ public class WriteBuffer implements BufferGetter {
 	public enum ST {
 		block,
 		writable,
-		io_queue,
 		writing,
 		close
 	}

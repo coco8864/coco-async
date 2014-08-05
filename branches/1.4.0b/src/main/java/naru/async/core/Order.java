@@ -20,7 +20,7 @@ public class Order extends PoolBase{
 	public static final int TYPE_WRITE=5;
 	public static final int TYPE_CLOSE=6;
 	public static final int TYPE_FINISH=7;
-	public static final int TYPE_CANCEL=8;
+	//public static final int TYPE_CANCEL=8;
 	
 	private ChannelHandler handler;
 	private int orderType;//read,write,connect,accept,close
@@ -29,7 +29,6 @@ public class Order extends PoolBase{
 	private ByteBuffer buffers[];
 	private Throwable failure;
 	private boolean isTimeout;
-	private boolean isCancel;
 	private boolean isFinish;
 	private boolean isCloseOrder;
 	private long writeEndOffset;
@@ -57,7 +56,6 @@ public class Order extends PoolBase{
 		userContexts=null;
 		failure=null;
 		isTimeout=false;
-		isCancel=false;
 		isCloseOrder=false;
 		isFinish=false;
 		if(buffers!=null){
@@ -131,40 +129,6 @@ public class Order extends PoolBase{
 		}
 	}
 	
-	private void callbackCanceled(ChannelStastics stastics){
-		switch(orderType){
-		case TYPE_READ:
-			handler.onReadCanceled(userContext);
-			break;
-		case TYPE_WRITE:
-			if(userContexts!=null){
-				handler.onWriteCanceled(userContexts);
-			}else{
-				handler.onWriteCanceled(new Object[]{userContext});
-			}
-			break;
-		case TYPE_ACCEPT:
-			handler.onAcceptCanceled(userContext);
-			break;
-		case TYPE_CONNECT:
-			handler.onConnectCanceled(userContext);
-			break;
-		case TYPE_CLOSE:
-			//Ç†ÇËÇ¶Ç»Ç¢
-			logger.error("TYPE_CLOSE callbackCanceled()",new Exception());
-			handler.onCloseCanceled(userContext);
-			break;
-		case TYPE_FINISH:
-			logger.error("TYPE_FINISH callbackCanceled()",new Exception());
-			//Ç†ÇËÇ¶Ç»Ç¢
-			stastics.onFinished();
-			handler.onFinished();
-			//finishedÇí ímÇµÇΩÇΩÇﬂÅAhandlerÇ©ÇÁcontextÇêÿÇËó£Ç∑
-			//handler.setAttribute(SelectorContext.ATTR_ACCEPTED_CONTEXT, null);
-			break;
-		}
-	}
-	
 	private void callbackClosed(ChannelStastics stastics){
 		switch(orderType){
 		case TYPE_READ:
@@ -199,8 +163,6 @@ public class Order extends PoolBase{
 			callbackFailurer(stastics);
 		}else if(isTimeout){
 			callbackTimeout(stastics);
-		}else if(isCancel){
-			callbackCanceled(stastics);
 		}else if(isCloseOrder){
 			callbackClosed(stastics);
 		}else{
@@ -291,9 +253,6 @@ public class Order extends PoolBase{
 
 	public void timeout(){
 		isTimeout=true;
-	}
-	public void cancel(){
-		isCancel=true;
 	}
 	public void closeOrder(){
 		isCloseOrder=true;

@@ -14,9 +14,7 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 	private static Logger logger=Logger.getLogger(ReadChannel.class);
 	private static long bufferMinLimit=8192;
 	public enum State {
-		select_queue,
-		select,
-		io_queue,
+		selecting,
 		reading,
 		close
 	}

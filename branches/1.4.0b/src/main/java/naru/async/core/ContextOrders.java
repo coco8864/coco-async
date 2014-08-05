@@ -21,7 +21,6 @@ public class ContextOrders {
 	private Order readOrder;
 	private LinkedList<Order> writeOrders=new LinkedList<Order>();
 	private Order closeOrder;
-	private Order cancelOrder;
 	private Throwable failure;
 	
 	private ChannelContext context;
@@ -45,8 +44,6 @@ public class ContextOrders {
 		sb.append(readOrder);
 		sb.append(":closeOrder:");
 		sb.append(closeOrder);
-		sb.append(":cancelOrder:");
-		sb.append(cancelOrder);
 		sb.append(":failure:");
 		sb.append(failure);
 		logger.debug(sb.toString());
@@ -57,7 +54,6 @@ public class ContextOrders {
 		readOrder=null;
 		writeOrders.clear();
 		closeOrder=null;
-		cancelOrder=null;
 		failure=null;
 	}
 	
@@ -109,12 +105,6 @@ public class ContextOrders {
 			}
 			closeOrder=order;
 			break;
-		case Order.TYPE_CANCEL:
-			if(cancelOrder!=null){
-				return false;
-			}
-			cancelOrder=order;
-			break;
 		}
 		return true;
 	}
@@ -147,10 +137,6 @@ public class ContextOrders {
 	}
 	public boolean isConnectOrder(){
 		return connectOrder!=null;
-	}
-	
-	public boolean isCancelOrder(){
-		return cancelOrder!=null;
 	}
 	
 	/**
@@ -193,13 +179,9 @@ public class ContextOrders {
 		if(closeOrder!=null){
 			count++;
 		}
-		if(cancelOrder!=null){
-			count++;
-		}
 		return count;
 	}
 	
-	private static int CANCEL=1;
 	private static int FAILURE=2;
 	private static int TIMEOUT=3;
 	private static int CLOSE_ORDER=4;
@@ -207,9 +189,7 @@ public class ContextOrders {
 	private int queueOrders(int event,int orderType,Throwable e){
 		int count=0;
 		if((orderType==Order.TYPE_NON||orderType==Order.TYPE_SELECT)&& acceptOrder!=null){
-			if(event==CANCEL){
-				acceptOrder.cancel();
-			}else if(event==FAILURE){
+			if(event==FAILURE){
 				acceptOrder.setFailure(e);
 			}else if(event==TIMEOUT){
 				//ありえない
@@ -222,9 +202,7 @@ public class ContextOrders {
 			count++;
 		}
 		if((orderType==Order.TYPE_NON||orderType==Order.TYPE_CONNECT)&&connectOrder!=null){
-			if(event==CANCEL){
-				connectOrder.cancel();
-			}else if(event==FAILURE){
+			if(event==FAILURE){
 				connectOrder.setFailure(e);
 			}else if(event==TIMEOUT){
 				connectOrder.timeout();
@@ -236,9 +214,7 @@ public class ContextOrders {
 			count++;
 		}
 		if((orderType==Order.TYPE_NON||orderType==Order.TYPE_READ)&&readOrder!=null){
-			if(event==CANCEL){
-				readOrder.cancel();
-			}else if(event==FAILURE){
+			if(event==FAILURE){
 				readOrder.setFailure(e);
 			}else if(event==TIMEOUT){
 				readOrder.timeout();
@@ -262,9 +238,7 @@ public class ContextOrders {
 					order.unref(true);//通知したとみなす
 				}
 			}
-			if(event==CANCEL){
-				writeOrder.cancel();
-			}else if(event==FAILURE){
+			if(event==FAILURE){
 				writeOrder.setFailure(e);
 			}else if(event==TIMEOUT){
 				writeOrder.timeout();
@@ -281,29 +255,7 @@ public class ContextOrders {
 			closeOrder=null;
 			count++;
 		}
-		if((orderType==Order.TYPE_NON||orderType==Order.TYPE_CANCEL)&&cancelOrder!=null){
-			if(event==CANCEL){
-				cancelOrder.cancel();
-			}else if(event==FAILURE){
-				cancelOrder.setFailure(e);
-			}else if(event==TIMEOUT){
-				//cancelには、timeoutがないのでありえない
-			}else if(event==CLOSE_ORDER){
-				//cancelが動作する前に、closeされた状況.ありえる
-				closeOrder.closeOrder();
-			}
-			context.queueCallback(cancelOrder);
-			cancelOrder=null;
-			count++;
-		}
 		return count;
-	}
-	
-	/**
-	 * 全Orderにcancel通知
-	 */
-	public int cancel(){
-		return queueOrders(CANCEL,Order.TYPE_NON,null);
 	}
 	
 	/**

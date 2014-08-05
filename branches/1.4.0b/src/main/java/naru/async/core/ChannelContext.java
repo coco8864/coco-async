@@ -701,10 +701,6 @@ public class ChannelContext extends PoolBase{
 				queueIO(IO.CLOSEABLE);//Ç±Ç±Ç≈åãã«IO.CLOSEABLEÇ…Ç»ÇÈ
 				return nextWakeup;
 			}
-			/* canselóvãÅ? */
-			if(orders.isCancelOrder()){
-				orders.cancel();
-			}
 			/* timeoutîªíË */
 			if(connectTimeoutTime<=now){
 				orders.timeout(Order.TYPE_CONNECT);
