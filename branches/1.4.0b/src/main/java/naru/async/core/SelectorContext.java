@@ -45,7 +45,7 @@ public class SelectorContext implements Runnable {
 		return stastics;
 	}
 	
-	public void putContext(ChannelContext context){
+	public void queueSelect(ChannelContext context){
 		synchronized(contexts){
 			stastics.inQueue();
 			context.ref();

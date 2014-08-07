@@ -19,7 +19,6 @@ import java.util.regex.Pattern;
 import org.apache.log4j.Logger;
 
 import naru.async.core.ChannelContext;
-import naru.async.core.Order;
 import naru.async.core.SelectorContext;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
@@ -122,7 +121,7 @@ public abstract class ChannelHandler extends PoolBase{
 		}
 		if(this.context!=null){
 			totalReadLength=this.context.getTotalReadLength();			
-			totalWriteLength=this.context.getTotalWriteLength();			
+			totalWriteLength=this.context.getTotalReadLength();			
 			logger.debug("setContext endHandler.cid:"+this.context.getPoolId()+":this:"+this+":newContext:"+context);
 			this.context.unref();
 		}
@@ -240,9 +239,6 @@ public abstract class ChannelHandler extends PoolBase{
 			handler.unref();
 			return null;//ない
 		}
-//		handler.attribute.putAll(attribute);//属性を引き継ぐ
-//		attribute.clear();
-		context.setHandler(handler);
 		handler.setContext(context);
 		setContext(null);
 		handlerClosed();//自ハンドラは閉じたものとする
@@ -268,17 +264,6 @@ public abstract class ChannelHandler extends PoolBase{
 		return handler;
 	}
 	
-	/*
-	 * 指定されたhandlerと呼び出しhandlerのライフサイクルと同期させる。
-	 */
-//	public ChannelHandler attachHandler(ChannelHandler handler){
-//		return handler;
-//	}
-
-	public int orderCount(){
-		return context.orderCount();
-	}
-	
 	public enum IpBlockType{
 		blackWhite,//blackListを見てなければ、whiteLsitを見てなければブロック
 		whiteBlack//whiteLsitを見てなければ、blackListを見てなければ許可
@@ -302,17 +287,10 @@ public abstract class ChannelHandler extends PoolBase{
 			logger.error("failt to asyncAccept.",e);
 			return false;
 		}
-		setContext(ChannelContext.create(this, serverSocketChannel));
-		Order order=Order.create(this, Order.TYPE_SELECT, userContext);
-		context.setAcceptClass(acceptClass);
-		context.setAcceptUserContext(userContext);
-		context.setIpBlock(ipBlockType, blackList, whiteList);
-		if(context.acceptOrder(order)==false){
-			handlerClosed();
-			context=ChannelContext.getDummyContext();
-			return false;
-		}
-		return true;
+		
+		ChannelContext serverContext=ChannelContext.serverChannelCreate(this, serverSocketChannel);
+		setContext(serverContext);
+		return serverContext.asyncAccept(userContext,address,backlog,acceptClass,ipBlockType,blackList,whiteList);
 	}
 	
 
@@ -348,14 +326,9 @@ public abstract class ChannelHandler extends PoolBase{
 			logger.error("fail to connect",e);
 			return false;
 		}
-		setContext(ChannelContext.create(this, channel));
-		Order order=Order.create(this, Order.TYPE_CONNECT, userContext);
-		if(context.connectOrder(order,timeout)==false){
-			logger.warn("fail to asyncConnect connectOrder error.cid:"+getPoolId());
-			context=ChannelContext.getDummyContext();
-			return false;
-		}
-		return true;
+		ChannelContext socketContext=ChannelContext.socketChannelCreate(this, channel);
+		setContext(socketContext);
+		return socketContext.asyncConnect(userContext, address, timeout);
 	}
 	
 	public boolean asyncRead(Object userContext){
@@ -364,12 +337,7 @@ public abstract class ChannelHandler extends PoolBase{
 			return false;
 		}
 		logger.debug("asyncRead.cid:"+getChannelId()+":userContext:"+userContext);
-		Order order=Order.create(this, Order.TYPE_READ, userContext);
-		if(context.readOrder(order)==false){
-			logger.warn("fail to asyncRead readOrder error.cid:"+getChannelId());
-			return false;
-		}
-		return true;
+		return context.asyncRead(userContext);
 	}
 	
 	public boolean asyncWrite(Object userContext,ByteBuffer[] buffers){
@@ -382,12 +350,7 @@ public abstract class ChannelHandler extends PoolBase{
 		if(logger.isDebugEnabled()){
 			logger.debug("asyncWrite.cid:"+getChannelId()+":this:"+this +":length:"+BuffersUtil.remaining(buffers));
 		}
-		Order order=Order.create(this, Order.TYPE_WRITE, userContext,buffers);
-		if(context.writeOrder(order)==false){
-			logger.debug("fail to asyncWrite writeOrder error.id:"+getPoolId());
-			return false;
-		}
-		return true;
+		return context.asyncWrite(userContext, buffers);
 	}
 	
 	public boolean asyncClose(Object userContext){
@@ -400,13 +363,7 @@ public abstract class ChannelHandler extends PoolBase{
 			logger.error("asyncClose context is null.this:"+this);
 			return false;
 		}
-		Order order=Order.create(this, Order.TYPE_CLOSE, userContext);
-		if(context.closeOrder(order)==false){
-			logger.error("asyncClose closeOrder error.this:"+this);
-			return false;
-		}
-		handlerClosed();
-		return true;
+		return context.asyncClose(userContext);
 	}
 	
 	
@@ -623,7 +580,7 @@ public abstract class ChannelHandler extends PoolBase{
 		if(context==null){
 			return totalWriteLength;
 		}
-		return context.getTotalWriteLength();
+		return context.getTotalReadLength();
 	}
 	
 	/* spdy用のcontextを作成 */
@@ -642,7 +599,7 @@ public abstract class ChannelHandler extends PoolBase{
 		if(context==null){
 			return;
 		}
-		context.finishChildContext();
+		//context.finishChildContext();
 	}
 	
 }

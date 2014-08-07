@@ -51,72 +51,6 @@ public class ChannelContext extends PoolBase{
 		}
 	}
 	
-	private static ThreadLocal<ChannelContext> currentContext=new ThreadLocal<ChannelContext>();
-	private LinkedList<Order> callbackOrders=new LinkedList<Order>();
-	private boolean inCallback=false;
-	/* callback関連 */
-	public void queueCallback(Order order){
-		synchronized(callbackOrders){
-			callbackOrders.add(order);
-			logger.debug("queueCallback cid:"+getPoolId() +":size:"+callbackOrders.size()+":"+order.getOrderType()+ ":" +handler);
-			if(inCallback==false){
-				inCallback=true;
-				DispatchManager.enqueue(this);
-			}
-		}
-	}
-	
-	/**
-	 * dispatch workerから呼び出される、多重では走行しない
-	 */
-	public void callback(){
-		Order order=null;
-		boolean isFinishCallback=false;
-		ChannelHandler finishHandler=null;
-		currentContext.set(this);
-		try{
-			while(true){
-				synchronized(callbackOrders){
-					logger.debug("callback cid:"+getPoolId() +":size:"+callbackOrders.size());
-					if(order!=null){
-						callbackOrders.remove(order);
-					}
-					if(callbackOrders.size()==0){
-						inCallback=false;
-						break;
-					}
-					order=(Order)callbackOrders.get(0);
-				}
-				if(order.isFinish()){
-					isFinishCallback=true;
-					finishHandler=order.getHandler();
-				}
-				try{
-					order.callback(stastics);
-				}catch(Throwable t){
-					logger.warn("callback return Throwable",t);
-					//回線が切断されたとして処理
-					//doneClosed(true);
-				}
-			}
-		}finally{
-			currentContext.set(null);
-			if(isFinishCallback==false){
-				return;
-			}
-			logger.debug("callback isFinishCallback=true.cid:"+getPoolId());
-			if(finishHandler!=handler){
-				logger.warn("finish callback finishHandler:"+finishHandler);
-				logger.warn("finish callback handler:"+handler);
-			}
-			readBuffer.cleanup();
-			writeBuffer.cleanup();
-			finishHandler.unref();
-			setHandler(null);
-			unref();
-		}
-	}
-	
 	public void dump(){
 		dump(logger);
 	}
@@ -125,8 +59,8 @@ public class ChannelContext extends PoolBase{
 		StringBuffer sb=new StringBuffer("[");
 		sb.append("cid:");
 		sb.append(getPoolId());
-		sb.append(":ioStatus:");
-		sb.append(ioStatus);
+		//sb.append(":ioStatus:");
+		//sb.append(ioStatus);
 		sb.append(":handler:");
 		sb.append(handler);
 		if(selector!=null){
@@ -160,10 +94,21 @@ public class ChannelContext extends PoolBase{
 	}
 	
 	private ChannelStastics stastics=new ChannelStastics();
-	private ReadChannel readChannel=new ReadChannel();
-	private WriteChannel writeChannel=new WriteChannel();
+	private ReadChannel readChannel=new ReadChannel(this);
+	private WriteChannel writeChannel=new WriteChannel(this);
 	private ContextOrders orders=new ContextOrders(this);
 	
+	ContextOrders getContextOrders(){
+		return orders;
+	}
+	
+	ReadChannel getReadChannel(){
+		return readChannel;
+	}
+	
+	WriteChannel getWriteChannel(){
+		return writeChannel;
+	}
 	
 	private SelectableChannel channel;
 	private Socket socket;
@@ -193,38 +138,62 @@ public class ChannelContext extends PoolBase{
 		return context;
 	}
 	
-	public static ChannelContext create(ChannelHandler handler,SelectableChannel channel){
+	public static ChannelContext serverChannelCreate(ChannelHandler handler,ServerSocketChannel channel){
 		ChannelContext context=(ChannelContext)PoolManager.getInstance(ChannelContext.class);
 		context.setHandler(handler);
 		context.channel=channel;
 		context.selector=IOManager.getSelectorContext(context);
-		context.readBuffer.setup();
-		context.writeBuffer.setup();
-		logger.debug("ChannelContext#create cid:"+context.getPoolId()+":ioStatus:"+context.ioStatus +":handler:"+handler.getPoolId()+":"+channel);
-		if(channel instanceof SocketChannel){
-			//context.setIoStatus(IO.SELECT);
-			context.socket=((SocketChannel)channel).socket();
-			InetAddress inetAddress=context.socket.getInetAddress();
-			context.remotePort=context.socket.getPort();
-			if(inetAddress!=null){
-				context.remoteIp=inetAddress.getHostAddress();
-			}
-			context.localPort=context.socket.getLocalPort();
-			inetAddress=context.socket.getLocalAddress();
-			if(inetAddress!=null){
-				context.localIp=inetAddress.getHostAddress();
-			}
-			context.serverSocket=null;
-		}else if(channel instanceof ServerSocketChannel){
-			context.serverSocket=((ServerSocketChannel)channel).socket();
-			context.localIp=context.remoteIp=null;
-			context.localPort=context.remotePort=-1;
-			context.socket=null;
-		}
+		context.readChannel.setup();
+		context.writeChannel.setup();
+		context.serverSocket=((ServerSocketChannel)channel).socket();
+		context.localIp=context.remoteIp=null;
+		context.localPort=context.remotePort=-1;
+		context.socket=null;
 		return context;
 	}
 	
+	public static ChannelContext socketChannelCreate(ChannelHandler handler,SocketChannel channel){
+		ChannelContext context=(ChannelContext)PoolManager.getInstance(ChannelContext.class);
+		context.setHandler(handler);
+		context.channel=channel;
+		context.selector=IOManager.getSelectorContext(context);
+		context.readChannel.setup();
+		context.writeChannel.setup();
+		//context.setIoStatus(IO.SELECT);
+		context.socket=((SocketChannel)channel).socket();
+		InetAddress inetAddress=context.socket.getInetAddress();
+		context.remotePort=context.socket.getPort();
+		if(inetAddress!=null){
+			context.remoteIp=inetAddress.getHostAddress();
+		}
+		context.localPort=context.socket.getLocalPort();
+		inetAddress=context.socket.getLocalAddress();
+		if(inetAddress!=null){
+			context.localIp=inetAddress.getHostAddress();
+		}
+		context.serverSocket=null;
+		return context;
+	}
+	
+	boolean isConnected(){
+		if(socket==null){
+			return false;
+		}
+		return socket.isConnected();
+	}
+	
+	public synchronized boolean foward(ChannelHandler handler){
+		setHandler(handler);
+		return true;
+	}
+	
 	public void setHandler(ChannelHandler handler){
+		if(this.handler!=null){
+			this.handler.unref();
+		}
+		if(handler!=null){
+			handler.ref();
+		}
 		this.handler=handler;
 	}
 	
@@ -238,24 +207,116 @@ public class ChannelContext extends PoolBase{
 		}
 	}
 	
-	public boolean asyncAccept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass,IpBlockType ipBlockType,Pattern blackList,Pattern whiteList){
-		return false;
-	}
+	/* accept関連 */
+	private Class acceptClass;
+	private Object acceptUserContext;
+	private IpBlockType ipBlockType;
+	private Pattern blackList;
+	private Pattern whiteList;
 	
-	public boolean asyncConnect(Object userContext,InetSocketAddress address,long timeout){
-		return false;
-	}
-	
-	public boolean asyncRead(Object userContext){
-		return false;
-	}
-	
-	public boolean asyncWrite(Object userContext,ByteBuffer[] buffers){
-		return false;
-	}
-	
-	public boolean asynChannelContextlose(Object userContext){
-		return false;
+	public synchronized boolean asyncAccept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass,IpBlockType ipBlockType,Pattern blackList,Pattern whiteList){
+		if(orders.acceptOrder(userContext)==false){
+			return false;
+		}
+		this.acceptClass=acceptClass;
+		this.acceptUserContext=acceptUserContext;
+		this.ipBlockType=ipBlockType;
+		this.blackList=blackList;
+		this.whiteList=whiteList;
+		stastics.asyncAccept();
+		return true;
 	}
 
+	public synchronized boolean asyncConnect(Object userContext,InetSocketAddress address,long timeout){
+		if(orders.connectOrder(userContext)==false){
+			return false;
+		}
+		stastics.asyncConnect();
+		return true;
+	}
+	
+	public synchronized boolean asyncRead(Object userContext){
+		if(orders.readOrder(userContext)==false){
+			return false;
+		}
+		if(orders.isReadOrder()&&readTimeout>0){
+			readTimeoutTime=System.currentTimeMillis()+readTimeout;
+		}
+		stastics.asyncRead();
+		return true;
+	}
+	
+	public synchronized boolean asyncWrite(Object userContext,ByteBuffer[] buffers){
+		long length=BuffersUtil.remaining(buffers);
+		long asyncWriteStartOffset=stastics.getAsyncWriteLength();		
+		if(orders.writeOrder(userContext,buffers,asyncWriteStartOffset,length)==false){
+			return false;
+		}
+		if(orders.isReadOrder()&&writeTimeout>0&&writeTimeoutTime<0){
+			writeTimeoutTime=System.currentTimeMillis()+writeTimeout;
+		}
+		stastics.addAsyncWriteLength(length);
+		stastics.asyncWrite();
+		return true;
+	}
+	
+	public synchronized boolean asyncClose(Object userContext){
+		if( orders.closeOrder(userContext)==false ){
+			return false;
+		}
+		stastics.asyncClose();
+		return true;
+	}
+
+	public long getTotalReadLength() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+	
+	private long readTimeoutTime;
+	private long writeTimeoutTime;
+
+	private long readTimeout;
+	private long writeTimeout;
+	
+	public long getReadTimeout() {
+		return readTimeout;
+	}
+	
+	public void setReadTimeout(long readTimeout) {
+		this.readTimeout=readTimeout;
+	}
+
+	public long getWriteTimeout() {
+		return writeTimeout;
+	}
+
+	public void setWriteTimeout(long writeTimeout) {
+		this.writeTimeout=writeTimeout;
+	}
+	
+	public String getRemoteIp(){
+		return	remoteIp;
+	}
+	
+	public int getRemotePort(){
+		return	remotePort;
+	}
+	
+	public String getLocalIp(){
+		return	localIp;
+	}
+	
+	public int getLocalPort(){
+		return	localPort;
+	}
+
+	ChannelHandler getHandler() {
+		return handler;
+	}
+
+	SelectorContext getSelector() {
+		return selector;
+	}
+	
 }

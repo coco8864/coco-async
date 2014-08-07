@@ -14,6 +14,7 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 	private static Logger logger=Logger.getLogger(ReadChannel.class);
 	private static long bufferMinLimit=8192;
 	public enum State {
+		init,
 		selecting,
 		reading,
 		close
@@ -24,12 +25,15 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private long totalReadLength;
 	private long currentBufferLength;
+	
+	ReadChannel(ChannelContext context){
+		this.context=context;
+	}
 
-	public void setup(ChannelContext context){
-		state=State.select_queue;
+	public void setup(){
+		state=State.init;
 		store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
 		context.ref();//storeが生きている間contextを確保する
-		this.context=context;
 		store=Store.open(false);//storeはここでしか設定しない
 		store.asyncBuffer(this, store);
 		totalReadLength=currentBufferLength=0L;
@@ -42,7 +46,10 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 			for(ByteBuffer buffer:buffers){
 				workBuffer.add(buffer);
 			}
-			context.queueCallback(order);
+			if(context.getContextOrders().doneRead(workBuffer)){
+				workBuffer.clear();//成功した場合workBufferはクリアされるが念のため
+				currentBufferLength=0;
+			}
 			if(currentBufferLength<bufferMinLimit){
 				store.asyncBuffer(this, store);
 			}
@@ -63,20 +70,41 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 		}
 	}
 
-	boolean asyncConnect(){
-		return false;
+	void queueSelect(){
+		state=State.selecting;
+		context.getSelector().queueSelect(context);
 	}
-	boolean asyncRead(){
-		return false;
+	
+	boolean asyncConnect(){
+		synchronized(context){
+			queueSelect();
+		}
+		return true;
+	}
+	
+	boolean asyncRead(Order order){
+		if(currentBufferLength==0){
+			return false;
+		}
+		ByteBuffer[] bufs=BuffersUtil.toByteBufferArray(workBuffer);
+		workBuffer.clear();
+		currentBufferLength=0;
+		order.setBuffers(bufs);
+		context.getContextOrders().queueCallback(order);
+		return true;
 	}
 	
 	void readable(){
 		synchronized(context){
+			state=State.reading;
+			IOManager.enqueue(this);
 		}
 	}
 	
 	void connectable(){
 		synchronized(context){
+			state=State.reading;
+			IOManager.enqueue(this);
 		}
 	}
 }

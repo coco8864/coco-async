@@ -14,24 +14,28 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 	private static Logger logger=Logger.getLogger(WriteChannel.class);
 	private static long bufferMinLimit=8192;
 	public enum State {
+		init,
 		block,
 		writable,
-		io_queue,
 		writing,
 		close
 	}
-	private State state=State.writable;
+	private State state;
 	private ChannelContext context;
 	private Store store;
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private long totalWriteLength;
 	private long currentBufferLength;
+	private boolean isAsyncClose=false;
+	
+	WriteChannel(ChannelContext context){
+		this.context=context;
+	}
 
-	public void setup(ChannelContext context){
-		state=State.writable;
+	public void setup(){
+		state=State.init;
 		store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
 		context.ref();//storeが生きている間contextを確保する
-		this.context=context;
 		store=Store.open(false);//storeはここでしか設定しない
 		store.asyncBuffer(this, store);
 		totalWriteLength=currentBufferLength=0L;
@@ -45,7 +49,7 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 				workBuffer.add(buffer);
 			}
 			if(state==State.writable){
-				state=State.io_queue;
+				state=State.writing;
 				IOManager.enqueue(this);
 			}else if(state==State.close){
 				//TODO
@@ -71,24 +75,48 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 	}
 
 	boolean asyncWrite(ByteBuffer[] buffers){
+		switch(state){
+		case block:
+			break;
+		case writable:
+			state=State.writing;
+			IOManager.enqueue(this);
+		case writing:
+			break;
+		case init:
+		case close:
+			return false;
+		}
 		store.putBuffer(buffers);
-		return false;
+		return true;
 	}
 	
 	boolean asyncClose(){
-		return false;
+		if(isAsyncClose){
+			return false;
+		}
+		switch(state){
+		case block:
+		case writable:
+			state=State.writing;
+			isAsyncClose=true;
+			IOManager.enqueue(this);
+		case writing:
+			break;
+		case init:
+		case close:
+			return false;
+		}
+		return true;
 	}
 	
 	void writable(){
 		synchronized(context){
-			if(state!=State.block){
-				return;
-			}else if(state==xx){
-			}
-			if(currentBufferLength==0){
+			if(state==State.block){
 				state=State.writable;
-			}else{
-				state=State.io_queue;
+			}
+			if(state==State.writable&&currentBufferLength!=0){
+				state=State.writing;
 				IOManager.enqueue(this);
 			}
 		}

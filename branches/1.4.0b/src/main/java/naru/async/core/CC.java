@@ -27,7 +27,7 @@ import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
 
-public class ChannelContext extends PoolBase{
+public class CC extends PoolBase{
 	private static Logger logger=Logger.getLogger(ChannelContext.class);
 	private static HashSet<ChannelContext> channelContexts=new HashSet<ChannelContext>();
 	private static ChannelStastics totalChannelStastics=new  ChannelStastics();

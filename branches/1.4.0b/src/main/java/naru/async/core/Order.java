@@ -31,6 +31,7 @@ public class Order extends PoolBase{
 	private boolean isTimeout;
 	private boolean isFinish;
 	private boolean isCloseOrder;
+	private long writeStartOffset;
 	private long writeEndOffset;
 	
 	public static Order create(ChannelHandler handler,int orderType,Object userContext){
@@ -262,5 +263,8 @@ public class Order extends PoolBase{
 	}
 	public void setWriteEndOffset(long writeEndOffset) {
 		this.writeEndOffset = writeEndOffset;
+	}
+	public void setWriteStartOffset(long writeStartOffset) {
+		this.writeStartOffset = writeStartOffset;
 	}
 }
