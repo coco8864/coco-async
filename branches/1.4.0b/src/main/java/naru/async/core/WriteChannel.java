@@ -22,6 +22,7 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 		block,
 		writable,
 		writing,
+		closing,
 		close
 	}
 	private State state;
@@ -154,6 +155,8 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 			break;
 		case init:
 		case close:
+		case closing:
+			PoolManager.poolBufferInstance(buffers);
 			return false;
 		}
 		store.putBuffer(buffers);
@@ -176,9 +179,9 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 		switch(state){
 		case block:
 		case writable:
-			state=State.writing;
 			IOManager.enqueue(this);
 		case writing:
+			state=State.closing;
 			break;
 		case init:
 		case close:

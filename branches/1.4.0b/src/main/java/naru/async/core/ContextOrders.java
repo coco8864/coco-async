@@ -7,6 +7,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 
 import naru.async.ChannelHandler;
+import naru.async.core.ReadChannel.State;
 import naru.async.pool.BuffersUtil;
 
 import org.apache.log4j.Logger;
@@ -410,7 +411,7 @@ public class ContextOrders {
 			return false;
 		}
 		acceptOrder=Order.create(context.getHandler(), Order.TYPE_SELECT, userContext);
-		context.getReadChannel().queueSelect();
+		context.getReadChannel().queueSelect(State.accepting);
 		return true;
 	}
 	
@@ -423,7 +424,7 @@ public class ContextOrders {
 			queueCallback(connectOrder);
 			connectOrder=null;
 		}
-		context.getReadChannel().queueSelect();
+		context.getReadChannel().queueSelect(State.reading);
 		return true;
 	}
 	

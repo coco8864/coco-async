@@ -19,7 +19,8 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 	private static long bufferMinLimit=8192;
 	public enum State {
 		init,
-		selecting,
+		accepting,
+		connecting,
 		reading,
 		close
 	}
@@ -94,7 +95,7 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 		if(length>0){
 			synchronized(context){
 				store.putBuffer(BuffersUtil.toByteBufferArray(buffer));
-				queueSelect();
+				queueSelect(State.reading);
 			}
 			return true;
 		}else{//0í∑éÛêM
@@ -119,7 +120,7 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 				context.getContextOrders().failure(failure);
 			}else{
 				context.getContextOrders().doneConnect();
-				queueSelect();
+				queueSelect(State.reading);
 			}
 		}
 	}
@@ -144,14 +145,14 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 		context.unref();
 	}
 
-	void queueSelect(){
-		state=State.selecting;
+	void queueSelect(State state){
+		this.state=state;
 		context.getSelector().queueSelect(context);
 	}
 	
 	boolean asyncConnect(){
 		synchronized(context){
-			queueSelect();
+			queueSelect(State.connecting);
 		}
 		return true;
 	}
