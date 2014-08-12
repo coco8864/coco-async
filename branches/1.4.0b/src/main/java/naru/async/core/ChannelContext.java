@@ -431,4 +431,18 @@ java.nio.channels.ClosedChannelException
 		return selector;
 	}
 	
+	boolean checkFinish(){
+		if(orders.xxx()){
+			return false;
+		}
+		if(!readChannel.isClose()){
+			return false;
+		}
+		if(!writeChannel.isClose()){
+			return false;
+		}
+		orders.finish();
+		return true;
+	}
+	
 }
