@@ -82,7 +82,7 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 		}
 	}
 	
-	private boolean executeWrite(ByteBuffer[] prepareBuffers) {
+	private boolean executeWrite(ByteBuffer[] prepareBuffers,boolean isClosing) {
 		Throwable failure=null;
 		GatheringByteChannel channel=(GatheringByteChannel)this.channel;
 		long length=0;
@@ -98,6 +98,9 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 			logger.warn("fail to write.channel:"+channel+":cid:"+context.getPoolId(),e);
 			failure=e;
 			context.closeSocket();
+		}
+		if(isClosing){
+			context.shutdownOutputSocket();
 		}
 		synchronized(context){
 			if(failure!=null){
@@ -121,6 +124,10 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 			currentBufferLength-=length;
 			totalWriteLength+=length;
 			context.getContextOrders().doneWrite(totalWriteLength);
+			if(isClosing){
+				state=State.close;
+				context.getContextOrders().doneClose();
+			}
 			if(currentBufferLength<bufferMinLimit){
 				store.asyncBuffer(this, store);
 			}
@@ -129,12 +136,13 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 	}
 
 	public void doIo() {
+		ByteBuffer[] prepareBuffers=null;
+		boolean isClosing=false;
 		synchronized(context){
-			//write or close
-			ByteBuffer[] prepareBuffers=BuffersUtil.toByteBufferArray(workBuffer);
+			prepareBuffers=BuffersUtil.toByteBufferArray(workBuffer);
+			isClosing=(state==State.closing);
 		}
-		synchronized(context){
-		}
+		executeWrite(prepareBuffers,isClosing);
 	}
 	public void ref() {
 		context.ref();
@@ -185,6 +193,7 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 			break;
 		case init:
 		case close:
+		case closing:
 			return false;
 		}
 		return true;
