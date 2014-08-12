@@ -201,15 +201,15 @@ public class SelectorContext implements Runnable {
 			} else if (key.isReadable()) {//READ‚ğ—Dæ“I‚É”»’f
 //				context.readable(true);
 				stastics.read();
-				context.queueIO(ChannelContext.IO.READABLE);
+				context.getReadChannel().readable();
 			}else if(key.isWritable()){
 //				context.writable(true);
 				stastics.write();
-				context.queueIO(ChannelContext.IO.WRITABLE);
+				context.getWriteChannel().writable();
 			}else if(key.isConnectable()){
 				// Ú‘±‰Â”\‚É‚È‚Á‚½ê‡
 				stastics.connect();
-				context.queueIO(ChannelContext.IO.CONNECTABLE);
+				context.getReadChannel().connectable();
 			}
 		}
 	}

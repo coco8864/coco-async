@@ -85,15 +85,13 @@ public class ContextOrders {
 				return;
 			}
 			logger.debug("callback isFinishCallback=true.cid:"+context.getPoolId());
-			if(finishHandler!=handler){
-				logger.warn("finish callback finishHandler:"+finishHandler);
-				logger.warn("finish callback handler:"+handler);
-			}
-			readBuffer.cleanup();
-			writeBuffer.cleanup();
+			//if(finishHandler!=handler){
+			//	logger.warn("finish callback finishHandler:"+finishHandler);
+			//	logger.warn("finish callback handler:"+handler);
+			//}
 			finishHandler.unref();
-			setHandler(null);
-			unref();
+			context.setHandler(null);
+			context.unref();
 		}
 	}
 	

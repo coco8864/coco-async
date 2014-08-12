@@ -1,6 +1,10 @@
 package naru.async.core;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.SelectableChannel;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 
 import org.apache.log4j.Logger;
@@ -21,22 +25,24 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 	}
 	private State state;
 	private ChannelContext context;
+	private SelectableChannel channel;
 	private Store store;
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
-	private long totalReadLength;
 	private long currentBufferLength;
+	private long totalReadLength;
 	
 	ReadChannel(ChannelContext context){
 		this.context=context;
 	}
 
-	public void setup(){
+	public void setup(SelectableChannel channel){
 		state=State.init;
 		store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
 		context.ref();//storeが生きている間contextを確保する
 		store=Store.open(false);//storeはここでしか設定しない
 		store.asyncBuffer(this, store);
 		totalReadLength=currentBufferLength=0L;
+		this.channel=channel;
 	}
 	
 	public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
@@ -63,11 +69,79 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 	public void onBufferFailure(Object userContext, Throwable failure) {
 	}
 
+	private boolean executeRead() {
+		ByteBuffer buffer=PoolManager.getBufferInstance();
+		long length=0;
+		Throwable failure=null;
+		try {
+			length=((ReadableByteChannel)channel).read(buffer);
+			buffer.flip();
+			logger.debug("##executeRead length:"+length +":cid:"+context.getPoolId());
+		} catch (IOException e) {
+			failure=e;
+			logger.warn("fail to read.cid:"+context.getPoolId() +":channel:"+ channel,failure);
+		}
+		if(failure!=null){
+			PoolManager.poolBufferInstance(buffer);
+			context.closeSocket();
+			synchronized(context){
+				context.getContextOrders().failure(failure);
+				state=State.close;
+			}
+			context.dump();
+			return false;
+		}
+		if(length>0){
+			synchronized(context){
+				store.putBuffer(BuffersUtil.toByteBufferArray(buffer));
+				queueSelect();
+			}
+			return true;
+		}else{//0長受信
+			PoolManager.poolBufferInstance(buffer);
+			synchronized(context){
+				state=State.close;
+			}
+		}
+		return true;
+	}
+	
+	private void finishConnect(){
+		Throwable failure=null;
+		try {
+			((SocketChannel)channel).finishConnect();//リモートが止まっている場合は、ここでConnectExceptionとなる。
+		} catch (IOException e) {
+			context.closeSocket();
+			failure=e;
+		}
+		synchronized(context){
+			if(failure!=null){
+				context.getContextOrders().failure(failure);
+			}else{
+				context.getContextOrders().doneConnect();
+				queueSelect();
+			}
+		}
+	}
+	
+	private void forceClose(){
+		context.closeSocket();
+		synchronized(context){
+			state=State.close;
+		}
+	}
+	
 	public void doIo() {
 		synchronized(context){
+			//read or connect or forceClose
 		}
-		synchronized(context){
-		}
+	}
+	public void ref() {
+		context.ref();
+	}
+
+	public void unref() {
+		context.unref();
 	}
 
 	void queueSelect(){
