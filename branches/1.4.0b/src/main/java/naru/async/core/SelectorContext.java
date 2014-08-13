@@ -92,7 +92,8 @@ public class SelectorContext implements Runnable {
 	 * @param nextWakeup 次のタイムアウト時刻で一番近い時刻
 	 * @return
 	 */
-	private long selectAll(long nextWakeup){
+	private long selectAll(){
+		long timeoutTime=Long.MAX_VALUE;
 		Set nextContexts=new HashSet();
 		Set<SelectionKey> keys=selector.keys();
 		Iterator<SelectionKey> itr=keys.iterator();
@@ -102,11 +103,13 @@ public class SelectorContext implements Runnable {
 				continue;
 			}
 			ChannelContext context=(ChannelContext)key.attachment();
-			long contextNextWakeup=context.select(this,nextWakeup);
-			if(contextNextWakeup<0){//参加したかったが、参加させられなかった。
+			if(context.select()){
+				long time=context.getNextSelectWakeUp();
+				if(time<timeoutTime){
+					timeoutTime=time;
+				}
+			}else{//参加したかったが、参加させられなかった。
 				nextContexts.add(context);
-			}else{
-				nextWakeup=contextNextWakeup;
 			}
 		}
 		while(true){
@@ -123,12 +126,14 @@ public class SelectorContext implements Runnable {
 				context.unref();
 				continue;
 			}
-			long contextNextWakeup=context.select(this,nextWakeup);
-			if(contextNextWakeup<0){//参加したかったが、参加させられなかった。
-				nextContexts.add(context);
-			}else{
+			if(context.select()){
+				long time=context.getNextSelectWakeUp();
+				if(time<timeoutTime){
+					timeoutTime=time;
+				}
 				context.unref();
-				nextWakeup=contextNextWakeup;
+			}else{//参加したかったが、参加させられなかった。
+				nextContexts.add(context);
 			}
 		}
 		int nextContextsCount=nextContexts.size();
@@ -149,7 +154,7 @@ public class SelectorContext implements Runnable {
 //			logger.info("wakeup2 this:"+this);
 			
 		}
-		return nextWakeup;
+		return timeoutTime;
 	}
 	
 	public static String ATTR_ACCEPTED_CONTEXT="naru.async.acceptedContext";
@@ -175,7 +180,7 @@ public class SelectorContext implements Runnable {
 				try {
 					socketChannel = serverSocketChannel.accept();
 					Socket s=socketChannel.socket();
-					if( !context.acceptable(s) ){
+					if( !context.acceptable() ){
 						logger.debug("refuse socketChannel:"+socketChannel);
 						s.close();//接続拒否
 						stastics.acceptRefuse();
@@ -247,6 +252,9 @@ public class SelectorContext implements Runnable {
 				minCount=0;
 			}
 			long interval=nextWakeup-now;
+			if(interval>selectInterval){
+				interval=selectInterval;
+			}
 			logger.debug("select in.interval:"+interval);
 			stastics.loop();
 			int selectCount=0;
@@ -268,11 +276,11 @@ public class SelectorContext implements Runnable {
 			}
 			/* 選択されたチャネルを処理する */
 //			logger.info("select out.selectCount:"+selectCount+":this:"+this);
-			nextWakeup=System.currentTimeMillis()+selectInterval;
+			//nextWakeup=System.currentTimeMillis()+selectInterval;
 			dispatch();
 			
 			/* selectモードを調整する(close timeout　変更) */
-			nextWakeup=selectAll(nextWakeup);
+			nextWakeup=selectAll();
 			
 			/* 停止要求されている場合は、停止 */
 			if( isRun==false ){

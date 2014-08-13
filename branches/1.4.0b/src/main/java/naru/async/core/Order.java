@@ -12,53 +12,52 @@ import naru.async.pool.PoolManager;
 public class Order extends PoolBase{
 	private static Logger logger=Logger.getLogger(Order.class);
 	
-	public static final int TYPE_NON=0;
-	public static final int TYPE_SELECT=1;
-	public static final int TYPE_ACCEPT=2;
-	public static final int TYPE_CONNECT=3;
-	public static final int TYPE_READ=4;
-	public static final int TYPE_WRITE=5;
-	public static final int TYPE_CLOSE=6;
-	public static final int TYPE_FINISH=7;
-	//public static final int TYPE_CANCEL=8;
+	enum OrderType{
+		non,
+		select,
+		accept,
+		connect,
+		read,
+		write,
+		close,
+		finish
+	}
 	
 	private ChannelHandler handler;
-	private int orderType;//read,write,connect,accept,close
+	private OrderType orderType;//read,write,connect,accept,close
 	private Object userContext;
 	private Object[] userContexts;
 	private ByteBuffer buffers[];
 	private Throwable failure;
 	private boolean isTimeout;
-	private boolean isFinish;
-	private boolean isCloseOrder;
+	//private boolean isCloseOrder;
 	private long writeStartOffset;
 	private long writeEndOffset;
+	private long timeoutTime;
 	
-	public static Order create(ChannelHandler handler,int orderType,Object userContext){
+	public long getTimeoutTime() {
+		return timeoutTime;
+	}
+	public static Order create(ChannelHandler handler,OrderType orderType,Object userContext){
 		return create(handler,orderType,userContext,null);
 	}
-	public static Order create(ChannelHandler handler,int orderType,Object userContext,ByteBuffer[] buffers){
+	public static Order create(ChannelHandler handler,OrderType orderType,Object userContext,ByteBuffer[] buffers){
 		Order order=(Order)PoolManager.getInstance(Order.class);
 		logger.debug("Order#create:"+handler.getPoolId()+":"+orderType+ ":" +order);
 		order.setHandler(handler);
 		order.orderType=orderType;
 		order.userContext=userContext;
 		order.buffers=buffers;
-		if(orderType==TYPE_FINISH){
-			order.isFinish=true;
-		}
 		return order;
 	}
 	
 	public void recycle() {
 		setHandler(null);
-		orderType=TYPE_NON;
+		orderType=OrderType.non;
 		userContext=null;
 		userContexts=null;
 		failure=null;
 		isTimeout=false;
-		isCloseOrder=false;
-		isFinish=false;
 		if(buffers!=null){
 			PoolManager.poolBufferInstance(buffers);
 			buffers=null;
@@ -82,11 +81,11 @@ public class Order extends PoolBase{
 	
 	private void callbackFailurer(ChannelStastics stastics){
 		switch(orderType){
-		case TYPE_READ:
+		case read:
 			stastics.onReadFailure();
 			handler.onReadFailure(userContext, failure);
 			break;
-		case TYPE_WRITE:
+		case write:
 			stastics.onWriteFailure();
 			if(userContexts!=null){
 				handler.onWriteFailure(userContexts,failure);
@@ -94,15 +93,15 @@ public class Order extends PoolBase{
 				handler.onWriteFailure(new Object[]{userContext},failure);
 			}
 			break;
-		case TYPE_ACCEPT:
+		case accept:
 			stastics.onAcceptFailure();
 			handler.onAcceptFailure(userContext,failure);
 			break;
-		case TYPE_CONNECT:
+		case connect:
 			stastics.onConnectFailure();
 			handler.onConnectFailure(userContext,failure);
 			break;
-		case TYPE_CLOSE:
+		case close:
 			stastics.onCloseFailure();
 			handler.onCloseFailure(userContext,failure);
 			break;
@@ -111,11 +110,11 @@ public class Order extends PoolBase{
 	
 	private void callbackTimeout(ChannelStastics stastics){
 		switch(orderType){
-		case TYPE_READ:
+		case read:
 			stastics.onReadTimeout();
 			handler.onReadTimeout(userContext);
 			break;
-		case TYPE_WRITE:
+		case write:
 			stastics.onWriteTimeout();
 			if(userContexts!=null){
 				handler.onWriteTimeout(userContexts);
@@ -123,7 +122,7 @@ public class Order extends PoolBase{
 				handler.onWriteTimeout(new Object[]{userContext});
 			}
 			break;
-		case TYPE_CONNECT:
+		case connect:
 			stastics.onConnectTimeout();
 			handler.onConnectTimeout(userContext);
 			break;
@@ -132,11 +131,11 @@ public class Order extends PoolBase{
 	
 	private void callbackClosed(ChannelStastics stastics){
 		switch(orderType){
-		case TYPE_READ:
+		case read:
 			stastics.onReadClosed();
 			handler.onReadClosed(userContext);
 			break;
-		case TYPE_WRITE:
+		case write:
 			stastics.onWriteClosed();
 			if(userContexts!=null){
 				handler.onWriteClosed(userContexts);
@@ -144,15 +143,15 @@ public class Order extends PoolBase{
 				handler.onWriteClosed(new Object[]{userContext});
 			}
 			break;
-		case TYPE_ACCEPT:
+		case accept:
 			stastics.onAcceptClosed();
 			handler.onAcceptClosed(userContext);
 			break;
-		case TYPE_CONNECT:
+		case connect:
 			stastics.onConnectClosed();
 			handler.onConnectClosed(userContext);
 			break;
-		case TYPE_CLOSE:
+		case close:
 			stastics.onCloseClosed();
 			handler.onCloseClosed(userContext);
 			break;
@@ -168,31 +167,31 @@ public class Order extends PoolBase{
 			callbackClosed(stastics);
 		}else{
 			switch(orderType){
-			case TYPE_READ:
+			case read:
 				stastics.onRead();
 				handler.onRead(userContext, popBuffers());
 				break;
-			case TYPE_WRITE:
+			case write:
 				stastics.onWritten();
 				handler.onWritten(userContext);
 				break;
-			case TYPE_SELECT:
+			case select:
 				stastics.onAcceptable();
 				handler.onAcceptable(userContext);
 				break;
-			case TYPE_ACCEPT:
+			case accept:
 				stastics.onAccepted();
 				handler.onAccepted(userContext);
 				break;
-			case TYPE_CONNECT:
+			case connect:
 				stastics.onConnected();
 				handler.onConnected(userContext);
 				break;
-			case TYPE_CLOSE:
+			case close:
 				stastics.onCloseClosed();
 				handler.onCloseClosed(userContext);
 				break;
-			case TYPE_FINISH:
+			case finish:
 				stastics.onFinished();
 				handler.onFinished();
 				//finishedを通知したため、handlerからcontextを切り離す
@@ -203,7 +202,7 @@ public class Order extends PoolBase{
 	}
 	
 	public boolean isFinish(){
-		return isFinish;
+		return orderType==OrderType.finish;
 	}
 	
 	public void callback(ChannelStastics ststics){
@@ -214,20 +213,20 @@ public class Order extends PoolBase{
 		}
 		try{
 			internalCallback(ststics);
-//		}catch(Throwable t){
-//			//ここに来たときhandlerは、foward後かもしれない
-//			logger.warn("handler event return exception.handler:"+handler,t);
+		}catch(Throwable t){
+			//ここに来たときhandlerは、foward後かもしれない
+			logger.warn("callback return throwable.",t);
 		}finally{
 			logger.debug("callbacked.cid:"+handler.getChannelId()+":type:"+orderType);
 			unref(true);//orderは通知したら寿命が切れる,orderは、handlerを所有しているのでorderの開放と共にhandlerの参照は減算される
 		}
 	}
 
-	public int getOrderType() {
+	public OrderType getOrderType() {
 		return orderType;
 	}
 
-	public void setOrderType(int orderType) {
+	public void setOrderType(OrderType orderType) {
 		this.orderType = orderType;
 	}
 
@@ -254,9 +253,6 @@ public class Order extends PoolBase{
 
 	public void timeout(){
 		isTimeout=true;
-	}
-	public void closeOrder(){
-		isCloseOrder=true;
 	}
 	public long getWriteEndOffset() {
 		return writeEndOffset;

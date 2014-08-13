@@ -212,8 +212,9 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 	}
 	
 	boolean isBlock(){
-		synchronized(context){
-			return (state==State.block);
-		}
+		return (state==State.block);
+	}
+	boolean isClose(){
+		return (state==State.close);
 	}
 }

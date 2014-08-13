@@ -7,6 +7,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 
 import naru.async.ChannelHandler;
+import naru.async.core.Order.OrderType;
 import naru.async.core.ReadChannel.State;
 import naru.async.pool.BuffersUtil;
 
@@ -21,6 +22,7 @@ import org.apache.log4j.Logger;
 public class ContextOrders {
 	private static Logger logger=Logger.getLogger(ContextOrders.class);
 	
+	private boolean isFinished;//finish　Orderを実行したか否か
 	private Order acceptOrder;
 	private Order connectOrder;
 	private Order readOrder;
@@ -125,8 +127,12 @@ public class ContextOrders {
 		failure=null;
 	}
 	
+	boolean isCloseOrder(){
+		return closeOrder!=null;
+	}
+	
 	public boolean order(Order order){
-		int type=order.getOrderType();
+		OrderType type=order.getOrderType();
 		
 		if(failure!=null && type!=Order.TYPE_CLOSE){
 			//誰にも通知していないエラーが溜まっていれば、通知
@@ -205,6 +211,31 @@ public class ContextOrders {
 	}
 	public boolean isConnectOrder(){
 		return connectOrder!=null;
+	}
+	
+	long getConnectTimeoutTime(){
+		if(connectOrder!=null){
+			return connectOrder.getTimeoutTime();
+		}
+		return Long.MAX_VALUE;
+	}
+	
+	long getReadTimeoutTime(){
+		if(readOrder!=null){
+			return readOrder.getTimeoutTime();
+		}
+		return Long.MAX_VALUE;
+	}
+	
+	long getWriteTimeoutTime(){
+		long timeoutTime=Long.MAX_VALUE;
+		for(Order order:writeOrders){
+			long time=order.getTimeoutTime();
+			if(timeoutTime>time){
+				timeoutTime=time;
+			}
+		}
+		return timeoutTime;
 	}
 	
 	/**

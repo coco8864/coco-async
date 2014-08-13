@@ -22,6 +22,7 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 		accepting,
 		connecting,
 		reading,
+		closing,
 		close
 	}
 	private State state;
@@ -31,6 +32,10 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private long currentBufferLength;
 	private long totalReadLength;
+	
+	State getState(){
+		return state;
+	}
 	
 	ReadChannel(ChannelContext context){
 		this.context=context;
@@ -150,6 +155,15 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 		context.getSelector().queueSelect(context);
 	}
 	
+	void queueIo(){
+		queueIo(this.state);
+	}
+	
+	void queueIo(State state){
+		this.state=state;
+		IOManager.enqueue(this);
+	}
+	
 	boolean asyncConnect(){
 		synchronized(context){
 			queueSelect(State.connecting);
@@ -171,15 +185,13 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 	
 	void readable(){
 		synchronized(context){
-			state=State.reading;
-			IOManager.enqueue(this);
+			queueIo();
 		}
 	}
 	
 	void connectable(){
 		synchronized(context){
-			state=State.reading;
-			IOManager.enqueue(this);
+			queueIo();
 		}
 	}
 }
