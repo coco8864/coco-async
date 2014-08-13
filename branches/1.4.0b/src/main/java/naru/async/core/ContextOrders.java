@@ -437,6 +437,15 @@ public class ContextOrders {
 		return true;
 	}
 	
+	public boolean doneClose(){
+		if(closeOrder==null){
+			return false;
+		}
+		queueCallback(closeOrder);
+		closeOrder=null;
+		return true;
+	}
+	
 	boolean acceptOrder(Object userContext){
 		if(acceptOrder!=null){
 			return false;

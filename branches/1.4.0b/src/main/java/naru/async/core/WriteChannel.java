@@ -74,14 +74,6 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 	public void onBufferFailure(Object userContext, Throwable failure) {
 	}
 	
-	private boolean executeClose() {
-		context.shutdownOutputSocket();
-		synchronized(context){
-			state=State.close;
-			context.getContextOrders().doneClose();
-		}
-	}
-	
 	private boolean executeWrite(ByteBuffer[] prepareBuffers,boolean isClosing) {
 		Throwable failure=null;
 		GatheringByteChannel channel=(GatheringByteChannel)this.channel;
