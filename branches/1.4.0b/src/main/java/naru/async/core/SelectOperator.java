@@ -43,9 +43,9 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 
 	public void setup(SelectableChannel channel){
 		state=State.init;
+		store=Store.open(false);//storeはここでしか設定しない
 		store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
 		context.ref();//storeが生きている間contextを確保する
-		store=Store.open(false);//storeはここでしか設定しない
 		store.asyncBuffer(this, store);
 		totalReadLength=currentBufferLength=0L;
 		this.channel=channel;

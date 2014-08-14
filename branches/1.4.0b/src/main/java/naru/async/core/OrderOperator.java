@@ -408,8 +408,10 @@ public class OrderOperator {
 		if(context.isConnected()){//‚·‚Å‚Éconnect‚ª¬Œ÷‚µ‚Ä‚¢‚½ê‡
 			queueCallback(connectOrder);
 			connectOrder=null;
+			context.getSelectOperator().queueSelect(State.reading);
+		}else{
+			context.getSelectOperator().queueSelect(State.connecting);
 		}
-		context.getSelectOperator().queueSelect(State.reading);
 		return true;
 	}
 	

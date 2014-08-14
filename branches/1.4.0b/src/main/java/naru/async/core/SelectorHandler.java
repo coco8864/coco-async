@@ -132,7 +132,7 @@ public class SelectorHandler implements Runnable {
 				if(time<timeoutTime){
 					timeoutTime=time;
 				}
-				context.unref();
+				//context.unref();
 			}else{//参加したかったが、参加させられなかった。
 				nextContexts.add(context);
 			}
