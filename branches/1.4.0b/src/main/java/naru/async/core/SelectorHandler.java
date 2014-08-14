@@ -52,6 +52,7 @@ public class SelectorHandler implements Runnable {
 			context.ref();
 			contexts.add(context);
 		}
+		wakeup();
 	}
 	public void wakeup(){
 		if(isWakeup==false){
