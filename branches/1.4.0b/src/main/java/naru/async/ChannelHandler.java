@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
 import org.apache.log4j.Logger;
 
 import naru.async.core.ChannelContext;
-import naru.async.core.SelectorContext;
+import naru.async.core.SelectorHandler;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
@@ -150,7 +150,7 @@ public abstract class ChannelHandler extends PoolBase{
 	}
 	
 	public void setHandlerAttribute(String name, Object value) {
-		if(name==SelectorContext.ATTR_ACCEPTED_CONTEXT){
+		if(name==SelectorHandler.ATTR_ACCEPTED_CONTEXT){
 			logger.debug("setContext() call.context"+value);
 			//accept channelは、Selectorで作られる。context設定メソッドを隠蔽するための処理
 			setContext((ChannelContext)value);
@@ -580,7 +580,7 @@ public abstract class ChannelHandler extends PoolBase{
 		if(context==null){
 			return totalWriteLength;
 		}
-		return context.getTotalReadLength();
+		return context.getTotalWriteLength();
 	}
 	
 	/* spdy用のcontextを作成 */

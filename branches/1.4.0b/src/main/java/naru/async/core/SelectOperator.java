@@ -14,10 +14,10 @@ import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolManager;
 import naru.async.store.Store;
 
-public class ReadChannel implements BufferGetter,ChannelIO{
-	private static Logger logger=Logger.getLogger(ReadChannel.class);
+public class SelectOperator implements BufferGetter,ChannelIO{
+	private static Logger logger=Logger.getLogger(SelectOperator.class);
 	private static long bufferMinLimit=8192;
-	public enum State {
+	enum State {
 		init,
 		accepting,
 		connecting,
@@ -37,7 +37,7 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 		return state;
 	}
 	
-	ReadChannel(ChannelContext context){
+	SelectOperator(ChannelContext context){
 		this.context=context;
 	}
 
@@ -58,7 +58,7 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 			for(ByteBuffer buffer:buffers){
 				workBuffer.add(buffer);
 			}
-			if(context.getContextOrders().doneRead(workBuffer)){
+			if(context.getOrderOperator().doneRead(workBuffer)){
 				workBuffer.clear();//成功した場合workBufferはクリアされるが念のため
 				currentBufferLength=0;
 			}
@@ -75,6 +75,14 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 	public void onBufferFailure(Object userContext, Throwable failure) {
 	}
 
+	/* statusにcloseを設定する場合に呼び出す */
+	private void closed(){
+		synchronized(context){
+			state=State.close;
+			context.getOrderOperator().checkAndCallbackFinish();
+		}
+	}
+	
 	private boolean executeRead() {
 		ByteBuffer buffer=PoolManager.getBufferInstance();
 		long length=0;
@@ -82,6 +90,7 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 		try {
 			length=((ReadableByteChannel)channel).read(buffer);
 			buffer.flip();
+			totalReadLength+=length;
 			logger.debug("##executeRead length:"+length +":cid:"+context.getPoolId());
 		} catch (IOException e) {
 			failure=e;
@@ -91,8 +100,8 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 			PoolManager.poolBufferInstance(buffer);
 			context.closeSocket();
 			synchronized(context){
-				context.getContextOrders().failure(failure);
-				state=State.close;
+				context.getOrderOperator().failure(failure);
+				closed();
 			}
 			context.dump();
 			return false;
@@ -106,12 +115,17 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 		}else{//0長受信
 			PoolManager.poolBufferInstance(buffer);
 			synchronized(context){
-				state=State.close;
+				context.getWriteOperator().onRead0();
+				closed();
 			}
 		}
 		return true;
 	}
 	
+	public long getTotalReadLength() {
+		return totalReadLength;
+	}
+
 	private void finishConnect(){
 		Throwable failure=null;
 		try {
@@ -122,9 +136,9 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 		}
 		synchronized(context){
 			if(failure!=null){
-				context.getContextOrders().failure(failure);
+				context.getOrderOperator().failure(failure);
 			}else{
-				context.getContextOrders().doneConnect();
+				context.getOrderOperator().doneConnect();
 				queueSelect(State.reading);
 			}
 		}
@@ -132,14 +146,24 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 	
 	private void forceClose(){
 		context.closeSocket();
-		synchronized(context){
-			state=State.close;
-		}
+		closed();
 	}
 	
 	public void doIo() {
+		boolean isConnect;
+		boolean isRead;
+		boolean isClose;
 		synchronized(context){
-			//read or connect or forceClose
+			isConnect=(state==State.connecting);
+			isRead=(state==State.reading);
+			isClose=(state==State.closing);
+		}
+		if(isClose){
+			forceClose();
+		}else if(isConnect){
+			finishConnect();
+		}else if(isRead){
+			executeRead();
 		}
 	}
 	public void ref() {
@@ -179,7 +203,7 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 		workBuffer.clear();
 		currentBufferLength=0;
 		order.setBuffers(bufs);
-		context.getContextOrders().queueCallback(order);
+		context.getOrderOperator().queueCallback(order);
 		return true;
 	}
 	
@@ -193,5 +217,9 @@ public class ReadChannel implements BufferGetter,ChannelIO{
 		synchronized(context){
 			queueIo();
 		}
+	}
+	
+	boolean isClose(){
+		return (state==State.close);
 	}
 }

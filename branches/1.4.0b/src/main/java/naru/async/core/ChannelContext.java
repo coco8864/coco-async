@@ -14,6 +14,7 @@ import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
@@ -21,8 +22,8 @@ import org.apache.log4j.Logger;
 import naru.async.ChannelHandler;
 import naru.async.ChannelStastics;
 import naru.async.ChannelHandler.IpBlockType;
-import naru.async.core.CC.IO;
-import naru.async.core.ReadChannel.State;
+import naru.async.core.Order.OrderType;
+import naru.async.core.SelectOperator.State;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
@@ -75,7 +76,7 @@ public class ChannelContext extends PoolBase{
 		}
 		//writeBuffer.dump(logger);
 		//readBuffer.dump(logger);
-		orders.dump(logger);
+		orderOperator.dump(logger);
 		logger.debug("]");
 	}
 	
@@ -91,20 +92,24 @@ public class ChannelContext extends PoolBase{
 	}
 	
 	private ChannelStastics stastics=new ChannelStastics();
-	private ReadChannel readChannel=new ReadChannel(this);
-	private WriteChannel writeChannel=new WriteChannel(this);
-	private ContextOrders orders=new ContextOrders(this);
+	private SelectOperator selectOperator=new SelectOperator(this);
+	private WriteOperator writeOperator=new WriteOperator(this);
+	private OrderOperator orderOperator=new OrderOperator(this);
 	
-	ContextOrders getContextOrders(){
-		return orders;
+	ChannelStastics getChannelStastics(){
+		return stastics;
 	}
 	
-	ReadChannel getReadChannel(){
-		return readChannel;
+	OrderOperator getOrderOperator(){
+		return orderOperator;
 	}
 	
-	WriteChannel getWriteChannel(){
-		return writeChannel;
+	SelectOperator getSelectOperator(){
+		return selectOperator;
+	}
+	
+	WriteOperator getWriteOperator(){
+		return writeOperator;
 	}
 	
 	private SelectableChannel channel;
@@ -131,7 +136,7 @@ public class ChannelContext extends PoolBase{
 	private int localPort=-1;
 	
 	private Map attribute=new HashMap();//handlerに付随する属性
-	private SelectorContext selector;
+	private SelectorHandler selector;
 	private SelectionKey selectionKey;//IO_SELECTの場合有効
 	private long nextSelectWakeUp;
 	long getNextSelectWakeUp() {
@@ -159,8 +164,8 @@ public class ChannelContext extends PoolBase{
 		context.setHandler(handler);
 		context.channel=channel;
 		context.selector=IOManager.getSelectorContext(context);
-		context.readChannel.setup(channel);
-		context.writeChannel.setup(channel);
+		context.selectOperator.setup(channel);
+		context.writeOperator.setup(channel);
 		context.serverSocket=((ServerSocketChannel)channel).socket();
 		context.localIp=context.remoteIp=null;
 		context.localPort=context.remotePort=-1;
@@ -173,8 +178,8 @@ public class ChannelContext extends PoolBase{
 		context.setHandler(handler);
 		context.channel=channel;
 		context.selector=IOManager.getSelectorContext(context);
-		context.readChannel.setup(channel);
-		context.writeChannel.setup(channel);
+		context.selectOperator.setup(channel);
+		context.writeOperator.setup(channel);
 		//context.setIoStatus(IO.SELECT);
 		context.socket=((SocketChannel)channel).socket();
 		InetAddress inetAddress=context.socket.getInetAddress();
@@ -192,48 +197,60 @@ public class ChannelContext extends PoolBase{
 	}
 	
 	private int acceptingSelect(long now){
-		if(orders.isCloseOrder()){
-			readChannel.queueIo(State.closing);
+		if(orderOperator.isCloseOrder()){
+			selectOperator.queueIo(State.closing);
 			return 0;
 		}
 		return SelectionKey.OP_ACCEPT;
 	}
 	
 	private int connectingSelect(long now){
-		if(orders.isCloseOrder()){
-			readChannel.queueIo(State.closing);
+		if(orderOperator.isCloseOrder()){
+			selectOperator.queueIo(State.closing);
 			return 0;
 		}
-		long time=orders.getConnectTimeoutTime();
-		if(now>time){
-			orders.timeout(orderType);
-			readChannel.queueIo(State.closing);
+		long time=orderOperator.checkConnectTimeout(now);
+		if(time==OrderOperator.CHECK_TIMEOUT){
+			orderOperator.timeout(OrderType.connect);
+			selectOperator.queueIo(State.closing);
 			return 0;
 		}
 		nextSelectWakeUp=time;
 		return SelectionKey.OP_CONNECT;
 	}
 	
+	private void updateNextSelectWakeUp(long timeoutTime){
+		if(nextSelectWakeUp<=timeoutTime){
+			return;
+		}
+		nextSelectWakeUp=timeoutTime;
+	}
+	
 	private int readingSelect(long now){
-		long time=orders.getReadTimeoutTime();
-		int ops=0;
-		if(now>time){
-			orders.timeout(orderType);
-			if(writeChannel.isClose()){//write側がすでにcloseしていたら
-				readChannel.queueIo(State.closing);
+		long time=orderOperator.checkReadTimeout(now);
+		if(time==OrderOperator.CHECK_TIMEOUT){
+			orderOperator.timeout(OrderType.read);
+			if(writeOperator.isClose()){
+				selectOperator.queueIo(State.closing);
 				return 0;
 			}
+			//readはtimeoutしても処理続行
+		}else{
+			nextSelectWakeUp=time;
 		}
-		nextSelectWakeUp=time;
-		ops=SelectionKey.OP_READ;
-		if(writeChannel.isBlock()){
-			time=orders.getWriteTimeoutTime();
-			if(now>time){
-				orders.timeout(orderType);
-			}else if(nextSelectWakeUp>time){
-				nextSelectWakeUp=time;
-			}
+		int ops=SelectionKey.OP_READ;
+		if(!writeOperator.isBlock()){
+			return ops;
+		}
+		time=orderOperator.checkWriteTimeout(now);
+		if(time==OrderOperator.CHECK_TIMEOUT){
+			//writeがtimeoutしたらfailureとして処理
+			orderOperator.timeout(OrderType.write);
+			selectOperator.queueIo(State.closing);
+			return 0;
+		}else{
 			ops|=SelectionKey.OP_WRITE;
+			updateNextSelectWakeUp(time);
 		}
 		return ops;
 	}
@@ -242,7 +259,7 @@ public class ChannelContext extends PoolBase{
 		long now=System.currentTimeMillis();
 		nextSelectWakeUp=Long.MAX_VALUE;
 		int ops=0;
-		switch(readChannel.getState()){
+		switch(selectOperator.getState()){
 		case accepting:
 			ops=acceptingSelect(now);
 			break;
@@ -254,7 +271,8 @@ public class ChannelContext extends PoolBase{
 			break;
 		default:
 			//error
-			readChannel.queueIo(State.closing);
+			orderOperator.failure(null);
+			selectOperator.queueIo(State.closing);
 		}
 		if(ops==0){//selectを続ける必要なし
 			return true;
@@ -272,11 +290,11 @@ public class ChannelContext extends PoolBase{
 			channel.configureBlocking(false);
 			selectionKey=selector.register(channel, ops,this);
 		} catch (ClosedChannelException e) {
-			orders.failure(e);
-			readChannel.queueIo(State.closing);
+			orderOperator.failure(e);
+			selectOperator.queueIo(State.closing);
 		} catch (IOException e) {
-			orders.failure(e);
-			readChannel.queueIo(State.closing);
+			orderOperator.failure(e);
+			selectOperator.queueIo(State.closing);
 		}
 		return true;
 	}
@@ -321,11 +339,11 @@ public class ChannelContext extends PoolBase{
 	private Pattern whiteList;
 	
 	public synchronized boolean asyncAccept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass,IpBlockType ipBlockType,Pattern blackList,Pattern whiteList){
-		if(orders.acceptOrder(userContext)==false){
+		if(orderOperator.acceptOrder(userContext)==false){
 			return false;
 		}
 		this.acceptClass=acceptClass;
-		this.acceptUserContext=acceptUserContext;
+		this.acceptUserContext=userContext;
 		this.ipBlockType=ipBlockType;
 		this.blackList=blackList;
 		this.whiteList=whiteList;
@@ -334,7 +352,7 @@ public class ChannelContext extends PoolBase{
 	}
 
 	public synchronized boolean asyncConnect(Object userContext,InetSocketAddress address,long timeout){
-		if(orders.connectOrder(userContext)==false){
+		if(orderOperator.connectOrder(userContext,timeout)==false){
 			return false;
 		}
 		stastics.asyncConnect();
@@ -342,11 +360,12 @@ public class ChannelContext extends PoolBase{
 	}
 	
 	public synchronized boolean asyncRead(Object userContext){
-		if(orders.readOrder(userContext)==false){
-			return false;
+		long timeoutTime=Long.MAX_VALUE;
+		if(readTimeout>0){
+			timeoutTime=System.currentTimeMillis()+readTimeout;
 		}
-		if(orders.isReadOrder()&&readTimeout>0){
-			readTimeoutTime=System.currentTimeMillis()+readTimeout;
+		if(orderOperator.readOrder(userContext,timeoutTime)==false){
+			return false;
 		}
 		stastics.asyncRead();
 		return true;
@@ -354,12 +373,13 @@ public class ChannelContext extends PoolBase{
 	
 	public synchronized boolean asyncWrite(Object userContext,ByteBuffer[] buffers){
 		long length=BuffersUtil.remaining(buffers);
-		long asyncWriteStartOffset=stastics.getAsyncWriteLength();		
-		if(orders.writeOrder(userContext,buffers,asyncWriteStartOffset,length)==false){
-			return false;
+		long asyncWriteStartOffset=stastics.getAsyncWriteLength();
+		long timeoutTime=Long.MAX_VALUE;
+		if(writeTimeout>0){
+			timeoutTime=System.currentTimeMillis()+writeTimeout;
 		}
-		if(orders.isReadOrder()&&writeTimeout>0&&writeTimeoutTime<0){
-			writeTimeoutTime=System.currentTimeMillis()+writeTimeout;
+		if(orderOperator.writeOrder(userContext,buffers,asyncWriteStartOffset,length,timeoutTime)==false){
+			return false;
 		}
 		stastics.addAsyncWriteLength(length);
 		stastics.asyncWrite();
@@ -367,7 +387,7 @@ public class ChannelContext extends PoolBase{
 	}
 	
 	public synchronized boolean asyncClose(Object userContext){
-		if( orders.closeOrder(userContext)==false ){
+		if( orderOperator.closeOrder(userContext)==false ){
 			return false;
 		}
 		stastics.asyncClose();
@@ -375,13 +395,13 @@ public class ChannelContext extends PoolBase{
 	}
 
 	public long getTotalReadLength() {
-		// TODO Auto-generated method stub
-		return 0;
+		return selectOperator.getTotalReadLength();
 	}
 	
-	private long readTimeoutTime;
-	private long writeTimeoutTime;
-
+	public long getTotalWriteLength() {
+		return writeOperator.getTotalWriteLength();
+	}
+	
 	private long readTimeout;
 	private long writeTimeout;
 	
@@ -421,22 +441,64 @@ public class ChannelContext extends PoolBase{
 		return handler;
 	}
 
-	SelectorContext getSelector() {
+	SelectorHandler getSelector() {
 		return selector;
 	}
+
+	public Class getAcceptClass() {
+		return acceptClass;
+	}
+
+	public Object getAcceptUserContext() {
+		return acceptUserContext;
+	}
 	
-	boolean checkFinish(){
-		if(orders.xxx()){
+	private boolean matchPattern(Pattern pattern,String ip){
+		if(pattern==null){
 			return false;
 		}
-		if(!readChannel.isClose()){
-			return false;
+		Matcher matcher;
+		synchronized(pattern){
+			matcher=pattern.matcher(ip);
 		}
-		if(!writeChannel.isClose()){
-			return false;
+		return matcher.matches();
+	}
+	
+	boolean acceptable(Socket socket){
+		String clietnIp=socket.getInetAddress().getHostAddress();
+		switch(ipBlockType){
+		/*
+		case black://blackになければ許可
+			if( matchPattern(blackList,clietnIp) ){
+				return false;
+			}
+		case white://whiteになければ拒否
+			if( !matchPattern(whiteList,clietnIp) ){
+				return false;
+			}
+		*/
+		case blackWhite://blackを見てなければwhiteを見てなければ拒否
+			if( matchPattern(blackList,clietnIp) ){
+				return false;
+			}
+			if( !matchPattern(whiteList,clietnIp) ){
+				return false;
+			}
+		case whiteBlack://whiteを見てなければblackを見てなければ許可
+			if( !matchPattern(whiteList,clietnIp) ){
+				if( matchPattern(blackList,clietnIp) ){
+					return false;
+				}
+			}
 		}
-		orders.finish();
+		Order order=Order.create(handler, OrderType.select, acceptUserContext);
+		orderOperator.queueCallback(order);
 		return true;
+	}
+	
+	public void accepted(Object userContext){
+		Order order=Order.create(handler, OrderType.accept, userContext);
+		orderOperator.queueCallback(order);
 	}
 	
 }

@@ -1,26 +1,20 @@
 package naru.async.core;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.GatheringByteChannel;
-import java.nio.channels.ReadableByteChannel;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.log4j.Logger;
 
-import naru.async.pool.BuffersUtil;
-import naru.async.pool.PoolManager;
 import naru.queuelet.Queuelet;
 import naru.queuelet.QueueletContext;
 
 public class IOManager implements Queuelet {
 	private static Logger logger=Logger.getLogger(IOManager.class);
 	private static QueueletContext queueletContext;
-	private static SelectorContext selectors[];
+	private static SelectorHandler selectors[];
 	private static SelectorStastics stastics[];
 	
-	public static SelectorContext getSelectorContext(ChannelContext context){
+	public static SelectorHandler getSelectorContext(ChannelContext context){
 		int index=(int)(context.getPoolId()%selectors.length);
 		return selectors[index];
 	}
@@ -62,11 +56,11 @@ public class IOManager implements Queuelet {
 			selectInterval=Long.parseLong(selectIntervalParam);
 		}
 		logger.info("selectInterval:"+selectInterval);
-		selectors=new SelectorContext[selectorCount];
+		selectors=new SelectorHandler[selectorCount];
 		stastics=new SelectorStastics[selectorCount];
 		try {
 			for(int i=0;i<selectors.length;i++){
-				selectors[i]=new SelectorContext(i,selectInterval);
+				selectors[i]=new SelectorHandler(i,selectInterval);
 				stastics[i]=selectors[i].getStastics();
 				selectors[i].start(i);
 			}
@@ -100,7 +94,7 @@ public class IOManager implements Queuelet {
 			return false;
 		}finally{
 			//IO‚ªŠ®—¹‚·‚é‚Ü‚ÅChannelContext‚ªÄ—˜—p‚³‚ê‚È‚¢‚æ‚¤‚É‚·‚é
-			context.unref();
+			channelIO.unref();
 		}
 	}
 	

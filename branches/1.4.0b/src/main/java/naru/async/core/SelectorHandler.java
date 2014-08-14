@@ -16,10 +16,11 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import naru.async.ChannelHandler;
+import naru.async.core.SelectOperator.State;
 import naru.async.pool.PoolManager;
 
-public class SelectorContext implements Runnable {
-	static private Logger logger=Logger.getLogger(SelectorContext.class);
+public class SelectorHandler implements Runnable {
+	static private Logger logger=Logger.getLogger(SelectorHandler.class);
 	private int id;
 	
 	private long selectInterval;
@@ -34,7 +35,7 @@ public class SelectorContext implements Runnable {
 	public int getId(){
 		return id;
 	}
-	SelectorContext(int id,long selectInterval) throws IOException{
+	SelectorHandler(int id,long selectInterval) throws IOException{
 		this.id=id;
 		this.selectInterval=selectInterval;
 		this.selector = Selector.open();
@@ -83,7 +84,7 @@ public class SelectorContext implements Runnable {
 				continue;
 			}
 			ChannelContext context=(ChannelContext)key.attachment();
-			context.queueIO(ChannelContext.IO.CLOSEABLE);
+			context.getSelectOperator().queueIo(State.closing);
 		}
 	}
 	
@@ -179,10 +180,10 @@ public class SelectorContext implements Runnable {
 				ServerSocketChannel serverSocketChannel =(ServerSocketChannel) selectableChannel;
 				try {
 					socketChannel = serverSocketChannel.accept();
-					Socket s=socketChannel.socket();
-					if( !context.acceptable() ){
+					Socket socket=socketChannel.socket();
+					if( !context.acceptable(socket) ){
 						logger.debug("refuse socketChannel:"+socketChannel);
-						s.close();//接続拒否
+						socket.close();//接続拒否
 						stastics.acceptRefuse();
 						continue;
 					}
@@ -193,7 +194,7 @@ public class SelectorContext implements Runnable {
 				}
 				//ユーザオブジェクトを獲得する
 				ChannelHandler handler=(ChannelHandler)PoolManager.getInstance(context.getAcceptClass());
-				ChannelContext acceptContext=ChannelContext.create(handler, socketChannel);
+				ChannelContext acceptContext=ChannelContext.socketChannelCreate(handler, socketChannel);
 				
 				handler.setHandlerAttribute(ATTR_ACCEPTED_CONTEXT, acceptContext);
 				Object userAcceptContext=context.getAcceptUserContext();
@@ -202,19 +203,19 @@ public class SelectorContext implements Runnable {
 				//acceptContext.queueuSelect();
 				stastics.read();
 				//acceptContext.setIoStatus(ChannelContext.IO.SELECT);
-				acceptContext.queueIO(ChannelContext.IO.READABLE);
+				acceptContext.getSelectOperator().queueIo(State.reading);
 			} else if (key.isReadable()) {//READを優先的に判断
 //				context.readable(true);
 				stastics.read();
-				context.getReadChannel().readable();
+				context.getSelectOperator().readable();
 			}else if(key.isWritable()){
 //				context.writable(true);
 				stastics.write();
-				context.getWriteChannel().writable();
+				context.getWriteOperator().writable();
 			}else if(key.isConnectable()){
 				// 接続可能になった場合
 				stastics.connect();
-				context.getReadChannel().connectable();
+				context.getSelectOperator().connectable();
 			}
 		}
 	}

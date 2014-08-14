@@ -14,8 +14,8 @@ import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolManager;
 import naru.async.store.Store;
 
-public class WriteChannel implements BufferGetter,ChannelIO{
-	private static Logger logger=Logger.getLogger(WriteChannel.class);
+public class WriteOperator implements BufferGetter,ChannelIO{
+	private static Logger logger=Logger.getLogger(WriteOperator.class);
 	private static long bufferMinLimit=8192;
 	public enum State {
 		init,
@@ -34,7 +34,7 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 	private long currentBufferLength;
 	private boolean isAsyncClose=false;
 	
-	WriteChannel(ChannelContext context){
+	WriteOperator(ChannelContext context){
 		this.context=context;
 	}
 
@@ -58,8 +58,6 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 			if(state==State.writable){
 				state=State.writing;
 				IOManager.enqueue(this);
-			}else if(state==State.close){
-				//TODO
 			}
 			if(currentBufferLength<bufferMinLimit){
 				store.asyncBuffer(this, store);
@@ -96,8 +94,8 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 		}
 		synchronized(context){
 			if(failure!=null){
-				context.getContextOrders().failure(failure);
-				state=State.close;
+				context.getOrderOperator().failure(failure);
+				closed();
 				return false;
 			}else if(prepareBuffersLength==length){
 				state=State.writable;
@@ -115,16 +113,19 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 			}
 			currentBufferLength-=length;
 			totalWriteLength+=length;
-			context.getContextOrders().doneWrite(totalWriteLength);
+			context.getOrderOperator().doneWrite(totalWriteLength);
 			if(isClosing){
-				state=State.close;
-				context.getContextOrders().doneClose();
-			}
-			if(currentBufferLength<bufferMinLimit){
+				context.getOrderOperator().doneClose(true);
+				closed();
+			}else if(currentBufferLength<bufferMinLimit){
 				store.asyncBuffer(this, store);
 			}
 		}
 		return true;
+	}
+
+	public long getTotalWriteLength() {
+		return totalWriteLength;
 	}
 
 	public void doIo() {
@@ -169,6 +170,19 @@ public class WriteChannel implements BufferGetter,ChannelIO{
 			return;
 		}
 		isRead0length=true;
+	}
+	
+	/* status‚Éclose‚ðÝ’è‚·‚éê‡‚ÉŒÄ‚Ño‚· */
+	private void closed(){
+		synchronized(context){
+			state=State.close;
+			context.getOrderOperator().checkAndCallbackFinish();
+		}
+	}
+	
+	/* 0’·ŽóM‚µ‚½ê‡ */
+	boolean onRead0(){
+		return asyncClose();
 	}
 	
 	boolean asyncClose(){

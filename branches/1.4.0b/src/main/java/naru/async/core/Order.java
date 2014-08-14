@@ -30,13 +30,16 @@ public class Order extends PoolBase{
 	private ByteBuffer buffers[];
 	private Throwable failure;
 	private boolean isTimeout;
-	//private boolean isCloseOrder;
+	private boolean isCloseOrder;//ã≠êßcloseÇÃÇΩÇﬂäÆóπÇµÇΩOrder
 	private long writeStartOffset;
 	private long writeEndOffset;
 	private long timeoutTime;
 	
 	public long getTimeoutTime() {
 		return timeoutTime;
+	}
+	public void setTimeoutTime(long timeoutTime){
+		this.timeoutTime=timeoutTime;
 	}
 	public static Order create(ChannelHandler handler,OrderType orderType,Object userContext){
 		return create(handler,orderType,userContext,null);
@@ -254,6 +257,11 @@ public class Order extends PoolBase{
 	public void timeout(){
 		isTimeout=true;
 	}
+	
+	public void closeOrder(){
+		isCloseOrder=true;
+	}
+	
 	public long getWriteEndOffset() {
 		return writeEndOffset;
 	}
