@@ -195,16 +195,16 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		return true;
 	}
 	
-	boolean asyncRead(Order order){
+	void asyncRead(Order order){
 		if(currentBufferLength==0){
-			return false;
+			context.getSelector().wakeup();
+			return;
 		}
 		ByteBuffer[] bufs=BuffersUtil.toByteBufferArray(workBuffer);
 		workBuffer.clear();
 		currentBufferLength=0;
 		order.setBuffers(bufs);
 		context.getOrderOperator().queueCallback(order);
-		return true;
 	}
 	
 	void readable(){

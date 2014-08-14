@@ -421,9 +421,7 @@ public class OrderOperator {
 		}
 		readOrder=Order.create(context.getHandler(), OrderType.read, userContext);
 		readOrder.setTimeoutTime(timeoutTime);
-		if( context.getSelectOperator().asyncRead(readOrder) ){
-			readOrder=null;
-		}
+		context.getSelectOperator().asyncRead(readOrder);
 		return true;
 	}
 	
