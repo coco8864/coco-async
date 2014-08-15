@@ -98,7 +98,7 @@ public class CoreTest extends TestBase{
 		ChannelHandler ah=ChannelHandler.accept("ChannelHandler.accept", address, 1024, TestServerHandler.class);
 		CoreTest.coreTester=new CoreTester();
 		int i=0;
-		for(i=0;i<1000;i++){
+		for(i=0;i<100;i++){
 			Thread.sleep(50);
 			if( ChannelHandler.connect(TestClientHandler.class, i, address, 1000)==null ){
 				fail("ChannelHandler.connect fail");

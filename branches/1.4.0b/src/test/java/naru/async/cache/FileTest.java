@@ -55,7 +55,7 @@ public class FileTest extends TestBase {
 	
 	public void qtest1() throws Throwable{
 		CacheBuffer asyncFile=CacheBuffer.open(new File("pom.xml"));
-		asyncFile.asyncGet(new Getter(), asyncFile);
+		asyncFile.asyncBuffer(new Getter(), asyncFile);
 	}
 	
 	@Test
@@ -68,9 +68,9 @@ public class FileTest extends TestBase {
 		CacheBuffer asyncFile=CacheBuffer.open(new File("pom.xml"));
 		CacheBuffer asyncFile2=CacheBuffer.open(new File("pom.xml"));
 		CacheBuffer asyncFile3=CacheBuffer.open(new File("pom.xml"));
-		asyncFile.asyncGet(new Getter(), asyncFile);
-		asyncFile2.asyncGet(new Getter(), asyncFile2);
-		asyncFile3.asyncGet(new Getter(), asyncFile3);
+		asyncFile.asyncBuffer(new Getter(), asyncFile);
+		asyncFile2.asyncBuffer(new Getter(), asyncFile2);
+		asyncFile3.asyncBuffer(new Getter(), asyncFile3);
 		Thread.sleep(1000);
 	}
 	
@@ -86,7 +86,7 @@ public class FileTest extends TestBase {
 		asyncFile.flip();
 		ByteBuffer b[]=asyncFile.popTopBuffer();
 		System.out.println(BuffersUtil.toStringFromBuffer(b[0], "utf-8"));
-		asyncFile.asyncGet(new Getter(), asyncFile);
+		asyncFile.asyncBuffer(new Getter(), asyncFile);
 		Thread.sleep(1000);
 	}
 	

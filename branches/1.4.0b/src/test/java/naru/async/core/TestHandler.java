@@ -81,14 +81,16 @@ public abstract class TestHandler extends ChannelHandler {
 	public void onTimeout(Object userContext) {
 		logger.info("onTimeout:"+name+":userContext:"+userContext);
 		timeoutCount++;
-		asyncClose("asyncClose from onTimeout:"+name);
+		boolean ret=asyncClose("asyncClose from onTimeout:"+name);
+		logger.info("asyncClose return:"+ret);
 	}
 
 	@Override
 	public void onFailure(Object userContext,Throwable t) {
 		logger.info("onFailure:"+name+":userContext:"+userContext,t);
 		failureCount++;
-		asyncClose("asyncClose from onFailure:"+name);
+		boolean ret=asyncClose("asyncClose from onFailure:"+name);
+		logger.info("asyncClose return:"+ret);
 	}
 	
 	/**
@@ -100,7 +102,8 @@ public abstract class TestHandler extends ChannelHandler {
 		logger.info("onConnectFailure:"+name+":userContext:"+userContext,t);
 		connectFailureCount++;
 //		coreTester.outTest(this);
-		asyncClose("asyncClose from onConnectFailure:"+name);
+		boolean ret=asyncClose("asyncClose from onConnectFailure:"+name);
+		logger.info("asyncClose return:"+ret);
 	}
 
 	@Override
