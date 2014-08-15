@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import org.apache.log4j.Logger;
 
 import naru.async.BufferGetter;
+import naru.async.ChannelStastics;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolManager;
 import naru.async.store.Store;
@@ -28,20 +29,25 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		close
 	}
 	private State state;
-	private ChannelContext context;
 	private SelectableChannel channel;
 	private Store store;
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private long currentBufferLength;
 	private long totalReadLength;
 	
-	State getState(){
-		return state;
-	}
+	private ChannelContext context;
+	private ChannelStastics stastics;
+	private WriteOperator writeOperator;
+	private OrderOperator orderOperator;
 	
 	SelectOperator(ChannelContext context){
 		this.context=context;
 	}
+	
+	State getState(){
+		return state;
+	}
+	
 
 	public void setup(SelectableChannel channel){
 		state=State.init;
@@ -51,6 +57,9 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		store.asyncBuffer(this, store);
 		totalReadLength=currentBufferLength=0L;
 		this.channel=channel;
+		this.stastics=context.getChannelStastics();
+		this.writeOperator=context.getWriteOperator();
+		this.orderOperator=context.getOrderOperator();
 	}
 	
 	public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
@@ -60,7 +69,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 			for(ByteBuffer buffer:buffers){
 				workBuffer.add(buffer);
 			}
-			if(context.getOrderOperator().doneRead(workBuffer)){
+			if(orderOperator.doneRead(workBuffer)){
 				workBuffer.clear();//ê¨å˜ÇµÇΩèÍçáworkBufferÇÕÉNÉäÉAÇ≥ÇÍÇÈÇ™îOÇÃÇΩÇﬂ
 				currentBufferLength=0;
 			}
@@ -82,9 +91,12 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		logger.debug("closed.cid:"+context.getPoolId());
 		synchronized(context){
 			state=State.close;
-			context.getOrderOperator().checkAndCallbackFinish();
+			orderOperator.checkAndCallbackFinish();
 			store.close();
 		}
+		store.unref();
+		context.unref();
+		store=null;
 	}
 	
 	private boolean executeRead() {
@@ -109,7 +121,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 			PoolManager.poolBufferInstance(buffer);
 			context.closeSocket();
 			synchronized(context){
-				context.getOrderOperator().failure(failure);
+				orderOperator.failure(failure);
 				closed();
 			}
 			context.dump();
@@ -124,8 +136,8 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		}else{//0í∑éÛêM
 			PoolManager.poolBufferInstance(buffer);
 			synchronized(context){
-				context.getOrderOperator().doneClose(false);
-				context.getWriteOperator().onRead0();
+				orderOperator.doneClose(false);
+				writeOperator.onRead0();
 				closed();
 			}
 		}
@@ -146,9 +158,9 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		}
 		synchronized(context){
 			if(failure!=null){
-				context.getOrderOperator().failure(failure);
+				orderOperator.failure(failure);
 			}else{
-				context.getOrderOperator().doneConnect();
+				orderOperator.doneConnect();
 				queueSelect(State.selectReading);
 			}
 		}
@@ -212,7 +224,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		workBuffer.clear();
 		currentBufferLength=0;
 		order.setBuffers(bufs);
-		context.getOrderOperator().queueCallback(order);
+		orderOperator.queueCallback(order);
 	}
 	
 	void readable(){

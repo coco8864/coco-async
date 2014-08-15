@@ -61,7 +61,6 @@ public class SelectorHandler implements Runnable {
 			//可能性があるが容認（synchronizedしてまで守る必要なし)
 			isWakeup=true;
 			selector.wakeup();
-//			logger.info("wakeup this:"+this);
 		}
 	}
 	
@@ -134,7 +133,8 @@ public class SelectorHandler implements Runnable {
 				if(time<timeoutTime){
 					timeoutTime=time;
 				}
-				//TODO context.unref();
+				//TODO
+				context.unref();
 			}else{//参加したかったが、参加させられなかった。
 				nextContexts.add(context);
 			}
@@ -201,23 +201,18 @@ public class SelectorHandler implements Runnable {
 				handler.setHandlerAttribute(ATTR_ACCEPTED_CONTEXT, acceptContext);
 				Object userAcceptContext=context.getAcceptUserContext();
 				acceptContext.accepted(userAcceptContext);
-				//2013/12/8 acceptContextとりあえず読んでみる(for perfomance)
-				//acceptContext.queueuSelect();
 				stastics.read();
-				//acceptContext.setIoStatus(ChannelContext.IO.SELECT);
 				acceptContext.getSelectOperator().queueSelect(State.selectReading);
 			} else if (key.isReadable()) {//READを優先的に判断
-//				context.readable(true);
 				stastics.read();
 				context.getSelectOperator().readable();
-			}else if(key.isWritable()){
-//				context.writable(true);
-				stastics.write();
-				context.getWriteOperator().writable();
-			}else if(key.isConnectable()){
-				// 接続可能になった場合
+			}else if(key.isConnectable()){// 接続可能になった場合
 				stastics.connect();
 				context.getSelectOperator().connectable();
+			}
+			if(key.isWritable()){// 書き込みが可能になった場合
+				stastics.write();
+				context.getWriteOperator().writable();
 			}
 		}
 	}

@@ -6,6 +6,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 
 import naru.async.ChannelHandler;
+import naru.async.ChannelStastics;
 import naru.async.core.Order.OrderType;
 import naru.async.core.SelectOperator.State;
 import naru.async.pool.BuffersUtil;
@@ -28,18 +29,34 @@ public class OrderOperator {
 	}
 	private static final DummyHandler DUMMY_HANDLER=new DummyHandler();
 	
-	private boolean isFinished;//finish　Orderを実行したか否か
 	private Order acceptOrder;
 	private Order connectOrder;
 	private Order readOrder;
 	private LinkedList<Order> writeOrders=new LinkedList<Order>();
 	private Order closeOrder;
 	private Throwable failure;
+	private boolean isFinished;//finish　Orderを実行したか否か
 	
 	private ChannelContext context;
+	private ChannelStastics stastics;
+	private SelectOperator selectOperator;
+	private WriteOperator writeOperator;
 
 	public OrderOperator(ChannelContext context){
 		this.context=context;
+	}
+	
+	void setup(){
+		this.stastics=context.getChannelStastics();
+		this.writeOperator=context.getWriteOperator();
+		this.selectOperator=context.getSelectOperator();
+		acceptOrder=null;
+		connectOrder=null;
+		readOrder=null;
+		writeOrders.clear();
+		closeOrder=null;
+		failure=null;
+		isFinished=false;
 	}
 	
 	/* callback関連 */
@@ -63,10 +80,10 @@ public class OrderOperator {
 		if(orderCount()!=0){
 			return false;
 		}
-		if(!context.getSelectOperator().isClose()){
+		if(!selectOperator.isClose()){
 			return false;
 		}
-		if(!context.getWriteOperator().isClose()){
+		if(!writeOperator.isClose()){
 			return false;
 		}
 		isFinished=true;
@@ -103,7 +120,7 @@ public class OrderOperator {
 					finishHandler=order.getHandler();
 				}
 				try{
-					order.callback(context.getChannelStastics());
+					order.callback(stastics);
 				}catch(Throwable t){
 					logger.warn("callback return Throwable",t);
 					//TODO 回線が切断されたとして処理
@@ -148,14 +165,6 @@ public class OrderOperator {
 		sb.append(":failure:");
 		sb.append(failure);
 		logger.debug(sb.toString());
-	}
-	public void recycle() {
-		acceptOrder=null;
-		connectOrder=null;
-		readOrder=null;
-		writeOrders.clear();
-		closeOrder=null;
-		failure=null;
 	}
 	
 	boolean isCloseOrder(){
@@ -340,7 +349,7 @@ public class OrderOperator {
 			closeOrder=null;
 		}
 		if(isAsyncClose){
-			if(context.getSelectOperator().isClose()){
+			if(selectOperator.isClose()){
 				return count;
 			}
 			/*　正常系ではしばらく待つと0長受信するはず,0長受信を一定期間待つ */
@@ -401,7 +410,7 @@ public class OrderOperator {
 			return false;
 		}
 		acceptOrder=Order.create(context.getHandler(), OrderType.accept, userContext);
-		context.getSelectOperator().queueSelect(State.accepting);
+		selectOperator.queueSelect(State.accepting);
 		return true;
 	}
 	
@@ -416,9 +425,9 @@ public class OrderOperator {
 		if(context.isConnected()){//すでにconnectが成功していた場合
 			queueCallback(connectOrder);
 			connectOrder=null;
-			context.getSelectOperator().queueSelect(State.selectReading);
+			selectOperator.queueSelect(State.selectReading);
 		}else{
-			context.getSelectOperator().queueSelect(State.selectConnecting);
+			selectOperator.queueSelect(State.selectConnecting);
 		}
 		return true;
 	}
@@ -429,12 +438,12 @@ public class OrderOperator {
 		}
 		readOrder=Order.create(context.getHandler(), OrderType.read, userContext);
 		readOrder.setTimeoutTime(timeoutTime);
-		context.getSelectOperator().asyncRead(readOrder);
+		selectOperator.asyncRead(readOrder);
 		return true;
 	}
 	
 	boolean writeOrder(Object userContext,ByteBuffer[] buffers,long asyncWriteStartOffset,long length,long timeoutTime){
-		if( context.getWriteOperator().asyncWrite(buffers)==false){
+		if( writeOperator.asyncWrite(buffers)==false){
 			return false;
 		}
 		Order order=Order.create(context.getHandler(), OrderType.write, userContext);
@@ -449,7 +458,7 @@ public class OrderOperator {
 		if(closeOrder!=null){
 			return false;
 		}
-		if( context.getWriteOperator().asyncClose()==false){
+		if( writeOperator.asyncClose()==false){
 			return false;
 		}
 		closeOrder=Order.create(context.getHandler(), OrderType.close, userContext);

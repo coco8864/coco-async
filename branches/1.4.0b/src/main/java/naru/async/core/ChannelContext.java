@@ -174,6 +174,7 @@ public class ChannelContext extends PoolBase{
 		context.selector=IOManager.getSelectorContext(context);
 		context.selectOperator.setup(channel);
 		context.writeOperator.setup(channel);
+		context.orderOperator.setup();
 		return context;
 	}
 	
@@ -203,9 +204,14 @@ public class ChannelContext extends PoolBase{
 		return context;
 	}
 	
+	private void closing(){
+		cancelSelect();
+		selectOperator.queueIo(State.closing);
+	}
+	
 	private int acceptingSelect(long now){
 		if(orderOperator.isCloseOrder()){
-			selectOperator.queueIo(State.closing);
+			closing();
 			return 0;
 		}
 		return SelectionKey.OP_ACCEPT;
@@ -219,7 +225,7 @@ public class ChannelContext extends PoolBase{
 		long time=orderOperator.checkConnectTimeout(now);
 		if(time==OrderOperator.CHECK_TIMEOUT){
 			orderOperator.timeout(OrderType.connect);
-			selectOperator.queueIo(State.closing);
+			closing();
 			return 0;
 		}
 		nextSelectWakeUp=time;
@@ -238,7 +244,7 @@ public class ChannelContext extends PoolBase{
 		if(time==OrderOperator.CHECK_TIMEOUT){
 			orderOperator.timeout(OrderType.read);
 			if(writeOperator.isClose()){
-				selectOperator.queueIo(State.closing);
+				closing();
 				return 0;
 			}
 			//readÇÕtimeoutÇµÇƒÇ‡èàóùë±çs
@@ -253,7 +259,7 @@ public class ChannelContext extends PoolBase{
 		if(time==OrderOperator.CHECK_TIMEOUT){
 			//writeÇ™timeoutÇµÇΩÇÁfailureÇ∆ÇµÇƒèàóù
 			orderOperator.timeout(OrderType.write);
-			selectOperator.queueIo(State.closing);
+			closing();
 			return 0;
 		}else{
 			ops|=SelectionKey.OP_WRITE;
@@ -289,7 +295,8 @@ public class ChannelContext extends PoolBase{
 		default:
 			//error
 			orderOperator.failure(null);
-			selectOperator.queueIo(State.closing);
+			closing();
+			return false;
 		}
 		if(ops==0){//selectÇë±ÇØÇÈïKóvÇ»Çµ
 			cancelSelect();
@@ -306,10 +313,10 @@ public class ChannelContext extends PoolBase{
 			}
 		} catch (ClosedChannelException e) {
 			orderOperator.failure(e);
-			selectOperator.queueIo(State.closing);
+			closing();
 		} catch (IOException e) {
 			orderOperator.failure(e);
-			selectOperator.queueIo(State.closing);
+			closing();
 		}
 		return true;
 	}
@@ -514,6 +521,17 @@ public class ChannelContext extends PoolBase{
 	public void accepted(Object userContext){
 		Order order=Order.create(handler, OrderType.accept, userContext);
 		orderOperator.queueCallback(order);
+	}
+	
+	@Override
+	public void ref(){
+		super.ref();
+		logger.debug("#+#.cid:"+getPoolId(),new Throwable());
+	}
+	@Override
+	public boolean unref(){
+		logger.debug("#-#.cid:"+getPoolId(),new Throwable());
+		return super.unref();
 	}
 	
 }

@@ -10,6 +10,7 @@ import java.util.Iterator;
 import org.apache.log4j.Logger;
 
 import naru.async.BufferGetter;
+import naru.async.ChannelStastics;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolManager;
 import naru.async.store.Store;
@@ -26,13 +27,17 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		close
 	}
 	private State state;
-	private ChannelContext context;
 	private SelectableChannel channel;
 	private Store store;
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private long totalWriteLength;
 	private long currentBufferLength;
-	private boolean isAsyncClose=false;
+	private boolean isAsyncClose;
+	
+	private ChannelContext context;
+	private ChannelStastics stastics;
+	private SelectOperator selectOperator;
+	private OrderOperator orderOperator;
 	
 	WriteOperator(ChannelContext context){
 		this.context=context;
@@ -46,6 +51,10 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		store.asyncBuffer(this, store);
 		totalWriteLength=currentBufferLength=0L;
 		this.channel=channel;
+		this.stastics=context.getChannelStastics();
+		this.selectOperator=context.getSelectOperator();
+		this.orderOperator=context.getOrderOperator();
+		isAsyncClose=false;
 	}
 	
 	public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
@@ -86,17 +95,17 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	
 	private boolean afterWrite(long prepareBuffersLength,long writeLength,Throwable failure,boolean isClosing){
 		if(failure!=null){
-			context.getOrderOperator().failure(failure);
+			orderOperator.failure(failure);
 			closed();
 			return false;
 		}
 		if(writeLength>0){
 			currentBufferLength-=writeLength;
 			totalWriteLength+=writeLength;
-			context.getOrderOperator().doneWrite(totalWriteLength);
+			orderOperator.doneWrite(totalWriteLength);
 		}
 		if(isClosing){
-			context.getOrderOperator().doneClose(true);
+			orderOperator.doneClose(true);
 			closed();
 			return false;
 		}
@@ -191,9 +200,12 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		logger.debug("closed.cid:"+context.getPoolId());
 		synchronized(context){
 			state=State.close;
-			context.getOrderOperator().checkAndCallbackFinish();
+			orderOperator.checkAndCallbackFinish();
 			store.close();
 		}
+		store.unref();
+		context.unref();
+		store=null;
 	}
 	
 	/* 0í∑éÛêMÇµÇΩèÍçá */
@@ -216,6 +228,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		case init:
 		case close:
 		case closing:
+			logger.debug("fail to asyncClose.cid:"+context.getPoolId()+":"+state);
 			return false;
 		}
 		return true;
