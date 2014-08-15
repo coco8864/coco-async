@@ -56,21 +56,21 @@ public class OrderOperator {
 	}
 	
 	synchronized boolean checkAndCallbackFinish(){
+		logger.debug("checkAndCallbackFinish.cid:"+context.getPoolId());
 		if(isFinished){
 			return false;
 		}
 		if(orderCount()!=0){
 			return false;
 		}
-		synchronized(context){
-			if(!context.getSelectOperator().isClose()){
-				return false;
-			}
-			if(!context.getWriteOperator().isClose()){
-				return false;
-			}
+		if(!context.getSelectOperator().isClose()){
+			return false;
+		}
+		if(!context.getWriteOperator().isClose()){
+			return false;
 		}
 		isFinished=true;
+		logger.debug("checkAndCallbackFinish done.cid:"+context.getPoolId());
 		queueCallback(Order.create(context.getHandler(), OrderType.finish, null));
 		return true;
 	}
@@ -78,10 +78,8 @@ public class OrderOperator {
 	private synchronized Order popOrder(){
 		logger.debug("callback cid:"+context.getPoolId() +":size:"+callbackOrders.size());
 		if(callbackOrders.size()==0){
-			if(checkAndCallbackFinish()==false){
-				inCallback=false;
-				return null;
-			}
+			inCallback=false;
+			return null;
 		}
 		Order order=(Order)callbackOrders.remove(0);
 		return order;
@@ -97,6 +95,9 @@ public class OrderOperator {
 		try{
 			while(true){
 				order=popOrder();
+				if(order==null){
+					break;
+				}
 				if(order.isFinish()){
 					isFinishCallback=true;
 					finishHandler=order.getHandler();
@@ -105,11 +106,14 @@ public class OrderOperator {
 					order.callback(context.getChannelStastics());
 				}catch(Throwable t){
 					logger.warn("callback return Throwable",t);
-					//回線が切断されたとして処理
+					//TODO 回線が切断されたとして処理
 					//doneClosed(true);
 				}
 			}
 		}finally{
+			synchronized(context){
+				checkAndCallbackFinish();
+			}
 			//currentContext.set(null);
 			if(isFinishCallback==false){
 				return;
@@ -328,7 +332,7 @@ public class OrderOperator {
 	/**
 	 * 指定されたorderにclosed通知
 	 */
-	public int doneClose(boolean isAsyncClose){
+	int doneClose(boolean isAsyncClose){
 		int count=0;
 		if(closeOrder!=null){
 			queueCallback(closeOrder);
@@ -336,11 +340,15 @@ public class OrderOperator {
 			closeOrder=null;
 		}
 		if(isAsyncClose){
+			if(context.getSelectOperator().isClose()){
+				return count;
+			}
 			/*　正常系ではしばらく待つと0長受信するはず,0長受信を一定期間待つ */
 			if(readOrder!=null){
+				readOrder.setTimeoutTime(System.currentTimeMillis()+CLOSE_INTERVAL);
+			}else{
 				readOrder=Order.create(DUMMY_HANDLER, OrderType.read, null);
 			}
-			readOrder.setTimeoutTime(System.currentTimeMillis()+CLOSE_INTERVAL);
 		}else{
 			closeOrder();
 		}
@@ -408,9 +416,9 @@ public class OrderOperator {
 		if(context.isConnected()){//すでにconnectが成功していた場合
 			queueCallback(connectOrder);
 			connectOrder=null;
-			context.getSelectOperator().queueSelect(State.reading);
+			context.getSelectOperator().queueSelect(State.selectReading);
 		}else{
-			context.getSelectOperator().queueSelect(State.connecting);
+			context.getSelectOperator().queueSelect(State.selectConnecting);
 		}
 		return true;
 	}

@@ -47,6 +47,7 @@ public class SelectorHandler implements Runnable {
 	}
 	
 	public void queueSelect(ChannelContext context){
+		logger.debug("queueSelect.cid:"+context.getPoolId());
 		synchronized(contexts){
 			stastics.inQueue();
 			context.ref();
@@ -133,7 +134,7 @@ public class SelectorHandler implements Runnable {
 				if(time<timeoutTime){
 					timeoutTime=time;
 				}
-				//context.unref();
+				//TODO context.unref();
 			}else{//参加したかったが、参加させられなかった。
 				nextContexts.add(context);
 			}
@@ -204,7 +205,7 @@ public class SelectorHandler implements Runnable {
 				//acceptContext.queueuSelect();
 				stastics.read();
 				//acceptContext.setIoStatus(ChannelContext.IO.SELECT);
-				acceptContext.getSelectOperator().queueIo(State.reading);
+				acceptContext.getSelectOperator().queueSelect(State.selectReading);
 			} else if (key.isReadable()) {//READを優先的に判断
 //				context.readable(true);
 				stastics.read();
