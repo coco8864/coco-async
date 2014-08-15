@@ -27,11 +27,14 @@ public class IOManager implements Queuelet {
 	 * @author Naru
 	 *
 	 */
-	public static void enqueue(Object obj){
-		if(obj==null){
+	public static void enqueue(Object req){
+		if(req==null){
 			return;
 		}
-		queueletContext.enque(obj);
+		if(req!=STOP_REQUEST){
+			((ChannelIO)req).ref();
+		}
+		queueletContext.enque(req);
 	}
 	
 	private static String STOP_REQUEST="stop";

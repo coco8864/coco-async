@@ -118,14 +118,22 @@ public class ChannelContext extends PoolBase{
 	
 	void closeSocket(){
 		try {
-			socket.close();
+			if(socket!=null){
+				socket.close();
+			}else if(serverSocket!=null){
+				serverSocket.close();
+			}
 		} catch (IOException e) {
 		}
 	}
 	
 	void shutdownOutputSocket(){
 		try {
-			socket.shutdownOutput();
+			if(socket!=null){
+				socket.shutdownOutput();
+			}else if(serverSocket!=null){
+				serverSocket.close();
+			}
 		} catch (IOException e) {
 		}
 	}
@@ -159,14 +167,19 @@ public class ChannelContext extends PoolBase{
 		return context;
 	}
 	
-	public static ChannelContext serverChannelCreate(ChannelHandler handler,ServerSocketChannel channel){
+	private static ChannelContext create(ChannelHandler handler,SelectableChannel channel){
 		ChannelContext context=(ChannelContext)PoolManager.getInstance(ChannelContext.class);
 		context.setHandler(handler);
 		context.channel=channel;
 		context.selector=IOManager.getSelectorContext(context);
 		context.selectOperator.setup(channel);
 		context.writeOperator.setup(channel);
-		context.serverSocket=((ServerSocketChannel)channel).socket();
+		return context;
+	}
+	
+	public static ChannelContext serverChannelCreate(ChannelHandler handler,ServerSocketChannel channel){
+		ChannelContext context=create(handler,channel);
+		context.serverSocket=channel.socket();
 		context.localIp=context.remoteIp=null;
 		context.localPort=context.remotePort=-1;
 		context.socket=null;
@@ -174,14 +187,8 @@ public class ChannelContext extends PoolBase{
 	}
 	
 	public static ChannelContext socketChannelCreate(ChannelHandler handler,SocketChannel channel){
-		ChannelContext context=(ChannelContext)PoolManager.getInstance(ChannelContext.class);
-		context.setHandler(handler);
-		context.channel=channel;
-		context.selector=IOManager.getSelectorContext(context);
-		context.selectOperator.setup(channel);
-		context.writeOperator.setup(channel);
-		//context.setIoStatus(IO.SELECT);
-		context.socket=((SocketChannel)channel).socket();
+		ChannelContext context=create(handler,channel);
+		context.socket=channel.socket();
 		InetAddress inetAddress=context.socket.getInetAddress();
 		context.remotePort=context.socket.getPort();
 		if(inetAddress!=null){
@@ -255,6 +262,14 @@ public class ChannelContext extends PoolBase{
 		return ops;
 	}
 	
+	private void cancelSelect(){
+		if(selectionKey==null){
+			return;
+		}
+		selectionKey.cancel();
+		selectionKey=null;
+	}
+	
 	synchronized boolean select(){
 		long now=System.currentTimeMillis();
 		nextSelectWakeUp=Long.MAX_VALUE;
@@ -263,11 +278,13 @@ public class ChannelContext extends PoolBase{
 		case accepting:
 			ops=acceptingSelect(now);
 			break;
-		case connecting:
+		case selectConnecting:
 			ops=connectingSelect(now);
+		case connecting:
 			break;
-		case reading:
+		case selectReading:
 			ops=readingSelect(now);
+		case reading:
 			break;
 		default:
 			//error
@@ -275,20 +292,18 @@ public class ChannelContext extends PoolBase{
 			selectOperator.queueIo(State.closing);
 		}
 		if(ops==0){//select‚ð‘±‚¯‚é•K—v‚È‚µ
+			cancelSelect();
 			return true;
 		}
 		try {
-			if(channel.isRegistered()){
-				logger.debug("IO_QUEUE_SELECT and isRegistered.cid:" + getPoolId() +":selectionKey:"+selectionKey);
-				if(selectionKey!=null){
-					logger.debug("cid:"+getPoolId() +":select#3 selectionKey.cancel().");
-					selectionKey.cancel();
-					selectionKey=null;
-				}
+			if(!channel.isRegistered()){
+				channel.configureBlocking(false);
+				selectionKey=selector.register(channel, ops,this);
+			}else if(selector.keyFor(channel).interestOps()!=ops){
+				logger.debug("change ops.cid:" + getPoolId() +":selectionKey:"+selectionKey);
+				cancelSelect();
 				return false;
 			}
-			channel.configureBlocking(false);
-			selectionKey=selector.register(channel, ops,this);
 		} catch (ClosedChannelException e) {
 			orderOperator.failure(e);
 			selectOperator.queueIo(State.closing);

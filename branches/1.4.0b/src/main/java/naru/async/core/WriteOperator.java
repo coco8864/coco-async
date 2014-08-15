@@ -72,54 +72,50 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	public void onBufferFailure(Object userContext, Throwable failure) {
 	}
 	
-	private boolean executeWrite(ByteBuffer[] prepareBuffers,boolean isClosing) {
+	private long executeWrite(ByteBuffer[] prepareBuffers) throws IOException {
 		Throwable failure=null;
 		GatheringByteChannel channel=(GatheringByteChannel)this.channel;
-		long length=0;
-		long prepareBuffersLength=BuffersUtil.remaining(prepareBuffers);
-		try {
-			length=channel.write(prepareBuffers);
-			logger.debug("##executeWrite length:"+length +":cid:"+context.getPoolId());
-			//lengthが0の事があるらしい,buffersの長さが0に違いない,buffer再利用の問題か？
-			if(logger.isDebugEnabled()){
-				logger.debug("executeWrite."+length +":cid:"+context.getPoolId()+":channel:"+channel);
-			}
-		} catch (IOException e) {
-			logger.warn("fail to write.channel:"+channel+":cid:"+context.getPoolId(),e);
-			failure=e;
-			context.closeSocket();
+		long length=channel.write(prepareBuffers);
+		logger.debug("##executeWrite length:"+length +":cid:"+context.getPoolId());
+		//lengthが0の事があるらしい,buffersの長さが0に違いない,buffer再利用の問題か？
+		if(logger.isDebugEnabled()){
+			logger.debug("executeWrite."+length +":cid:"+context.getPoolId()+":channel:"+channel);
+		}
+		return length;
+	}
+	
+	private boolean afterWrite(long prepareBuffersLength,long writeLength,Throwable failure,boolean isClosing){
+		if(failure!=null){
+			context.getOrderOperator().failure(failure);
+			closed();
+			return false;
+		}
+		if(writeLength>0){
+			currentBufferLength-=writeLength;
+			totalWriteLength+=writeLength;
+			context.getOrderOperator().doneWrite(totalWriteLength);
 		}
 		if(isClosing){
-			context.shutdownOutputSocket();
+			context.getOrderOperator().doneClose(true);
+			closed();
+			return false;
 		}
-		synchronized(context){
-			if(failure!=null){
-				context.getOrderOperator().failure(failure);
-				closed();
-				return false;
-			}else if(prepareBuffersLength==length){
-				state=State.writable;
-			}else{
-				state=State.block;
+		if(prepareBuffersLength==writeLength){
+			state=State.writable;
+		}else{
+			state=State.block;
+		}
+		Iterator<ByteBuffer> itr=workBuffer.iterator();
+		while(itr.hasNext()){
+			ByteBuffer buffer=itr.next();
+			if( buffer.hasRemaining() ){
+				break;
 			}
-			Iterator<ByteBuffer> itr=workBuffer.iterator();
-			while(itr.hasNext()){
-				ByteBuffer buffer=itr.next();
-				if( buffer.hasRemaining() ){
-					break;
-				}
-				itr.remove();
-				PoolManager.poolBufferInstance(buffer);
-			}
-			currentBufferLength-=length;
-			totalWriteLength+=length;
-			context.getOrderOperator().doneWrite(totalWriteLength);
-			if(isClosing){
-				context.getOrderOperator().doneClose(true);
-				closed();
-			}else if(currentBufferLength<bufferMinLimit){
-				store.asyncBuffer(this, store);
-			}
+			itr.remove();
+			PoolManager.poolBufferInstance(buffer);
+		}
+		if(currentBufferLength<bufferMinLimit){
+			store.asyncBuffer(this, store);
 		}
 		return true;
 	}
@@ -135,7 +131,25 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 			prepareBuffers=BuffersUtil.toByteBufferArray(workBuffer);
 			isClosing=(state==State.closing);
 		}
-		executeWrite(prepareBuffers,isClosing);
+		
+		long prepareBuffersLength=BuffersUtil.remaining(prepareBuffers);
+		long writeLength=0;
+		Throwable failure=null;
+		if(prepareBuffersLength>0){
+			try {
+				writeLength=executeWrite(prepareBuffers);
+			} catch (IOException e) {
+				logger.warn("fail to write.channel:"+channel+":cid:"+context.getPoolId(),e);
+				failure=e;
+				context.closeSocket();
+			}
+		}
+		if(isClosing){
+			context.shutdownOutputSocket();
+		}
+		synchronized(context){
+			afterWrite(prepareBuffersLength, writeLength, failure, isClosing);
+		}
 	}
 	public void ref() {
 		context.ref();
@@ -174,9 +188,11 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	
 	/* statusにcloseを設定する場合に呼び出す */
 	private void closed(){
+		logger.debug("closed.cid:"+context.getPoolId());
 		synchronized(context){
 			state=State.close;
 			context.getOrderOperator().checkAndCallbackFinish();
+			store.close();
 		}
 	}
 	
@@ -206,6 +222,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	}
 	
 	void writable(){
+		logger.debug("writable.cid:"+context.getPoolId());
 		synchronized(context){
 			if(state==State.block){
 				state=State.writable;

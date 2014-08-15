@@ -60,7 +60,7 @@ public class Order extends PoolBase{
 		userContext=null;
 		userContexts=null;
 		failure=null;
-		isTimeout=false;
+		isTimeout=isCloseOrder=false;
 		if(buffers!=null){
 			PoolManager.poolBufferInstance(buffers);
 			buffers=null;
