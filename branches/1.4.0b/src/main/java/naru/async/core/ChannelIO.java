@@ -1,7 +1,6 @@
 package naru.async.core;
 
-public interface ChannelIO {
+interface ChannelIO {
 	public void doIo();
-	public void ref();
-	public void unref();
+	public ChannelContext getContext();
 }

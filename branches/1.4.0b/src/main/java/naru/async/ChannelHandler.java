@@ -9,8 +9,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -19,30 +17,17 @@ import java.util.regex.Pattern;
 import org.apache.log4j.Logger;
 
 import naru.async.core.ChannelContext;
-import naru.async.core.SelectorHandler;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
 
 public abstract class ChannelHandler extends PoolBase{
 	private static Logger logger=Logger.getLogger(ChannelHandler.class);
-	public static String CALLEE_HANDLER="naru.async.calleeHandler";
-	//attrubuteのこのキーが設定されていた場合、このterminalにTraceBufferを通知する。
-	public static String TraceBufferTreminal="naru.async.traceBufferTerminal";
-	//上記が設定されていた時、TraceBufferのkeyにこの値を設定する。
-	public static String TraceBufferKey="naru.async.traceBufferKey";
-	
-	public static int ORDER_ACCEPT=1;
-	public static int ORDER_CONNECT=2;
-	public static int ORDER_READ=3;
-	public static int ORDER_WRITE=4;
-	public static int ORDER_CLOSE=5;
 	
 	private ChannelContext context;
 	private long totalReadLength=0;//contextが無くなった後,context情報を保持
 	private long totalWriteLength=0;//contextが無くなった後,context情報を保持
 	
-	private boolean isClosed=false;//クローズを受け付けた後、次の要求を受けないため
 	private Map attribute=new HashMap();//handlerに付随する属性
 	
 	public static class AcceptHandler extends ChannelHandler{
@@ -76,7 +61,6 @@ public abstract class ChannelHandler extends PoolBase{
 		}
 		attribute.clear();
 		setContext(null);
-		isClosed=false;
 		totalReadLength=totalWriteLength=0;
 		super.recycle();
 	}
@@ -89,14 +73,14 @@ public abstract class ChannelHandler extends PoolBase{
 	 * @return
 	 */
 	public static ChannelHandler accept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass){
-		return accept(userContext, address, backlog, acceptClass, IpBlockType.whiteBlack, null, null);
+		return accept(userContext, address, backlog, acceptClass, true, null, null);
 	}
-	public static ChannelHandler accept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass,IpBlockType ipBlockType,Pattern blackList,Pattern whiteList){
+	public static ChannelHandler accept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass,boolean isBlockOutOfList,Pattern blackList,Pattern whiteList){
 		if(!ChannelHandler.class.isAssignableFrom(acceptClass)){
 			throw new IllegalArgumentException("illegal handlerClass");
 		}
 		ChannelHandler handler=(ChannelHandler)PoolManager.getInstance(AcceptHandler.class);
-		if( handler.asyncAccept(userContext, address, backlog, acceptClass,ipBlockType,blackList,whiteList) ){
+		if( handler.asyncAccept(userContext, address, backlog, acceptClass,isBlockOutOfList,blackList,whiteList) ){
 			return handler;
 		}
 		handler.unref(true);
@@ -150,12 +134,6 @@ public abstract class ChannelHandler extends PoolBase{
 	}
 	
 	public void setHandlerAttribute(String name, Object value) {
-		if(name==SelectorHandler.ATTR_ACCEPTED_CONTEXT){
-			logger.debug("setContext() call.context"+value);
-			//accept channelは、Selectorで作られる。context設定メソッドを隠蔽するための処理
-			setContext((ChannelContext)value);
-			return;
-		}
 		synchronized(attribute){
 			attribute.put(name, value);
 		}
@@ -198,19 +176,6 @@ public abstract class ChannelHandler extends PoolBase{
 		return	context.getLocalPort();
 	}
 	
-	public void handlerClosed(){
-		if(isClosed==false){
-			isClosed=true;
-			dump();
-			if(context!=null){
-				context.dump();
-			}
-		}
-	}
-	public boolean isHandlerClosed(){
-		return isClosed;
-	}
-	
 	/**
 	 * 回線の一意性をあらわすID,但し再起動すると同一番号が振られるのでグローバル一意ではない。
 	 * @return
@@ -230,7 +195,7 @@ public abstract class ChannelHandler extends PoolBase{
 	 * @return
 	 */
 	public ChannelHandler forwardHandler(ChannelHandler handler){
-		if(isClosed){
+		if(context==null){
 			logger.warn("fail to forwardHandler already closed handle.cid:"+getPoolId());
 			handler.unref();//forwardに失敗したため、handlerは有効にならない
 			return null;
@@ -241,7 +206,6 @@ public abstract class ChannelHandler extends PoolBase{
 		}
 		handler.setContext(context);
 		setContext(null);
-		handlerClosed();//自ハンドラは閉じたものとする
 		unref();//自ハンドラは開放可能
 		return handler;
 	}
@@ -264,41 +228,31 @@ public abstract class ChannelHandler extends PoolBase{
 		return handler;
 	}
 	
-	public enum IpBlockType{
-		blackWhite,//blackListを見てなければ、whiteLsitを見てなければブロック
-		whiteBlack//whiteLsitを見てなければ、blackListを見てなければ許可
-	}
-	
+	//isBlockOutOfList　whiteListに載ってない、けどbackListに載ってなければ許可
 	public boolean asyncAccept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass){
-		return asyncAccept(userContext, address, backlog, acceptClass,IpBlockType.whiteBlack,null,null);
+		return asyncAccept(userContext, address, backlog, acceptClass,true,null,null);
 	}
-	
-	public boolean asyncAccept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass,IpBlockType ipBlockType,Pattern blackList,Pattern whiteList){
-		if(context!=null){
+	/**
+	 * 
+	 * @param userContext
+	 * @param address
+	 * @param backlog
+	 * @param acceptClass
+	 * @param isBlockOutOfList whiteList,blackList両方に載ってないipを許可するか否か
+	 * @param blackList
+	 * @param whiteList
+	 * @return
+	 */
+	public boolean asyncAccept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass,boolean isBlockOutOfList,Pattern blackList,Pattern whiteList){
+		ChannelContext serverContext=ChannelContext.serverChannelCreate(this, address,backlog);
+		if(serverContext==null){
 			return false;
 		}
-		/* contextを作る */
-		ServerSocketChannel serverSocketChannel;
-		try {
-			serverSocketChannel = ServerSocketChannel.open();
-			serverSocketChannel.configureBlocking(false);
-			serverSocketChannel.socket().bind(address,backlog);
-		} catch (IOException e) {
-			logger.error("failt to asyncAccept.",e);
-			return false;
-		}
-		
-		ChannelContext serverContext=ChannelContext.serverChannelCreate(this, serverSocketChannel);
 		setContext(serverContext);
-		return serverContext.asyncAccept(userContext,address,backlog,acceptClass,ipBlockType,blackList,whiteList);
+		return serverContext.asyncAccept(userContext,address,backlog,acceptClass,isBlockOutOfList,blackList,whiteList);
 	}
-	
 
 	public boolean asyncConnect(Object userContext,String remoteHost,int remotePort,long timeout){
-		if(isClosed){
-			logger.warn("fail to asyncConnect aleady closed.cid:"+getPoolId());
-			return false;
-		}
 		InetAddress inetAddress=null;
 		try {
 			inetAddress = InetAddress.getByName(remoteHost);
@@ -311,28 +265,16 @@ public abstract class ChannelHandler extends PoolBase{
 	}
 	
 	public boolean asyncConnect(Object userContext,InetSocketAddress address,long timeout){
-		if(isClosed){
-			logger.warn("fail to asyncConnect aleady closed.cid:"+getPoolId());
+		ChannelContext socketContext=ChannelContext.socketChannelCreate(this, address);
+		if(socketContext==null){
 			return false;
 		}
-		SocketChannel channel;
-		try {
-			channel=SocketChannel.open();
-			channel.configureBlocking(false);
-			if(channel.connect(address)){
-				//connectが完了しちゃった
-			}
-		} catch (IOException e) {
-			logger.error("fail to connect",e);
-			return false;
-		}
-		ChannelContext socketContext=ChannelContext.socketChannelCreate(this, channel);
 		setContext(socketContext);
 		return socketContext.asyncConnect(userContext, address, timeout);
 	}
 	
 	public boolean asyncRead(Object userContext){
-		if(context==null ||isClosed){
+		if(context==null){
 			logger.debug("fail to asyncRead aleady closed.cid:"+getChannelId());
 			return false;
 		}
@@ -341,7 +283,7 @@ public abstract class ChannelHandler extends PoolBase{
 	}
 	
 	public boolean asyncWrite(Object userContext,ByteBuffer[] buffers){
-		if(context==null || isClosed){
+		if(context==null){
 			PoolManager.poolBufferInstance(buffers);//失敗した場合もbuffersは消費する
 			logger.debug("fail to asyncWrite aleady closed.cid:"+getChannelId());
 			return false;
@@ -354,15 +296,11 @@ public abstract class ChannelHandler extends PoolBase{
 	}
 	
 	public boolean asyncClose(Object userContext){
-		if(isClosed){
-			logger.debug("fail to asyncClose aleady closed.this:"+this);
-			return false;
-		}
-		logger.debug("asyncClose.cid:"+getChannelId()+":this:"+this);
 		if(context==null){
 			logger.error("asyncClose context is null.this:"+this);
 			return false;
 		}
+		logger.debug("asyncClose.cid:"+getChannelId()+":this:"+this);
 		return context.asyncClose(userContext);
 	}
 	
@@ -390,7 +328,6 @@ public abstract class ChannelHandler extends PoolBase{
 		public void flush() throws IOException {
 			if(buffer!=null){
 				buffer.flip();
-//				System.out.println(new String(buffer.array(),0,buffer.limit()));
 				asyncWrite(userContext,BuffersUtil.toByteBufferArray(buffer));
 			}
 			buffer=null;
@@ -459,6 +396,15 @@ public abstract class ChannelHandler extends PoolBase{
 		logger.debug("#accepted.cid:"+getChannelId());
 	}
 	
+	public void onAcceptedInternal(ChannelContext context,Object userContext){
+		if(context!=null){
+			logger.debug("#onAcceptedInternal context is not null.cid:"+getChannelId());
+			return;
+		}
+		setContext(context);
+		onAccepted(userContext);
+	}
+	
 	public void onConnected(Object userContext){
 		logger.debug("#connected.cid:"+getChannelId());
 	}
@@ -504,9 +450,6 @@ public abstract class ChannelHandler extends PoolBase{
 	public void onCloseClosed(Object userContext){
 		onClosed(userContext);
 	}
-	public void onCancelClosed(Object userContext){
-		onClosed(userContext);
-	}
 	
 	/**
 	 * 要求が、何らかの異常によりにより実行できなかったたことを通知
@@ -516,7 +459,7 @@ public abstract class ChannelHandler extends PoolBase{
 	 */
 	public void onFailure(Throwable t){
 		logger.debug("#failure.cid:"+getChannelId(),t);
-		asyncClose(null);
+		//asyncClose(null);
 	}
 	public void onFailure(Object userContext,Throwable t){
 		onFailure(t);
@@ -540,9 +483,6 @@ public abstract class ChannelHandler extends PoolBase{
 	public void onCloseFailure(Object userContext,Throwable t){
 		onFailure(userContext,t);
 	}
-	public void onCancelFailure(Object userContext,Throwable t){
-		onFailure(userContext,t);
-	}
 	
 	/**
 	 * 要求が、タイムアウトにより実行できなかった事を通知
@@ -552,17 +492,19 @@ public abstract class ChannelHandler extends PoolBase{
 	 */
 	public void onTimeout() {
 		logger.debug("#timeout.cid:"+getChannelId());
-		asyncClose(null);
+		//asyncClose(null);
 	}
 	public void onTimeout(Object userContext) {
 		onTimeout();
 	}
-	public void onWriteTimeout(Object[] userContexts){
-		onTimeout(userContexts[0]);
-	}
 	public void onReadTimeout(Object userContext){
 		onTimeout(userContext);
 	}
+	/* not occur */
+	public void onWriteTimeout(Object[] userContexts){
+		onTimeout(userContexts[0]);
+	}
+	/* not occur */
 	public void onConnectTimeout(Object userContext){
 		onTimeout(userContext);
 	}
@@ -599,7 +541,6 @@ public abstract class ChannelHandler extends PoolBase{
 		if(context==null){
 			return;
 		}
-		//context.finishChildContext();
+		context.finishChildContext();
 	}
-	
 }

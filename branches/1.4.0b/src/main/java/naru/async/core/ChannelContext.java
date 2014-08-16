@@ -21,7 +21,6 @@ import org.apache.log4j.Logger;
 
 import naru.async.ChannelHandler;
 import naru.async.ChannelStastics;
-import naru.async.ChannelHandler.IpBlockType;
 import naru.async.core.Order.OrderType;
 import naru.async.core.SelectOperator.State;
 import naru.async.pool.BuffersUtil;
@@ -35,49 +34,6 @@ public class ChannelContext extends PoolBase{
 	
 	public static ChannelStastics getTotalChannelStastics(){
 		return totalChannelStastics;
-	}
-	
-	public static void dumpChannelContexts(){
-		dumpChannelContexts(logger);
-	}
-	public static void dumpChannelContexts(Logger logger){
-		Object[] cs=ChannelContexts.toArray();
-		logger.info("ChannelContext count:"+cs.length);
-		for(int i=0;i<cs.length;i++){
-			ChannelContext c=(ChannelContext)cs[i];
-			c.dump(logger);
-		}
-	}
-	
-	public void dump(){
-		dump(logger);
-	}
-	
-	public void dump(Logger logger){
-		StringBuffer sb=new StringBuffer("[");
-		sb.append("cid:");
-		sb.append(getPoolId());
-		//sb.append(":ioStatus:");
-		//sb.append(ioStatus);
-		sb.append(":handler:");
-		sb.append(handler);
-		if(selector!=null){
-			sb.append(":selectorId:");
-			sb.append(selector.getId());
-		}
-		sb.append(":socket:");
-		sb.append(socket);
-		sb.append(":");
-		sb.append(super.toString());
-		
-		logger.debug(sb.toString());
-		if(handler!=null){
-			handler.dump(logger);
-		}
-		//writeBuffer.dump(logger);
-		//readBuffer.dump(logger);
-		orderOperator.dump(logger);
-		logger.debug("]");
 	}
 	
 	public void activate() {
@@ -158,15 +114,6 @@ public class ChannelContext extends PoolBase{
 		return dummyContext;
 	}
 	
-	public static ChannelContext childContext(ChannelContext orgContext){
-		ChannelContext context=(ChannelContext)PoolManager.getInstance(ChannelContext.class);
-		context.remoteIp=orgContext.remoteIp;
-		context.remotePort=orgContext.remotePort;
-		context.localIp=orgContext.localIp;
-		context.localPort=orgContext.localPort;
-		return context;
-	}
-	
 	private static ChannelContext create(ChannelHandler handler,SelectableChannel channel){
 		ChannelContext context=(ChannelContext)PoolManager.getInstance(ChannelContext.class);
 		context.setHandler(handler);
@@ -178,16 +125,26 @@ public class ChannelContext extends PoolBase{
 		return context;
 	}
 	
-	public static ChannelContext serverChannelCreate(ChannelHandler handler,ServerSocketChannel channel){
-		ChannelContext context=create(handler,channel);
-		context.serverSocket=channel.socket();
+	public static ChannelContext serverChannelCreate(ChannelHandler handler,InetSocketAddress address,int backlog){
+		/* context‚ðì‚é */
+		ServerSocketChannel serverSocketChannel;
+		try {
+			serverSocketChannel = ServerSocketChannel.open();
+			serverSocketChannel.configureBlocking(false);
+			serverSocketChannel.socket().bind(address,backlog);
+		} catch (IOException e) {
+			logger.error("failt to asyncAccept.",e);
+			return null;
+		}
+		
+		ChannelContext context=create(handler,serverSocketChannel);
+		context.serverSocket=serverSocketChannel.socket();
 		context.localIp=context.remoteIp=null;
 		context.localPort=context.remotePort=-1;
 		context.socket=null;
 		return context;
 	}
-	
-	public static ChannelContext socketChannelCreate(ChannelHandler handler,SocketChannel channel){
+	static ChannelContext socketChannelCreate(ChannelHandler handler,SocketChannel channel){
 		ChannelContext context=create(handler,channel);
 		context.socket=channel.socket();
 		InetAddress inetAddress=context.socket.getInetAddress();
@@ -202,6 +159,21 @@ public class ChannelContext extends PoolBase{
 		}
 		context.serverSocket=null;
 		return context;
+	}
+	
+	public static ChannelContext socketChannelCreate(ChannelHandler handler,InetSocketAddress address){
+		SocketChannel channel;
+		try {
+			channel=SocketChannel.open();
+			channel.configureBlocking(false);
+			if(channel.connect(address)){
+				//connect‚ªŠ®—¹‚µ‚¿‚á‚Á‚½
+			}
+		} catch (IOException e) {
+			logger.error("fail to connect",e);
+			return null;
+		}
+		return socketChannelCreate(handler, channel);
 	}
 	
 	private void closing(){
@@ -307,6 +279,8 @@ public class ChannelContext extends PoolBase{
 				channel.configureBlocking(false);
 				selectionKey=selector.register(channel, ops,this);
 			}else if(selector.keyFor(channel).interestOps()!=ops){
+				//2014-08-16 12:40:46,606 [selector-2] ERROR naru.async.core.SelectorHandler - SelectorContext listener Throwable end.
+				//java.nio.channels.CancelledKeyException
 				logger.debug("change ops.cid:" + getPoolId() +":selectionKey:"+selectionKey);
 				cancelSelect();
 				return false;
@@ -356,17 +330,17 @@ public class ChannelContext extends PoolBase{
 	/* acceptŠÖ˜A */
 	private Class acceptClass;
 	private Object acceptUserContext;
-	private IpBlockType ipBlockType;
+	private boolean isBlockOutOfList;
 	private Pattern blackList;
 	private Pattern whiteList;
 	
-	public synchronized boolean asyncAccept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass,IpBlockType ipBlockType,Pattern blackList,Pattern whiteList){
+	public synchronized boolean asyncAccept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass,boolean isBlockOutOfList,Pattern blackList,Pattern whiteList){
 		if(orderOperator.acceptOrder(userContext)==false){
 			return false;
 		}
 		this.acceptClass=acceptClass;
 		this.acceptUserContext=userContext;
-		this.ipBlockType=ipBlockType;
+		this.isBlockOutOfList=isBlockOutOfList;
 		this.blackList=blackList;
 		this.whiteList=whiteList;
 		stastics.asyncAccept();
@@ -488,29 +462,18 @@ public class ChannelContext extends PoolBase{
 	
 	boolean acceptable(Socket socket){
 		String clietnIp=socket.getInetAddress().getHostAddress();
-		switch(ipBlockType){
-		/*
-		case black://black‚É‚È‚¯‚ê‚Î‹–‰Â
-			if( matchPattern(blackList,clietnIp) ){
-				return false;
-			}
-		case white://white‚É‚È‚¯‚ê‚Î‹‘”Û
-			if( !matchPattern(whiteList,clietnIp) ){
-				return false;
-			}
-		*/
-		case blackWhite://black‚ðŒ©‚Ä‚È‚¯‚ê‚Îwhite‚ðŒ©‚Ä‚È‚¯‚ê‚Î‹‘”Û
-			if( matchPattern(blackList,clietnIp) ){
-				return false;
-			}
-			if( !matchPattern(whiteList,clietnIp) ){
-				return false;
-			}
-		case whiteBlack://white‚ðŒ©‚Ä‚È‚¯‚ê‚Îblack‚ðŒ©‚Ä‚È‚¯‚ê‚Î‹–‰Â
+		if(isBlockOutOfList){//whiteList‚ÉÚ‚Á‚Ä‚È‚¢A‚¯‚ÇbackList‚ÉÚ‚Á‚Ä‚È‚¯‚ê‚Î‹–‰Â
 			if( !matchPattern(whiteList,clietnIp) ){
 				if( matchPattern(blackList,clietnIp) ){
 					return false;
 				}
+			}
+		}else{//blackList‚ÉÚ‚Á‚Ä‚½‚ç–³ðŒ‚Å‹–”ÛAwhiteList‚ÉÚ‚Á‚Ä‚È‚¢‚Ì‚à‹–”Û
+			if( matchPattern(blackList,clietnIp) ){
+				return false;
+			}
+			if( !matchPattern(whiteList,clietnIp) ){
+				return false;
 			}
 		}
 		Order order=Order.create(handler, OrderType.select, acceptUserContext);
@@ -519,8 +482,70 @@ public class ChannelContext extends PoolBase{
 	}
 	
 	public void accepted(Object userContext){
-		Order order=Order.create(handler, OrderType.accept, userContext);
+		Order order=Order.create(handler, OrderType.accept, null);
+		order.setUserCountexts(new Object[]{this,userContext});
 		orderOperator.queueCallback(order);
+	}
+	
+	/*--- for SPDY ---*/
+	public static ChannelContext childContext(ChannelContext orgContext){
+		ChannelContext context=(ChannelContext)PoolManager.getInstance(ChannelContext.class);
+		context.remoteIp=orgContext.remoteIp;
+		context.remotePort=orgContext.remotePort;
+		context.localIp=orgContext.localIp;
+		context.localPort=orgContext.localPort;
+		return context;
+	}
+	
+	/* spdy‘Î‰ž‚ÅŽÀconnection‚ª‚È‚¢Context‚Ìfinish */
+	public synchronized void finishChildContext(){
+		logger.debug("finishChildChannel.cid:"+getPoolId());
+		orderOperator.doneClose(false);
+		if(handler==null){//TODO ‚È‚ñ‚Ä‚±‚Á‚½
+			logger.warn("finishChildChannel.cid="+getPoolId()+":"+this);
+			return;
+		}
+		orderOperator.checkAndCallbackFinish();
+	}
+	
+	/* for debug */
+	public static void dumpChannelContexts(){
+		dumpChannelContexts(logger);
+	}
+	public static void dumpChannelContexts(Logger logger){
+		Object[] cs=ChannelContexts.toArray();
+		logger.info("ChannelContext count:"+cs.length);
+		for(int i=0;i<cs.length;i++){
+			ChannelContext c=(ChannelContext)cs[i];
+			c.dump(logger);
+		}
+	}
+	
+	public void dump(){
+		dump(logger);
+	}
+	
+	public void dump(Logger logger){
+		StringBuffer sb=new StringBuffer("[");
+		sb.append("cid:");
+		sb.append(getPoolId());
+		sb.append(":handler:");
+		sb.append(handler);
+		if(selector!=null){
+			sb.append(":selectorId:");
+			sb.append(selector.getId());
+		}
+		sb.append(":socket:");
+		sb.append(socket);
+		sb.append(":");
+		sb.append(super.toString());
+		
+		logger.debug(sb.toString());
+		if(handler!=null){
+			handler.dump(logger);
+		}
+		orderOperator.dump(logger);
+		logger.debug("]");
 	}
 	
 	@Override

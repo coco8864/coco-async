@@ -184,7 +184,7 @@ public class Order extends PoolBase{
 				break;
 			case accept:
 				stastics.onAccepted();
-				handler.onAccepted(userContext);
+				handler.onAcceptedInternal((ChannelContext)userContexts[0],userContexts[1]);
 				break;
 			case connect:
 				stastics.onConnected();

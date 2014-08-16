@@ -160,8 +160,6 @@ public class SelectorHandler implements Runnable {
 		return timeoutTime;
 	}
 	
-	public static String ATTR_ACCEPTED_CONTEXT="naru.async.acceptedContext";
-	
 	private void dispatch() {
 		// セレクトされた SelectionKeyオブジェクトをまとめて取得する
 		Iterator keyIterator = selector.selectedKeys().iterator();
@@ -197,8 +195,6 @@ public class SelectorHandler implements Runnable {
 				//ユーザオブジェクトを獲得する
 				ChannelHandler handler=(ChannelHandler)PoolManager.getInstance(context.getAcceptClass());
 				ChannelContext acceptContext=ChannelContext.socketChannelCreate(handler, socketChannel);
-				
-				handler.setHandlerAttribute(ATTR_ACCEPTED_CONTEXT, acceptContext);
 				Object userAcceptContext=context.getAcceptUserContext();
 				acceptContext.accepted(userAcceptContext);
 				stastics.read();

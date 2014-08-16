@@ -32,7 +32,7 @@ public class IOManager implements Queuelet {
 			return;
 		}
 		if(req!=STOP_REQUEST){
-			((ChannelIO)req).ref();
+			((ChannelIO)req).getContext().ref();
 		}
 		queueletContext.enque(req);
 	}
@@ -97,7 +97,7 @@ public class IOManager implements Queuelet {
 			return false;
 		}finally{
 			//IO‚ªŠ®—¹‚·‚é‚Ü‚ÅChannelContext‚ªÄ—˜—p‚³‚ê‚È‚¢‚æ‚¤‚É‚·‚é
-			channelIO.unref();
+			channelIO.getContext().unref();
 		}
 	}
 	

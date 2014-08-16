@@ -11,6 +11,7 @@ import org.apache.log4j.Logger;
 
 import naru.async.BufferGetter;
 import naru.async.ChannelStastics;
+import naru.async.core.SelectOperator.State;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolManager;
 import naru.async.store.Store;
@@ -32,7 +33,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private long totalWriteLength;
 	private long currentBufferLength;
-	private boolean isAsyncClose;
+	//private boolean isAsyncClose;
 	
 	private ChannelContext context;
 	private ChannelStastics stastics;
@@ -54,7 +55,6 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		this.stastics=context.getChannelStastics();
 		this.selectOperator=context.getSelectOperator();
 		this.orderOperator=context.getOrderOperator();
-		isAsyncClose=false;
 	}
 	
 	public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
@@ -160,12 +160,8 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 			afterWrite(prepareBuffersLength, writeLength, failure, isClosing);
 		}
 	}
-	public void ref() {
-		context.ref();
-	}
-
-	public void unref() {
-		context.unref();
+	public ChannelContext getContext() {
+		return context;
 	}
 
 	boolean asyncWrite(ByteBuffer[] buffers){
@@ -187,37 +183,29 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		return true;
 	}
 	
-	private boolean isRead0length=false;
-	void read0length(){
-		if(isRead0length){
-			return;
-		}
-		isRead0length=true;
-	}
-	
 	/* statusÇ…closeÇê›íËÇ∑ÇÈèÍçáÇ…åƒÇ—èoÇ∑ */
 	private void closed(){
 		logger.debug("closed.cid:"+context.getPoolId());
 		synchronized(context){
+			if(isClose()){
+				return;
+			}
 			state=State.close;
 			orderOperator.checkAndCallbackFinish();
+			context.unref();
 			store.close();
+			store.unref();
+			store=null;
+			
 		}
-		store.unref();
-		context.unref();
-		store=null;
 	}
 	
 	/* 0í∑éÛêMÇµÇΩèÍçá */
-	boolean onRead0(){
+	boolean onReadEos(){
 		return asyncClose();
 	}
 	
 	boolean asyncClose(){
-		if(isAsyncClose){
-			return false;
-		}
-		isAsyncClose=true;
 		switch(state){
 		case block:
 		case writable:

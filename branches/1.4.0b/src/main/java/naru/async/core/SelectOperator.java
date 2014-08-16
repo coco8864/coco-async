@@ -47,7 +47,6 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 	State getState(){
 		return state;
 	}
-	
 
 	public void setup(SelectableChannel channel){
 		state=State.init;
@@ -90,55 +89,56 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 	private void closed(){
 		logger.debug("closed.cid:"+context.getPoolId());
 		synchronized(context){
+			if(isClose()){
+				return;
+			}
 			state=State.close;
 			orderOperator.checkAndCallbackFinish();
+			context.unref();
 			store.close();
+			store.unref();
+			store=null;
 		}
-		store.unref();
-		context.unref();
-		store=null;
 	}
 	
 	private boolean executeRead() {
 		ByteBuffer buffer=PoolManager.getBufferInstance();
 		long length=0;
+		boolean isEos=false;
 		Throwable failure=null;
 		try {
 			//http://docs.oracle.com/javase/jp/6/api/java/nio/channels/ReadableByteChannel.html#read(java.nio.ByteBuffer)
-			//EOF=-1 0‚ÍEOF‚¶‚á‚È‚¢!!
+			//EOS(End Of Stream)=-1 0‚ÍEOS‚¶‚á‚È‚¢
 			length=((ReadableByteChannel)channel).read(buffer);
-			if(length<0){
-				length=0;
-			}
-			buffer.flip();
-			totalReadLength+=length;
 			logger.debug("##executeRead length:"+length +":cid:"+context.getPoolId());
+			if(length>0){
+				buffer.flip();
+				totalReadLength+=length;
+			}else if(length==0){
+				PoolManager.poolBufferInstance(buffer);
+			}else{
+				PoolManager.poolBufferInstance(buffer);
+				isEos=true;
+			}
 		} catch (IOException e) {
-			failure=e;
-			logger.warn("fail to read.cid:"+context.getPoolId() +":channel:"+ channel,failure);
-		}
-		if(failure!=null){
 			PoolManager.poolBufferInstance(buffer);
 			context.closeSocket();
-			synchronized(context){
+			failure=e;
+			context.dump();
+			logger.warn("fail to read.cid:"+context.getPoolId() +":channel:"+ channel,failure);
+		}
+		synchronized(context){
+			if(failure!=null){
 				orderOperator.failure(failure);
 				closed();
-			}
-			context.dump();
-			return false;
-		}
-		if(length>0){
-			synchronized(context){
+				return false;
+			}else if(isEos){
+				orderOperator.doneClose(false);
+				writeOperator.onReadEos();
+				closed();
+			}else{
 				store.putBuffer(BuffersUtil.toByteBufferArray(buffer));
 				queueSelect(State.selectReading);
-			}
-			return true;
-		}else{//0’·ŽóM
-			PoolManager.poolBufferInstance(buffer);
-			synchronized(context){
-				orderOperator.doneClose(false);
-				writeOperator.onRead0();
-				closed();
 			}
 		}
 		return true;
@@ -188,21 +188,24 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 			executeRead();
 		}
 	}
-	public void ref() {
-		context.ref();
-	}
 
-	public void unref() {
-		context.unref();
+	public ChannelContext getContext() {
+		return context;
 	}
 
 	void queueSelect(State state){
-		logger.debug("queueSelect.cid:"+context.getPoolId()+":"+state);
+		if(this.state==State.close){
+			return;
+		}
+		logger.debug("queueSelect.cid:"+context.getPoolId()+":"+this.state+">" +state);
 		this.state=state;
 		context.getSelector().queueSelect(context);
 	}
 	
 	void queueIo(State state){
+		if(this.state==State.close){
+			return;
+		}
 		logger.debug("queueIo.cid:"+context.getPoolId()+":"+this.state+">" +state);
 		this.state=state;
 		IOManager.enqueue(this);
