@@ -275,15 +275,11 @@ public class ChannelContext extends PoolBase{
 			return true;
 		}
 		try {
-			if(!channel.isRegistered()){
+			if(selectionKey==null){
 				channel.configureBlocking(false);
 				selectionKey=selector.register(channel, ops,this);
-			}else if(selector.keyFor(channel).interestOps()!=ops){
-				//2014-08-16 12:40:46,606 [selector-2] ERROR naru.async.core.SelectorHandler - SelectorContext listener Throwable end.
-				//java.nio.channels.CancelledKeyException
-				logger.debug("change ops.cid:" + getPoolId() +":selectionKey:"+selectionKey);
-				cancelSelect();
-				return false;
+			}else if(selectionKey.interestOps()!=ops){
+				selectionKey.interestOps(ops);
 			}
 		} catch (ClosedChannelException e) {
 			orderOperator.failure(e);

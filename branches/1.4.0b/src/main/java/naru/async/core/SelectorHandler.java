@@ -111,6 +111,7 @@ public class SelectorHandler implements Runnable {
 					timeoutTime=time;
 				}
 			}else{//参加したかったが、参加させられなかった。
+				logger.debug("nextContexts.add 1.cid:"+context.getPoolId());
 				nextContexts.add(context);
 			}
 		}
@@ -136,6 +137,7 @@ public class SelectorHandler implements Runnable {
 				//TODO
 				context.unref();
 			}else{//参加したかったが、参加させられなかった。
+				logger.debug("nextContexts.add 2.cid:"+context.getPoolId());
 				nextContexts.add(context);
 			}
 		}
