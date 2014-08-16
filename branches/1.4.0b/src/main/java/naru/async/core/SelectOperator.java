@@ -194,7 +194,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 	}
 
 	void queueSelect(State state){
-		if(this.state==State.close){
+		if(this.state==State.close||this.state==State.selectReading){
 			return;
 		}
 		logger.debug("queueSelect.cid:"+context.getPoolId()+":"+this.state+">" +state);

@@ -268,7 +268,7 @@ public class ChannelContext extends PoolBase{
 			//error
 			orderOperator.failure(null);
 			closing();
-			return false;
+			return true;
 		}
 		if(ops==0){//select‚ð‘±‚¯‚é•K—v‚È‚µ
 			cancelSelect();
