@@ -6,6 +6,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
@@ -199,8 +200,9 @@ public class ChannelContext extends PoolBase{
 			orderOperator.timeout(OrderType.connect);
 			closing();
 			return 0;
+		}else if(time>0){
+			updateNextSelectWakeUp(time);
 		}
-		nextSelectWakeUp=time;
 		return SelectionKey.OP_CONNECT;
 	}
 	
@@ -220,8 +222,8 @@ public class ChannelContext extends PoolBase{
 				return 0;
 			}
 			//read‚Ítimeout‚µ‚Ä‚àˆ—‘±s
-		}else{
-			nextSelectWakeUp=time;
+		}else if(time>0){
+			updateNextSelectWakeUp(time);
 		}
 		int ops=SelectionKey.OP_READ;
 		if(!writeOperator.isBlock()){
@@ -233,14 +235,14 @@ public class ChannelContext extends PoolBase{
 			orderOperator.timeout(OrderType.write);
 			closing();
 			return 0;
-		}else{
+		}else if(time>0){
 			ops|=SelectionKey.OP_WRITE;
 			updateNextSelectWakeUp(time);
 		}
 		return ops;
 	}
 	
-	private void cancelSelect(){
+	void cancelSelect(){
 		if(selectionKey==null){
 			return;
 		}
@@ -277,7 +279,11 @@ public class ChannelContext extends PoolBase{
 		try {
 			if(selectionKey==null){
 				channel.configureBlocking(false);
-				selectionKey=selector.register(channel, ops,this);
+				try {
+					selectionKey=selector.register(channel, ops,this);
+				} catch (CancelledKeyException e) {
+					return false;
+				}
 			}else if(selectionKey.interestOps()!=ops){
 				selectionKey.interestOps(ops);
 			}

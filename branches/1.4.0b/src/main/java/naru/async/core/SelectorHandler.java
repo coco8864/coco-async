@@ -28,7 +28,7 @@ public class SelectorHandler implements Runnable {
 	private Selector selector;
 	
 	private Thread selectorThread;
-	private LinkedList contexts=new LinkedList();
+	private LinkedList<ChannelContext> contexts=new LinkedList<ChannelContext>();
 	private boolean isWakeup;
 	private boolean isRun;
 	
@@ -87,6 +87,110 @@ public class SelectorHandler implements Runnable {
 			ChannelContext context=(ChannelContext)key.attachment();
 			context.getSelectOperator().queueIo(State.closing);
 		}
+	}
+	
+	private long selectAdd(long timeoutTime){
+		Set<ChannelContext> nextContexts=new HashSet<ChannelContext>();
+		while(true){
+			ChannelContext context;
+			synchronized(contexts){
+				if(contexts.size()==0){
+					break;
+				}
+				context=(ChannelContext)contexts.remove(0);
+			}
+			if(context.select()){
+				long time=context.getNextSelectWakeUp();
+				if(time<timeoutTime){
+					timeoutTime=time;
+				}
+			}else{//参加したかったが、参加させられなかった。
+				logger.debug("selectAdd fail to add.cid:"+context.getPoolId());
+				nextContexts.add(context);
+			}
+			context.unref();
+		}
+		for(ChannelContext context:nextContexts){
+			queueSelect(context);
+		}
+		return timeoutTime;
+	}
+	
+	private void accept(ChannelContext context,ServerSocketChannel serverSocketChannel){
+		SocketChannel socketChannel;
+		try {
+			socketChannel = serverSocketChannel.accept();
+			if(socketChannel==null){
+				return;
+			}
+			Socket socket=socketChannel.socket();
+			if( !context.acceptable(socket) ){
+				logger.debug("refuse socketChannel:"+socketChannel);
+				socket.close();//接続拒否
+				stastics.acceptRefuse();
+				return;
+			}
+			logger.debug("isAcceptable socketChannel:"+socketChannel);
+		} catch (IOException e) {
+			logger.error("fail to accept.",e);
+			return;
+		}
+		//ユーザオブジェクトを獲得する
+		ChannelHandler handler=(ChannelHandler)PoolManager.getInstance(context.getAcceptClass());
+		ChannelContext acceptContext=ChannelContext.socketChannelCreate(handler, socketChannel);
+		Object userAcceptContext=context.getAcceptUserContext();
+		acceptContext.accepted(userAcceptContext);
+		stastics.read();
+		acceptContext.getSelectOperator().queueSelect(State.selectReading);
+	}
+	
+	private void dispatch(SelectionKey key,ChannelContext context){
+		if(key.isWritable()){
+			stastics.write();
+			context.getWriteOperator().writable();
+		}
+		if(key.isConnectable()){
+			stastics.connect();
+			context.getSelectOperator().connectable();
+			context.cancelSelect();
+		}else if(key.isReadable()){
+			stastics.read();
+			context.getSelectOperator().readable();
+			context.cancelSelect();
+		}else if(key.isAcceptable()){
+			SelectableChannel selectableChannel=key.channel();
+			ServerSocketChannel serverSocketChannel =(ServerSocketChannel) selectableChannel;
+			accept(context, serverSocketChannel);
+		}
+	}
+	
+	private long checkAll(long timeoutTime){
+		Set<SelectionKey> keys=selector.keys();
+		Iterator<SelectionKey> itr=keys.iterator();
+		Set<SelectionKey> selectedKeys=selector.selectedKeys();
+		while(itr.hasNext()){
+			SelectionKey key=itr.next();
+			if(key.isValid()==false){
+				continue;
+			}
+			ChannelContext context=(ChannelContext)key.attachment();
+			logger.debug("checkAll cid:"+context.getPoolId());
+			if(selectedKeys.contains(key)){
+				logger.debug("checkAll selectedKeys cid:"+context.getPoolId());
+				dispatch(key, context);
+			}else if(context.select()){
+				logger.debug("checkAll context.select() cid:"+context.getPoolId());
+				long time=context.getNextSelectWakeUp();
+				if(time<timeoutTime){
+					timeoutTime=time;
+				}
+				logger.debug("after select getNextSelectWakeUp.cid:"+context.getPoolId()+":"+(timeoutTime-System.currentTimeMillis()));
+			}else{//参加したかったが、参加させられなかった。
+				logger.debug("checkAll fail to add.cid:"+context.getPoolId());
+				queueSelect(context);
+			}
+		}
+		return timeoutTime;
 	}
 	
 	/**
@@ -223,7 +327,7 @@ public class SelectorHandler implements Runnable {
 	 * 
 	 * @throws IOException
 	 */
-	private void waitForRequest() throws IOException {
+	private void waitForSelect() throws IOException {
 		isRun=true;
 		isWakeup=false;//若干余分にwakeupが呼び出されるのは許容する
 		long nextWakeup=System.currentTimeMillis()+selectInterval;//次にtimeoutする直近時刻
@@ -254,29 +358,27 @@ public class SelectorHandler implements Runnable {
 			logger.debug("select in.interval:"+interval);
 			stastics.loop();
 			int selectCount=0;
+			lastWakeup=System.currentTimeMillis();
+//			logger.info("select in.this:"+this+":interval:"+interval);
+			Set<SelectionKey> keys=selector.keys();
+			stastics.setSelectCount(keys.size());
 			if(interval>0){
-				lastWakeup=System.currentTimeMillis();
-//				System.out.println(Thread.currentThread().getName() + ":interval:"+interval);
-//				logger.info("select in.this:"+this+":interval:"+interval);
-				Set<SelectionKey> keys=selector.keys();
-				stastics.setSelectCount(keys.size());
 				selectCount=selector.select(interval);
-				isWakeup=false;//排他してないので、若干余分にwakeupが呼び出されるのは許容する
-//				System.out.println(Thread.currentThread().getName() + ":out:"+interval);
-				if(selectCount<0){
-					logger.info("select out break.selectCount:"+selectCount+":this:"+this);
-					break;
-				}else if(selectCount!=0){
-					minCount=0;//イベントが発生してwakeupされたならカウンタをクリア
-				}
+			}else{
+				selectCount=selector.selectNow();
+			}
+			isWakeup=false;//排他してないので、若干余分にwakeupが呼び出されるのは許容する
+			if(selectCount<0){
+				logger.info("select out break.selectCount:"+selectCount+":this:"+this);
+				break;
+			}else if(selectCount!=0){
+				minCount=0;//イベントが発生してwakeupされたならカウンタをクリア
 			}
 			/* 選択されたチャネルを処理する */
-//			logger.info("select out.selectCount:"+selectCount+":this:"+this);
-			//nextWakeup=System.currentTimeMillis()+selectInterval;
-			dispatch();
-			
-			/* selectモードを調整する(close timeout　変更) */
-			nextWakeup=selectAll();
+			nextWakeup=System.currentTimeMillis()+selectInterval;
+			nextWakeup=selectAdd(nextWakeup);
+			nextWakeup=checkAll(nextWakeup);
+			logger.debug("nextWakeup:"+nextWakeup+":"+(nextWakeup-System.currentTimeMillis()));
 			
 			/* 停止要求されている場合は、停止 */
 			if( isRun==false ){
@@ -289,7 +391,7 @@ public class SelectorHandler implements Runnable {
 	
 	public void run() {
 		try {
-			waitForRequest();
+			waitForSelect();
 			logger.info("SelectorContext nomal end.stastics:"+stastics.getLoopCount() +":"+ stastics.getSleepCount());
 		} catch (IOException e) {
 			logger.error("SelectorContext listener IOException end.",e);

@@ -108,9 +108,9 @@ public abstract class TestHandler extends ChannelHandler {
 
 	@Override
 	public void onFinished() {
-		System.out.println("onFinished.cid:"+getChannelId()+":length:"+tester.getLength());
+		System.out.println("onFinished.cid:"+getChannelId());
 		if(tester!=null){
-			logger.info("onFinished:"+name +":"+tester.getSeed());
+			logger.info("onFinished:"+name +":"+tester.getSeed()+":length:"+tester.getLength());
 		}else{
 			logger.info("onFinished:"+name +":tester is null");
 		}

@@ -397,7 +397,7 @@ public abstract class ChannelHandler extends PoolBase{
 	}
 	
 	public void onAcceptedInternal(ChannelContext context,Object userContext){
-		if(context!=null){
+		if(this.context!=null){
 			logger.debug("#onAcceptedInternal context is not null.cid:"+getChannelId());
 			return;
 		}

@@ -183,10 +183,11 @@ public class OrderOperator {
 	}
 	
 	public static final long CHECK_TIMEOUT=-1;
+	public static final long CHECK_NO_ORDER=-2;
 	
 	long checkConnectTimeout(long now){
 		if(connectOrder==null){
-			return CHECK_TIMEOUT;
+			return CHECK_NO_ORDER;
 		}
 		long timeoutTime=connectOrder.getTimeoutTime();
 		if(now<timeoutTime){
@@ -197,7 +198,7 @@ public class OrderOperator {
 	
 	long checkReadTimeout(long now){
 		if(readOrder==null){
-			return CHECK_TIMEOUT;
+			return CHECK_NO_ORDER;
 		}
 		long timeoutTime=readOrder.getTimeoutTime();
 		if(now<timeoutTime){
@@ -207,6 +208,9 @@ public class OrderOperator {
 	}
 	
 	long checkWriteTimeout(long now){
+		if(writeOrders.size()==0){
+			return CHECK_NO_ORDER;
+		}
 		long timeoutTime=Long.MAX_VALUE;
 		for(Order order:writeOrders){
 			long time=order.getTimeoutTime();
