@@ -45,6 +45,10 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	}
 
 	public void setup(SelectableChannel channel){
+		if(channel==null){
+			state=State.close;
+			return;
+		}
 		state=State.writable;
 		store=Store.open(false);//storeはここでしか設定しない
 		store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する

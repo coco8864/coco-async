@@ -86,10 +86,11 @@ public class SelectorHandler implements Runnable {
 			}
 			ChannelContext context=(ChannelContext)key.attachment();
 			context.getSelectOperator().queueIo(State.closing);
+			context.cancelSelect();
 		}
 	}
 	
-	private long selectAdd(long timeoutTime){
+	private long checkIn(long timeoutTime,Set<ChannelContext> selectIn){
 		Set<ChannelContext> nextContexts=new HashSet<ChannelContext>();
 		while(true){
 			ChannelContext context;
@@ -104,6 +105,7 @@ public class SelectorHandler implements Runnable {
 				if(time<timeoutTime){
 					timeoutTime=time;
 				}
+				selectIn.add(context);
 			}else{//参加したかったが、参加させられなかった。
 				logger.debug("selectAdd fail to add.cid:"+context.getPoolId());
 				nextContexts.add(context);
@@ -144,7 +146,7 @@ public class SelectorHandler implements Runnable {
 		acceptContext.getSelectOperator().queueSelect(State.selectReading);
 	}
 	
-	private void dispatch(SelectionKey key,ChannelContext context){
+	private boolean dispatch(SelectionKey key,ChannelContext context){
 		if(key.isWritable()){
 			stastics.write();
 			context.getWriteOperator().writable();
@@ -152,19 +154,20 @@ public class SelectorHandler implements Runnable {
 		if(key.isConnectable()){
 			stastics.connect();
 			context.getSelectOperator().connectable();
-			context.cancelSelect();
+			return true;
 		}else if(key.isReadable()){
 			stastics.read();
 			context.getSelectOperator().readable();
-			context.cancelSelect();
+			return true;
 		}else if(key.isAcceptable()){
 			SelectableChannel selectableChannel=key.channel();
 			ServerSocketChannel serverSocketChannel =(ServerSocketChannel) selectableChannel;
 			accept(context, serverSocketChannel);
 		}
+		return false;
 	}
 	
-	private long checkAll(long timeoutTime){
+	private long checkOut(long timeoutTime,Set<ChannelContext> selectOut){
 		Set<SelectionKey> keys=selector.keys();
 		Iterator<SelectionKey> itr=keys.iterator();
 		Set<SelectionKey> selectedKeys=selector.selectedKeys();
@@ -177,7 +180,11 @@ public class SelectorHandler implements Runnable {
 			logger.debug("checkAll cid:"+context.getPoolId());
 			if(selectedKeys.contains(key)){
 				logger.debug("checkAll selectedKeys cid:"+context.getPoolId());
-				dispatch(key, context);
+				if(dispatch(key, context)){
+					//dispatchに成功したなら、selectを続ける必要なし
+					context.ref();
+					selectOut.add(context);
+				}
 			}else if(context.select()){
 				logger.debug("checkAll context.select() cid:"+context.getPoolId());
 				long time=context.getNextSelectWakeUp();
@@ -185,138 +192,13 @@ public class SelectorHandler implements Runnable {
 					timeoutTime=time;
 				}
 				logger.debug("after select getNextSelectWakeUp.cid:"+context.getPoolId()+":"+(timeoutTime-System.currentTimeMillis()));
-			}else{//参加したかったが、参加させられなかった。
+			}else{//参加させられなかった。
 				logger.debug("checkAll fail to add.cid:"+context.getPoolId());
-				queueSelect(context);
+				context.ref();
+				selectOut.add(context);
 			}
 		}
 		return timeoutTime;
-	}
-	
-	/**
-	 * 
-	 * @param nextWakeup 次のタイムアウト時刻で一番近い時刻
-	 * @return
-	 */
-	private long selectAll(){
-		long timeoutTime=Long.MAX_VALUE;
-		Set nextContexts=new HashSet();
-		Set<SelectionKey> keys=selector.keys();
-		Iterator<SelectionKey> itr=keys.iterator();
-		while(itr.hasNext()){
-			SelectionKey key=itr.next();
-			if(key.isValid()==false){
-				continue;
-			}
-			ChannelContext context=(ChannelContext)key.attachment();
-			if(context.select()){
-				long time=context.getNextSelectWakeUp();
-				if(time<timeoutTime){
-					timeoutTime=time;
-				}
-			}else{//参加したかったが、参加させられなかった。
-				logger.debug("nextContexts.add 1.cid:"+context.getPoolId());
-				nextContexts.add(context);
-			}
-		}
-		while(true){
-			ChannelContext context;
-			synchronized(contexts){
-				if(contexts.size()==0){
-					break;
-				}
-				context=(ChannelContext)contexts.remove(0);
-			}
-			logger.debug("selectAll cid:"+context.getPoolId());
-			if(nextContexts.contains(context)){
-				//一回のselectで同じcontextのselectを複数回呼ぶのを防ぐ、弊害はないとは思うが
-				context.unref();
-				continue;
-			}
-			if(context.select()){
-				long time=context.getNextSelectWakeUp();
-				if(time<timeoutTime){
-					timeoutTime=time;
-				}
-				//TODO
-				context.unref();
-			}else{//参加したかったが、参加させられなかった。
-				logger.debug("nextContexts.add 2.cid:"+context.getPoolId());
-				nextContexts.add(context);
-			}
-		}
-		int nextContextsCount=nextContexts.size();
-		if(nextContextsCount!=0){
-			if(logger.isDebugEnabled()){
-				logger.debug("retry select.size:"+nextContexts.size());
-				Iterator citr=nextContexts.iterator();
-				while(citr.hasNext()){
-					ChannelContext context=(ChannelContext)citr.next();
-					logger.debug("id:"+context.getPoolId());
-				}
-			}
-			synchronized(contexts){
-				contexts.addAll(nextContexts);
-			}
-			//次selectがすぐに目覚める事を期待
-			selector.wakeup();
-//			logger.info("wakeup2 this:"+this);
-			
-		}
-		return timeoutTime;
-	}
-	
-	private void dispatch() {
-		// セレクトされた SelectionKeyオブジェクトをまとめて取得する
-		Iterator keyIterator = selector.selectedKeys().iterator();
-		while (keyIterator.hasNext()) {
-			SelectionKey key = (SelectionKey) keyIterator.next();
-			keyIterator.remove();//ずっと選択されたままになる事を防ぐ
-			
-			ChannelContext context=(ChannelContext)key.attachment();
-			SelectableChannel selectableChannel=key.channel();
-			SocketChannel socketChannel=null;
-			if(selectableChannel instanceof SocketChannel){
-				socketChannel=(SocketChannel)selectableChannel;
-			}
-			// セレクトされた SelectionKey の状態に応じて処理を決める
-			if(!key.isValid()){
-				logger.warn("dispatch key is aleardy canceled");
-			}else if (key.isAcceptable()) {//ここからjava.nio.channels.CancelledKeyExceptionが発生する？
-				ServerSocketChannel serverSocketChannel =(ServerSocketChannel) selectableChannel;
-				try {
-					socketChannel = serverSocketChannel.accept();
-					Socket socket=socketChannel.socket();
-					if( !context.acceptable(socket) ){
-						logger.debug("refuse socketChannel:"+socketChannel);
-						socket.close();//接続拒否
-						stastics.acceptRefuse();
-						continue;
-					}
-					logger.debug("isAcceptable socketChannel:"+socketChannel);
-				} catch (IOException e) {
-					logger.error("fail to accept.",e);
-					continue;//どうしようもない
-				}
-				//ユーザオブジェクトを獲得する
-				ChannelHandler handler=(ChannelHandler)PoolManager.getInstance(context.getAcceptClass());
-				ChannelContext acceptContext=ChannelContext.socketChannelCreate(handler, socketChannel);
-				Object userAcceptContext=context.getAcceptUserContext();
-				acceptContext.accepted(userAcceptContext);
-				stastics.read();
-				acceptContext.getSelectOperator().queueSelect(State.selectReading);
-			} else if (key.isReadable()) {//READを優先的に判断
-				stastics.read();
-				context.getSelectOperator().readable();
-			}else if(key.isConnectable()){// 接続可能になった場合
-				stastics.connect();
-				context.getSelectOperator().connectable();
-			}
-			if(key.isWritable()){// 書き込みが可能になった場合
-				stastics.write();
-				context.getWriteOperator().writable();
-			}
-		}
 	}
 
 	private static long MIN_INTERVAL_TIME=10;
@@ -331,9 +213,10 @@ public class SelectorHandler implements Runnable {
 		isRun=true;
 		isWakeup=false;//若干余分にwakeupが呼び出されるのは許容する
 		long nextWakeup=System.currentTimeMillis()+selectInterval;//次にtimeoutする直近時刻
-		//激しくwakeupされると寝る仕組み,10ms以下で16回loop...チューニング要素
 		long lastWakeup=System.currentTimeMillis();
 		int minCount=0;
+		Set<ChannelContext> selectOut=new HashSet<ChannelContext>();
+		Set<ChannelContext> selectIn=new HashSet<ChannelContext>();
 		while (true) {
 			long now=System.currentTimeMillis();
 			if( (lastWakeup-now)<MIN_INTERVAL_TIME ){
@@ -376,8 +259,19 @@ public class SelectorHandler implements Runnable {
 			}
 			/* 選択されたチャネルを処理する */
 			nextWakeup=System.currentTimeMillis()+selectInterval;
-			nextWakeup=selectAdd(nextWakeup);
-			nextWakeup=checkAll(nextWakeup);
+			nextWakeup=checkOut(nextWakeup,selectOut);
+			nextWakeup=checkIn(nextWakeup,selectIn);
+			/* selectOutの後、selectInしていないkeyをcancelする */
+			Iterator<ChannelContext> outItr=selectOut.iterator();
+			while(outItr.hasNext()){
+				ChannelContext out=outItr.next();
+				if(!selectIn.contains(out)){
+					out.cancelSelect();
+				}
+				out.unref();
+				outItr.remove();
+			}
+			selectIn.clear();
 			logger.debug("nextWakeup:"+nextWakeup+":"+(nextWakeup-System.currentTimeMillis()));
 			
 			/* 停止要求されている場合は、停止 */

@@ -72,7 +72,6 @@ public class Order extends PoolBase{
 			handler.ref();
 		}
 		if(this.handler!=null){
-//			logger.debug("handler.unref():"+this.handler);
 			this.handler.unref();
 		}
 		this.handler=handler;
@@ -271,4 +270,16 @@ public class Order extends PoolBase{
 	public void setWriteStartOffset(long writeStartOffset) {
 		this.writeStartOffset = writeStartOffset;
 	}
+	
+	@Override
+	public void ref(){
+		super.ref();
+		logger.debug("#+$.cid:"+getPoolId(),new Throwable());
+	}
+	@Override
+	public boolean unref(boolean real){
+		logger.debug("real:"+real+"#-$.cid:"+getPoolId(),new Throwable());
+		return super.unref();
+	}
+	
 }

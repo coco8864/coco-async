@@ -66,6 +66,9 @@ public class OrderOperator {
 	public synchronized void queueCallback(Order order){
 		callbackOrders.add(order);
 		logger.debug("queueCallback cid:"+context.getPoolId() +":size:"+callbackOrders.size()+":"+order.getOrderType());
+		if(order.getOrderType()==OrderType.non){
+			logger.error("!!!",new Exception());
+		}
 		if(inCallback==false){
 			inCallback=true;
 			DispatchManager.enqueue(this);
@@ -130,19 +133,14 @@ public class OrderOperator {
 		}finally{
 			synchronized(context){
 				checkAndCallbackFinish();
+				if(isFinishCallback==false){
+					return;
+				}
+				logger.debug("callback isFinishCallback=true.cid:"+context.getPoolId());
+				finishHandler.unref();
+				context.setHandler(null);
+				context.unref();
 			}
-			//currentContext.set(null);
-			if(isFinishCallback==false){
-				return;
-			}
-			logger.debug("callback isFinishCallback=true.cid:"+context.getPoolId());
-			//if(finishHandler!=handler){
-			//	logger.warn("finish callback finishHandler:"+finishHandler);
-			//	logger.warn("finish callback handler:"+handler);
-			//}
-			finishHandler.unref();
-			context.setHandler(null);
-			context.unref();
 		}
 	}
 	
@@ -442,7 +440,9 @@ public class OrderOperator {
 		}
 		readOrder=Order.create(context.getHandler(), OrderType.read, userContext);
 		readOrder.setTimeoutTime(timeoutTime);
-		selectOperator.asyncRead(readOrder);
+		if(selectOperator.asyncRead(readOrder)){
+			readOrder=null;
+		}
 		return true;
 	}
 	

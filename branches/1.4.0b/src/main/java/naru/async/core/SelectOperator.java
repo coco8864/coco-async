@@ -49,6 +49,10 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 	}
 
 	public void setup(SelectableChannel channel){
+		if(channel==null){
+			state=State.close;
+			return;
+		}
 		state=State.init;
 		store=Store.open(false);//storeはここでしか設定しない
 		store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
@@ -218,16 +222,17 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		return true;
 	}
 	
-	void asyncRead(Order order){
+	boolean asyncRead(Order order){
 		if(currentBufferLength==0){
 			context.getSelector().wakeup();
-			return;
+			return false;
 		}
 		ByteBuffer[] bufs=BuffersUtil.toByteBufferArray(workBuffer);
 		workBuffer.clear();
 		currentBufferLength=0;
 		order.setBuffers(bufs);
 		orderOperator.queueCallback(order);
+		return true;
 	}
 	
 	void readable(){

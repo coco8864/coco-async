@@ -177,14 +177,9 @@ public class ChannelContext extends PoolBase{
 		return socketChannelCreate(handler, channel);
 	}
 	
-	private void closing(){
-		cancelSelect();
-		selectOperator.queueIo(State.closing);
-	}
-	
 	private int acceptingSelect(long now){
 		if(orderOperator.isCloseOrder()){
-			closing();
+			selectOperator.queueIo(State.closing);
 			return 0;
 		}
 		return SelectionKey.OP_ACCEPT;
@@ -198,7 +193,7 @@ public class ChannelContext extends PoolBase{
 		long time=orderOperator.checkConnectTimeout(now);
 		if(time==OrderOperator.CHECK_TIMEOUT){
 			orderOperator.timeout(OrderType.connect);
-			closing();
+			selectOperator.queueIo(State.closing);
 			return 0;
 		}else if(time>0){
 			updateNextSelectWakeUp(time);
@@ -218,7 +213,7 @@ public class ChannelContext extends PoolBase{
 		if(time==OrderOperator.CHECK_TIMEOUT){
 			orderOperator.timeout(OrderType.read);
 			if(writeOperator.isClose()){
-				closing();
+				selectOperator.queueIo(State.closing);
 				return 0;
 			}
 			//read‚Ítimeout‚µ‚Ä‚àˆ—‘±s
@@ -233,7 +228,7 @@ public class ChannelContext extends PoolBase{
 		if(time==OrderOperator.CHECK_TIMEOUT){
 			//write‚ªtimeout‚µ‚½‚çfailure‚Æ‚µ‚Äˆ—
 			orderOperator.timeout(OrderType.write);
-			closing();
+			selectOperator.queueIo(State.closing);
 			return 0;
 		}else if(time>0){
 			ops|=SelectionKey.OP_WRITE;
@@ -248,6 +243,11 @@ public class ChannelContext extends PoolBase{
 		}
 		selectionKey.cancel();
 		selectionKey=null;
+	}
+	
+	private void failureEnd(){
+		orderOperator.failure(null);
+		selectOperator.queueIo(State.closing);
 	}
 	
 	synchronized boolean select(){
@@ -268,13 +268,12 @@ public class ChannelContext extends PoolBase{
 			break;
 		default:
 			//error
-			orderOperator.failure(null);
-			closing();
-			return true;
+			//logger.error("select state error.cid:"+getPoolId()+":"+selectOperator.getState());
+			//failureEnd();
+			return false;
 		}
 		if(ops==0){//select‚ð‘±‚¯‚é•K—v‚È‚µ
-			cancelSelect();
-			return true;
+			return false;
 		}
 		try {
 			if(selectionKey==null){
@@ -282,17 +281,19 @@ public class ChannelContext extends PoolBase{
 				try {
 					selectionKey=selector.register(channel, ops,this);
 				} catch (CancelledKeyException e) {
+					logger.error("select state error.cid:"+getPoolId()+":"+selectOperator.getState());
+					failureEnd();
 					return false;
 				}
 			}else if(selectionKey.interestOps()!=ops){
 				selectionKey.interestOps(ops);
 			}
 		} catch (ClosedChannelException e) {
-			orderOperator.failure(e);
-			closing();
+			failureEnd();
+			return false;
 		} catch (IOException e) {
-			orderOperator.failure(e);
-			closing();
+			failureEnd();
+			return false;
 		}
 		return true;
 	}
@@ -496,6 +497,9 @@ public class ChannelContext extends PoolBase{
 		context.remotePort=orgContext.remotePort;
 		context.localIp=orgContext.localIp;
 		context.localPort=orgContext.localPort;
+		context.selectOperator.setup(null);
+		context.writeOperator.setup(null);
+		context.orderOperator.setup();
 		return context;
 	}
 	
