@@ -11,7 +11,6 @@ import org.apache.log4j.Logger;
 
 import naru.async.BufferGetter;
 import naru.async.ChannelStastics;
-import naru.async.core.SelectOperator.State;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolManager;
 import naru.async.store.Store;
@@ -24,7 +23,9 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		block,
 		writable,
 		writing,
+		accepting,
 		closing,
+		acceptClosing,
 		close
 	}
 	private State state;
@@ -44,21 +45,30 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		this.context=context;
 	}
 
-	public void setup(SelectableChannel channel){
+	void close(){
+		state=State.close;
+	}
+	
+	public void setup(SelectableChannel channel,boolean isServer){
 		if(channel==null){
-			state=State.close;
+			close();
 			return;
 		}
-		state=State.writable;
-		store=Store.open(false);//storeはここでしか設定しない
-		store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
-		context.ref();//storeが生きている間contextを確保する
-		store.asyncBuffer(this, store);
 		totalWriteLength=currentBufferLength=0L;
 		this.channel=channel;
 		this.stastics=context.getChannelStastics();
 		this.selectOperator=context.getSelectOperator();
 		this.orderOperator=context.getOrderOperator();
+		if(isServer){
+			state=State.accepting;
+			store=null;
+		}else{
+			state=State.writable;
+			store=Store.open(false);//storeはここでしか設定しない
+			store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
+			context.ref();//storeが生きている間contextを確保する
+			store.asyncBuffer(this, store);
+		}
 	}
 	
 	public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
@@ -76,13 +86,22 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 				store.asyncBuffer(this, store);
 			}
 		}
+		PoolManager.poolArrayInstance(buffers);
 		return false;
 	}
 
 	public void onBufferEnd(Object userContext) {
+		logger.debug("onBufferEnd.cid:"+context.getPoolId());
+		PoolManager.poolBufferInstance(workBuffer);
+		workBuffer.clear();
+		store.unref();
+		store=null;
+		context.unref();
 	}
 
 	public void onBufferFailure(Object userContext, Throwable failure) {
+		logger.debug("onBufferFailure",failure);
+		onBufferEnd(userContext);
 	}
 	
 	private long executeWrite(ByteBuffer[] prepareBuffers) throws IOException {
@@ -97,7 +116,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		return length;
 	}
 	
-	private boolean afterWrite(long prepareBuffersLength,long writeLength,Throwable failure,boolean isClosing){
+	private boolean afterWrite(long prepareBuffersLength,long writeLength,Throwable failure,boolean isClosing,boolean isAcceptClosing){
 		if(failure!=null){
 			orderOperator.failure(failure);
 			closed();
@@ -110,6 +129,12 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		}
 		if(isClosing){
 			orderOperator.doneClose(true);
+			closed();
+			return false;
+		}
+		if(isAcceptClosing){
+			selectOperator.close();
+			orderOperator.doneClose(false);
 			closed();
 			return false;
 		}
@@ -140,9 +165,11 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	public void doIo() {
 		ByteBuffer[] prepareBuffers=null;
 		boolean isClosing=false;
+		boolean isAcceptClosing=false;
 		synchronized(context){
 			prepareBuffers=BuffersUtil.toByteBufferArray(workBuffer);
 			isClosing=(state==State.closing);
+			isAcceptClosing=(state==State.acceptClosing);
 		}
 		
 		long prepareBuffersLength=BuffersUtil.remaining(prepareBuffers);
@@ -157,11 +184,15 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 				context.closeSocket();
 			}
 		}
+		PoolManager.poolArrayInstance(prepareBuffers);
 		if(isClosing){
 			context.shutdownOutputSocket();
 		}
+		if(isAcceptClosing){
+			context.closeSocket();
+		}
 		synchronized(context){
-			afterWrite(prepareBuffersLength, writeLength, failure, isClosing);
+			afterWrite(prepareBuffersLength, writeLength, failure, isClosing,isAcceptClosing);
 		}
 	}
 	public ChannelContext getContext() {
@@ -180,6 +211,8 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		case init:
 		case close:
 		case closing:
+		case accepting:
+		case acceptClosing:
 			PoolManager.poolBufferInstance(buffers);
 			return false;
 		}
@@ -196,11 +229,10 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 			}
 			state=State.close;
 			orderOperator.checkAndCallbackFinish();
-			context.unref();
+			if(store==null){
+				return;
+			}
 			store.close();
-			store.unref();
-			store=null;
-			
 		}
 	}
 	
@@ -217,9 +249,14 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		case writing:
 			state=State.closing;
 			break;
+		case accepting:
+			IOManager.enqueue(this);
+			state=State.acceptClosing;
+			break;
 		case init:
 		case close:
 		case closing:
+		case acceptClosing:
 			logger.debug("fail to asyncClose.cid:"+context.getPoolId()+":"+state);
 			return false;
 		}

@@ -22,7 +22,7 @@ public abstract class TestHandler extends ChannelHandler {
 	private int connectFailureCount;
 	
 	public void sendBuffer(){
-		asyncWrite("sendBuffer.cid:"+getChannelId(),BuffersUtil.flipBuffers(tester.getBuffers()));
+		asyncWrite(BuffersUtil.flipBuffers(tester.getBuffers()),"sendBuffer.cid:"+getChannelId());
 	}
 	
 	public void reciveBuffer(){
@@ -59,7 +59,7 @@ public abstract class TestHandler extends ChannelHandler {
 	}
 
 	@Override
-	public void onRead(Object userContext, ByteBuffer[] buffers) {
+	public void onRead(ByteBuffer[] buffers, Object userContext) {
 		logger.info("onRead:"+name);
 		readCount++;
 		tester.putBuffer(buffers);
@@ -86,7 +86,7 @@ public abstract class TestHandler extends ChannelHandler {
 	}
 
 	@Override
-	public void onFailure(Object userContext,Throwable t) {
+	public void onFailure(Throwable t,Object userContext) {
 		logger.info("onFailure:"+name+":userContext:"+userContext,t);
 		failureCount++;
 		boolean ret=asyncClose("asyncClose from onFailure:"+name);
@@ -97,7 +97,7 @@ public abstract class TestHandler extends ChannelHandler {
 	 * onConnectFailureは、普通のonFailureとは違ってServerにリクエストが到着していない
 	 */
 	@Override
-	public void onConnectFailure(Object userContext, Throwable t) {
+	public void onConnectFailure(Throwable t, Object userContext) {
 		this.name=this.getClass().getName()+ ":cid:"+getChannelId();
 		logger.info("onConnectFailure:"+name+":userContext:"+userContext,t);
 		connectFailureCount++;

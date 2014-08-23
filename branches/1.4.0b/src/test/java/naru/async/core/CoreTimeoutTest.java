@@ -56,7 +56,7 @@ public class CoreTimeoutTest extends TestBase{
 		InetAddress inetAdder=InetAddress.getLocalHost();
 		InetSocketAddress address=new InetSocketAddress(inetAdder, 1234);
 		CoreTimeoutTest.coreTester=new CoreTester();
-		TestReadClientHandler tch=(TestReadClientHandler)ChannelHandler.connect(TestReadClientHandler.class,"ChannelHandler.connect", address, 1000);
+		TestReadClientHandler tch=(TestReadClientHandler)ChannelHandler.connect(TestReadClientHandler.class,address, 1000, "ChannelHandler.connect");
 		if( tch==null ){
 			fail("ChannelHandler.connect fail");
 		}
@@ -74,14 +74,14 @@ public class CoreTimeoutTest extends TestBase{
 			super.onConnected(userContext);
 			setWriteTimeout(1234);
 			System.out.println("onConnected.userContext:"+userContext);
-			asyncWrite("asyncWrite:"+getChannelId(),BuffersUtil.flipBuffers(tester.getBuffers()));
+			asyncWrite(BuffersUtil.flipBuffers(tester.getBuffers()),"asyncWrite:"+getChannelId());
 		}
 		
 		@Override
 		public void onWritten(Object userContext) {
 			super.onWritten(userContext);
 			System.out.println("onWritten.userContext:"+userContext);
-			asyncWrite("asyncWrite:"+getChannelId(),BuffersUtil.flipBuffers(tester.getBuffers()));
+			asyncWrite(BuffersUtil.flipBuffers(tester.getBuffers()),"asyncWrite:"+getChannelId());
 		}
 	}
 	
@@ -95,7 +95,7 @@ public class CoreTimeoutTest extends TestBase{
 		InetAddress inetAdder=InetAddress.getLocalHost();
 		InetSocketAddress address=new InetSocketAddress(inetAdder, 1234);
 		CoreTimeoutTest.coreTester=new CoreTester();
-		TestWriteClientHandler tch=(TestWriteClientHandler)ChannelHandler.connect(TestWriteClientHandler.class,"ChannelHandler.connect", address, 1000);
+		TestWriteClientHandler tch=(TestWriteClientHandler)ChannelHandler.connect(TestWriteClientHandler.class,address, 1000, "ChannelHandler.connect");
 		if( tch==null ){
 			fail("ChannelHandler.connect fail");
 		}
@@ -128,7 +128,7 @@ public class CoreTimeoutTest extends TestBase{
 		InetSocketAddress address=new InetSocketAddress(inetAdder, 1234);
 		CoreTimeoutTest.coreTester=new CoreTester();
 		for(int i=0;i<1;i++){
-			TestConnectClientHandler tch=(TestConnectClientHandler)ChannelHandler.connect(TestConnectClientHandler.class,"ChannelHandler.connect", address, 1000);
+			TestConnectClientHandler tch=(TestConnectClientHandler)ChannelHandler.connect(TestConnectClientHandler.class,address, 1000, "ChannelHandler.connect");
 			if( tch==null ){
 				fail("ChannelHandler.connect fail");
 			}
@@ -150,7 +150,7 @@ public class CoreTimeoutTest extends TestBase{
 		InetSocketAddress address=new InetSocketAddress(inetAdder, 1234);
 		CoreTimeoutTest.coreTester=new CoreTester();
 		for(int i=0;i<1;i++){
-			TestConnectClientHandler tch=(TestConnectClientHandler)ChannelHandler.connect(TestConnectClientHandler.class,"ChannelHandler.connect", address, 1000);
+			TestConnectClientHandler tch=(TestConnectClientHandler)ChannelHandler.connect(TestConnectClientHandler.class,address, 1000, "ChannelHandler.connect");
 			if( tch==null ){
 				fail("ChannelHandler.connect fail");
 			}

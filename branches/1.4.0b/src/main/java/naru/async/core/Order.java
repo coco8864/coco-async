@@ -85,27 +85,27 @@ public class Order extends PoolBase{
 		switch(orderType){
 		case read:
 			stastics.onReadFailure();
-			handler.onReadFailure(userContext, failure);
+			handler.onReadFailure(failure, userContext);
 			break;
 		case write:
 			stastics.onWriteFailure();
 			if(userContexts!=null){
-				handler.onWriteFailure(userContexts,failure);
+				handler.onWriteFailure(failure,userContexts);
 			}else{
-				handler.onWriteFailure(new Object[]{userContext},failure);
+				handler.onWriteFailure(failure,new Object[]{userContext});
 			}
 			break;
 		case accept:
 			stastics.onAcceptFailure();
-			handler.onAcceptFailure(userContext,failure);
+			handler.onAcceptFailure(failure,userContext);
 			break;
 		case connect:
 			stastics.onConnectFailure();
-			handler.onConnectFailure(userContext,failure);
+			handler.onConnectFailure(failure,userContext);
 			break;
 		case close:
 			stastics.onCloseFailure();
-			handler.onCloseFailure(userContext,failure);
+			handler.onCloseFailure(failure,userContext);
 			break;
 		}
 	}
@@ -171,7 +171,7 @@ public class Order extends PoolBase{
 			switch(orderType){
 			case read:
 				stastics.onRead();
-				handler.onRead(userContext, popBuffers());
+				handler.onRead(popBuffers(), userContext);
 				break;
 			case write:
 				stastics.onWritten();

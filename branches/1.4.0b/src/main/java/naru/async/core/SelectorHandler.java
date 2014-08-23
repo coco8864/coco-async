@@ -91,7 +91,7 @@ public class SelectorHandler implements Runnable {
 	}
 	
 	private long checkIn(long timeoutTime,Set<ChannelContext> selectIn){
-		Set<ChannelContext> nextContexts=new HashSet<ChannelContext>();
+		//Set<ChannelContext> nextContexts=new HashSet<ChannelContext>();
 		while(true){
 			ChannelContext context;
 			synchronized(contexts){
@@ -108,13 +108,13 @@ public class SelectorHandler implements Runnable {
 				selectIn.add(context);
 			}else{//参加したかったが、参加させられなかった。
 				logger.debug("selectAdd fail to add.cid:"+context.getPoolId());
-				nextContexts.add(context);
+				//nextContexts.add(context);
 			}
 			context.unref();
 		}
-		for(ChannelContext context:nextContexts){
-			queueSelect(context);
-		}
+		//for(ChannelContext context:nextContexts){
+		//	queueSelect(context);
+		//}
 		return timeoutTime;
 	}
 	

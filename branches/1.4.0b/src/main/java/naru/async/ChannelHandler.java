@@ -23,6 +23,15 @@ import naru.async.pool.PoolManager;
 
 public abstract class ChannelHandler extends PoolBase{
 	private static Logger logger=Logger.getLogger(ChannelHandler.class);
+	public enum State {
+		init,
+		connect,
+		close,
+		forwarded,
+		finished
+	}
+	private State state;
+	private Object lock=new Object();
 	
 	private ChannelContext context;
 	private long totalReadLength=0;//contextが無くなった後,context情報を保持
@@ -32,71 +41,16 @@ public abstract class ChannelHandler extends PoolBase{
 	
 	public static class AcceptHandler extends ChannelHandler{
 		public void onFinished() {
-			logger.debug("#finished.cid:"+getChannelId());
+			logger.debug("AcceptHandler#finished.cid:"+getChannelId());
 		}
-	}
-	
-	public void dump(){
-		dump(logger);
-	}
-	
-	public void dump(Logger logger){
-		logger.debug("$cid:"+getChannelId() + ":poolId:"+getPoolId() +":className:" +getClass().getName());
-		logger.debug("$attribute:"+attribute);
-	}
-	
-	public String toString(){
-		return "ChannelHandler[cid:"+getChannelId()+"]"+super.toString();
 	}
 	
 	public void recycle() {
-		Iterator itr=attribute.values().iterator();
-		while(itr.hasNext()){
-			Object value=itr.next();
-			if(value instanceof PoolBase){
-				PoolBase poolBase=(PoolBase)value;
-				poolBase.unref();
-			}
-			itr.remove();
-		}
+		state=State.init;
 		attribute.clear();
 		setContext(null);
 		totalReadLength=totalWriteLength=0;
 		super.recycle();
-	}
-
-	/**
-	 * @param userContext onAcceptable,onAcceptedのuserContextとして通知されます。
-	 * @param address
-	 * @param backlog
-	 * @param acceptClass
-	 * @return
-	 */
-	public static ChannelHandler accept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass){
-		return accept(userContext, address, backlog, acceptClass, true, null, null);
-	}
-	public static ChannelHandler accept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass,boolean isBlockOutOfList,Pattern blackList,Pattern whiteList){
-		if(!ChannelHandler.class.isAssignableFrom(acceptClass)){
-			throw new IllegalArgumentException("illegal handlerClass");
-		}
-		ChannelHandler handler=(ChannelHandler)PoolManager.getInstance(AcceptHandler.class);
-		if( handler.asyncAccept(userContext, address, backlog, acceptClass,isBlockOutOfList,blackList,whiteList) ){
-			return handler;
-		}
-		handler.unref(true);
-		return null;
-	}
-	
-	public static ChannelHandler connect(Class handlerClass,Object userContext,InetSocketAddress address,long timeout){
-		if(!ChannelHandler.class.isAssignableFrom(handlerClass)){
-			throw new IllegalArgumentException("illegal handlerClass");
-		}
-		ChannelHandler handler=(ChannelHandler)PoolManager.getInstance(handlerClass);
-		if(handler.asyncConnect(userContext, address, timeout)){
-			return handler;
-		}
-		handler.unref(true);
-		return null;
 	}
 	
 	private void setContext(ChannelContext context){
@@ -108,8 +62,61 @@ public abstract class ChannelHandler extends PoolBase{
 			totalWriteLength=this.context.getTotalReadLength();			
 			logger.debug("setContext endHandler.cid:"+this.context.getPoolId()+":this:"+this+":newContext:"+context);
 			this.context.unref();
+			synchronized(lock){
+				if(context==null&&this.state==State.connect){
+					this.state=State.finished;
+				}
+			}
 		}
 		this.context=context;
+	}
+	
+	/**
+	 * handlerを作成し呼び出しhandlerのライフサイクルと同期させる。
+	 * @param handlerClass
+	 * @return
+	 */
+	public static ChannelHandler allocHandler(Class handlerClass){
+		if(!ChannelHandler.class.isAssignableFrom(handlerClass)){
+			throw new IllegalArgumentException("illegal handlerClass");
+		}
+		ChannelHandler handler=(ChannelHandler)PoolManager.getInstance(handlerClass);
+		return handler;
+	}
+
+	/**
+	 * @param acceptClass
+	 * @param address
+	 * @param backlog
+	 * @param userContext onAcceptable,onAcceptedのuserContextとして通知されます。
+	 * @return
+	 */
+	public static ChannelHandler accept(Class acceptHandlerClass,InetSocketAddress address,int backlog,Object userContext){
+		return accept(acceptHandlerClass, address, backlog, true, null, null, userContext);
+	}
+	
+	public static ChannelHandler accept(Class acceptHandlerClass,InetSocketAddress address,int backlog,boolean isBlockOutOfList,Pattern blackList,Pattern whiteList,Object userContext){
+		if(!ChannelHandler.class.isAssignableFrom(acceptHandlerClass)){
+			throw new IllegalArgumentException("illegal handlerClass");
+		}
+		ChannelHandler handler=(ChannelHandler)PoolManager.getInstance(AcceptHandler.class);
+		if( handler.asyncAccept(acceptHandlerClass, address, backlog, isBlockOutOfList,blackList,whiteList,userContext) ){
+			return handler;
+		}
+		handler.unref(true);
+		return null;
+	}
+	
+	public static ChannelHandler connect(Class handlerClass,InetSocketAddress address,long timeout,Object userContext){
+		if(!ChannelHandler.class.isAssignableFrom(handlerClass)){
+			throw new IllegalArgumentException("illegal handlerClass");
+		}
+		ChannelHandler handler=(ChannelHandler)PoolManager.getInstance(handlerClass);
+		if(handler.asyncConnect(address, timeout, userContext)){
+			return handler;
+		}
+		handler.unref(true);
+		return null;
 	}
 	
 	public long getReadTimeout() {
@@ -200,12 +207,11 @@ public abstract class ChannelHandler extends PoolBase{
 			handler.unref();//forwardに失敗したため、handlerは有効にならない
 			return null;
 		}
-		if(context.foward(handler)==false){//Handler=Contextライフサイクルの同期を行う
-			handler.unref();
-			return null;//ない
-		}
+		context.foward(handler);//Handler=Contextライフサイクルの同期を行う
 		handler.setContext(context);
 		setContext(null);
+		state=State.forwarded;
+		handler.state=State.connect;
 		unref();//自ハンドラは開放可能
 		return handler;
 	}
@@ -215,44 +221,39 @@ public abstract class ChannelHandler extends PoolBase{
 		return forwardHandler(handler);
 	}
 	
-	/**
-	 * handlerを作成し呼び出しhandlerのライフサイクルと同期させる。
-	 * @param handlerClass
-	 * @return
-	 */
-	public ChannelHandler allocHandler(Class handlerClass){
-		if(!ChannelHandler.class.isAssignableFrom(handlerClass)){
-			throw new IllegalArgumentException("illegal handlerClass");
-		}
-		ChannelHandler handler=(ChannelHandler)PoolManager.getInstance(handlerClass);
-		return handler;
-	}
-	
 	//isBlockOutOfList　whiteListに載ってない、けどbackListに載ってなければ許可
-	public boolean asyncAccept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass){
-		return asyncAccept(userContext, address, backlog, acceptClass,true,null,null);
+	public boolean asyncAccept(InetSocketAddress address,int backlog,Class acceptClass,Object userContext){
+		return asyncAccept(acceptClass, address, backlog, true,null,null,userContext);
 	}
 	/**
 	 * 
-	 * @param userContext
+	 * @param acceptClass
 	 * @param address
 	 * @param backlog
-	 * @param acceptClass
 	 * @param isBlockOutOfList whiteList,blackList両方に載ってないipを許可するか否か
 	 * @param blackList
 	 * @param whiteList
+	 * @param userContext
 	 * @return
 	 */
-	public boolean asyncAccept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass,boolean isBlockOutOfList,Pattern blackList,Pattern whiteList){
-		ChannelContext serverContext=ChannelContext.serverChannelCreate(this, address,backlog);
-		if(serverContext==null){
-			return false;
+	public boolean asyncAccept(Class acceptHandlerClass,InetSocketAddress address,int backlog,boolean isBlockOutOfList,Pattern blackList,Pattern whiteList,Object userContext){
+		ChannelContext serverContext=null;
+		synchronized(lock){
+			if(state!=State.init){
+				logger.debug("asyncAccept error state:"+state +":cid:"+getChannelId());
+				return false;
+			}
+			serverContext=ChannelContext.serverChannelCreate(this, address,backlog);
+			if(serverContext==null){
+				return false;
+			}
+			setContext(serverContext);
+			state=State.connect;
 		}
-		setContext(serverContext);
-		return serverContext.asyncAccept(userContext,address,backlog,acceptClass,isBlockOutOfList,blackList,whiteList);
+		return serverContext.asyncAccept(acceptHandlerClass,address,backlog,isBlockOutOfList,blackList,whiteList,userContext);
 	}
 
-	public boolean asyncConnect(Object userContext,String remoteHost,int remotePort,long timeout){
+	public boolean asyncConnect(String remoteHost,int remotePort,long timeout,Object userContext){
 		InetAddress inetAddress=null;
 		try {
 			inetAddress = InetAddress.getByName(remoteHost);
@@ -261,44 +262,57 @@ public abstract class ChannelHandler extends PoolBase{
 			return false;
 		}
 		InetSocketAddress inetSocketAddress=new InetSocketAddress(inetAddress,remotePort);
-		return asyncConnect(userContext,inetSocketAddress,timeout);
+		return asyncConnect(inetSocketAddress,timeout,userContext);
 	}
 	
-	public boolean asyncConnect(Object userContext,InetSocketAddress address,long timeout){
-		ChannelContext socketContext=ChannelContext.socketChannelCreate(this, address);
-		if(socketContext==null){
-			return false;
+	public boolean asyncConnect(InetSocketAddress address,long timeout,Object userContext){
+		ChannelContext socketContext=null;
+		synchronized(lock){
+			if(state!=State.init){
+				logger.debug("asyncConnect error state:"+state +":cid:"+getChannelId());
+				return false;
+			}
+			socketContext=ChannelContext.socketChannelCreate(this, address);
+			if(socketContext==null){
+				return false;
+			}
+			setContext(socketContext);
+			state=State.connect;
 		}
-		setContext(socketContext);
-		return socketContext.asyncConnect(userContext, address, timeout);
+		return socketContext.asyncConnect(address, timeout, userContext);
 	}
 	
 	public boolean asyncRead(Object userContext){
-		if(context==null){
-			logger.debug("fail to asyncRead aleady closed.cid:"+getChannelId());
+		if(state!=State.connect){
+			logger.debug("asyncRead error state:"+state +":cid:"+getChannelId());
 			return false;
 		}
 		logger.debug("asyncRead.cid:"+getChannelId()+":userContext:"+userContext);
 		return context.asyncRead(userContext);
 	}
 	
-	public boolean asyncWrite(Object userContext,ByteBuffer[] buffers){
-		if(context==null){
-			PoolManager.poolBufferInstance(buffers);//失敗した場合もbuffersは消費する
-			logger.debug("fail to asyncWrite aleady closed.cid:"+getChannelId());
-			return false;
+	public boolean asyncWrite(ByteBuffer[] buffers,Object userContext){
+		synchronized(lock){
+			if(state!=State.connect){
+				PoolManager.poolBufferInstance(buffers);//失敗した場合もbuffersは消費する
+				logger.debug("asyncWrite error state:"+state +":cid:"+getChannelId());
+				return false;
+			}
 		}
 		logger.debug("asyncWrite.cid:"+getChannelId()+":this:"+this);
 		if(logger.isDebugEnabled()){
 			logger.debug("asyncWrite.cid:"+getChannelId()+":this:"+this +":length:"+BuffersUtil.remaining(buffers));
 		}
-		return context.asyncWrite(userContext, buffers);
+		return context.asyncWrite(buffers, userContext);
 	}
 	
 	public boolean asyncClose(Object userContext){
-		if(context==null){
-			logger.error("asyncClose context is null.this:"+this);
-			return false;
+		synchronized(lock){
+			if(state!=State.connect){
+				logger.debug("asyncClose error state:"+state +":cid:"+getChannelId());
+				return false;
+			}
+			state=State.close;
 		}
 		logger.debug("asyncClose.cid:"+getChannelId()+":this:"+this);
 		return context.asyncClose(userContext);
@@ -328,7 +342,7 @@ public abstract class ChannelHandler extends PoolBase{
 		public void flush() throws IOException {
 			if(buffer!=null){
 				buffer.flip();
-				asyncWrite(userContext,BuffersUtil.toByteBufferArray(buffer));
+				asyncWrite(BuffersUtil.toByteBufferArray(buffer),userContext);
 			}
 			buffer=null;
 		}
@@ -346,7 +360,7 @@ public abstract class ChannelHandler extends PoolBase{
 					PoolManager.poolBufferInstance(buffer);
 					buffer=null;
 					ByteBuffer[] buffers=BuffersUtil.buffers(src, offset, length);
-					asyncWrite(userContext,buffers);
+					asyncWrite(buffers,userContext);
 					return;
 				}
 			}
@@ -396,7 +410,7 @@ public abstract class ChannelHandler extends PoolBase{
 		logger.debug("#accepted.cid:"+getChannelId());
 	}
 	
-	public void onAcceptedInternal(ChannelContext context,Object userContext){
+	public final void onAcceptedInternal(ChannelContext context,Object userContext){
 		if(this.context!=null){
 			logger.debug("#onAcceptedInternal context is not null.cid:"+getChannelId());
 			return;
@@ -409,7 +423,7 @@ public abstract class ChannelHandler extends PoolBase{
 		logger.debug("#connected.cid:"+getChannelId());
 	}
 	
-	public void onRead(Object userContext,ByteBuffer[] buffers){
+	public void onRead(ByteBuffer[] buffers,Object userContext){
 		logger.debug("#read.cid:"+getChannelId());
 	}
 	
@@ -461,27 +475,27 @@ public abstract class ChannelHandler extends PoolBase{
 		logger.debug("#failure.cid:"+getChannelId(),t);
 		//asyncClose(null);
 	}
-	public void onFailure(Object userContext,Throwable t){
+	public void onFailure(Throwable t,Object userContext){
 		onFailure(t);
 	}
-	public void onWriteFailure(Object[] userContexts,Throwable t){
+	public void onWriteFailure(Throwable t,Object[] userContexts){
 		if(userContexts==null){
-			onFailure(null,t);
+			onFailure(t,null);
 			return;
 		}
-		onFailure(userContexts[0],t);
+		onFailure(t,userContexts[0]);
 	}
-	public void onReadFailure(Object userContext,Throwable t){
-		onFailure(userContext,t);
+	public void onReadFailure(Throwable t,Object userContext){
+		onFailure(t,userContext);
 	}
-	public void onAcceptFailure(Object userContext,Throwable t){
-		onFailure(userContext,t);
+	public void onAcceptFailure(Throwable t,Object userContext){
+		onFailure(t,userContext);
 	}
-	public void onConnectFailure(Object userContext,Throwable t){
-		onFailure(userContext,t);
+	public void onConnectFailure(Throwable t,Object userContext){
+		onFailure(t,userContext);
 	}
-	public void onCloseFailure(Object userContext,Throwable t){
-		onFailure(userContext,t);
+	public void onCloseFailure(Throwable t,Object userContext){
+		onFailure(t,userContext);
 	}
 	
 	/**
@@ -542,5 +556,19 @@ public abstract class ChannelHandler extends PoolBase{
 			return;
 		}
 		context.finishChildContext();
+	}
+	
+	/* for debug */
+	public void dump(){
+		dump(logger);
+	}
+	
+	public void dump(Logger logger){
+		logger.debug("$cid:"+getChannelId() + ":poolId:"+getPoolId() +":className:" +getClass().getName());
+		logger.debug("$attribute:"+attribute);
+	}
+	
+	public String toString(){
+		return "ChannelHandler[cid:"+getChannelId()+"]"+super.toString();
 	}
 }

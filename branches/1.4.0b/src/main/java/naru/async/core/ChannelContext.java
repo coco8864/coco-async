@@ -115,14 +115,14 @@ public class ChannelContext extends PoolBase{
 		return dummyContext;
 	}
 	
-	private static ChannelContext create(ChannelHandler handler,SelectableChannel channel){
+	private static ChannelContext create(ChannelHandler handler,SelectableChannel channel,boolean isServer){
 		ChannelContext context=(ChannelContext)PoolManager.getInstance(ChannelContext.class);
 		context.setHandler(handler);
 		context.channel=channel;
 		context.selector=IOManager.getSelectorContext(context);
-		context.selectOperator.setup(channel);
-		context.writeOperator.setup(channel);
 		context.orderOperator.setup();
+		context.writeOperator.setup(channel,isServer);
+		context.selectOperator.setup(channel,isServer);
 		return context;
 	}
 	
@@ -138,7 +138,7 @@ public class ChannelContext extends PoolBase{
 			return null;
 		}
 		
-		ChannelContext context=create(handler,serverSocketChannel);
+		ChannelContext context=create(handler,serverSocketChannel,true);
 		context.serverSocket=serverSocketChannel.socket();
 		context.localIp=context.remoteIp=null;
 		context.localPort=context.remotePort=-1;
@@ -146,7 +146,7 @@ public class ChannelContext extends PoolBase{
 		return context;
 	}
 	static ChannelContext socketChannelCreate(ChannelHandler handler,SocketChannel channel){
-		ChannelContext context=create(handler,channel);
+		ChannelContext context=create(handler,channel,false);
 		context.socket=channel.socket();
 		InetAddress inetAddress=context.socket.getInetAddress();
 		context.remotePort=context.socket.getPort();
@@ -305,9 +305,8 @@ public class ChannelContext extends PoolBase{
 		return socket.isConnected();
 	}
 	
-	public synchronized boolean foward(ChannelHandler handler){
+	public synchronized void foward(ChannelHandler handler){
 		setHandler(handler);
-		return true;
 	}
 	
 	public void setHandler(ChannelHandler handler){
@@ -331,17 +330,17 @@ public class ChannelContext extends PoolBase{
 	}
 	
 	/* acceptŠÖ˜A */
-	private Class acceptClass;
+	private Class acceptHandlerClass;
 	private Object acceptUserContext;
 	private boolean isBlockOutOfList;
 	private Pattern blackList;
 	private Pattern whiteList;
 	
-	public synchronized boolean asyncAccept(Object userContext,InetSocketAddress address,int backlog,Class acceptClass,boolean isBlockOutOfList,Pattern blackList,Pattern whiteList){
+	public synchronized boolean asyncAccept(Class acceptHandlerClass,InetSocketAddress address,int backlog,boolean isBlockOutOfList,Pattern blackList,Pattern whiteList,Object userContext){
 		if(orderOperator.acceptOrder(userContext)==false){
 			return false;
 		}
-		this.acceptClass=acceptClass;
+		this.acceptHandlerClass=acceptHandlerClass;
 		this.acceptUserContext=userContext;
 		this.isBlockOutOfList=isBlockOutOfList;
 		this.blackList=blackList;
@@ -350,7 +349,7 @@ public class ChannelContext extends PoolBase{
 		return true;
 	}
 
-	public synchronized boolean asyncConnect(Object userContext,InetSocketAddress address,long timeout){
+	public synchronized boolean asyncConnect(InetSocketAddress address,long timeout,Object userContext){
 		if(orderOperator.connectOrder(userContext,timeout)==false){
 			return false;
 		}
@@ -370,7 +369,7 @@ public class ChannelContext extends PoolBase{
 		return true;
 	}
 	
-	public synchronized boolean asyncWrite(Object userContext,ByteBuffer[] buffers){
+	public synchronized boolean asyncWrite(ByteBuffer[] buffers,Object userContext){
 		long length=BuffersUtil.remaining(buffers);
 		long asyncWriteStartOffset=stastics.getAsyncWriteLength();
 		long timeoutTime=Long.MAX_VALUE;
@@ -445,7 +444,7 @@ public class ChannelContext extends PoolBase{
 	}
 
 	public Class getAcceptClass() {
-		return acceptClass;
+		return acceptHandlerClass;
 	}
 
 	public Object getAcceptUserContext() {
@@ -497,8 +496,8 @@ public class ChannelContext extends PoolBase{
 		context.remotePort=orgContext.remotePort;
 		context.localIp=orgContext.localIp;
 		context.localPort=orgContext.localPort;
-		context.selectOperator.setup(null);
-		context.writeOperator.setup(null);
+		context.selectOperator.setup(null,false);
+		context.writeOperator.setup(null,false);
 		context.orderOperator.setup();
 		return context;
 	}

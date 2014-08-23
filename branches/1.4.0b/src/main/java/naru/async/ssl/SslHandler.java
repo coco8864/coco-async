@@ -103,7 +103,7 @@ public abstract class SslHandler extends ChannelHandler {
 	 * 読み込んだ平文を処理するメソッド
 	 * @param buffers
 	 */
-	public void onReadPlain(Object userContext,ByteBuffer[] buffers) {
+	public void onReadPlain(ByteBuffer[] buffers,Object userContext) {
 		//オーバライドしてね
 		return;
 	}
@@ -172,13 +172,13 @@ public abstract class SslHandler extends ChannelHandler {
 			ByteBuffer[] peekBuffers=PoolManager.duplicateBuffers(buffers);;
 			readPeekStore.putBuffer(peekBuffers);
 		}
-		onReadPlain(userContext,buffers);
+		onReadPlain(buffers,userContext);
 	}
 	
 	/**
 	 * 必要がある場合、平文化する
 	 */
-	public void onRead(Object userContext, ByteBuffer[] buffers) {
+	public void onRead(ByteBuffer[] buffers, Object userContext) {
 		if(sslAdapter==null){
 			callbackReadPlain(userContext,buffers);
 			return;
@@ -196,7 +196,7 @@ public abstract class SslHandler extends ChannelHandler {
 			sslAdapter.onRead(userContext, buffers);
 		} catch (SSLException e) {
 //			sslAdapter.print();
-			onReadFailure(userContext, e);
+			onReadFailure(e, userContext);
 			logger.error("read ssl error.cid:"+getChannelId(),e);
 			//復号化失敗時の処理
 		}
@@ -225,7 +225,7 @@ public abstract class SslHandler extends ChannelHandler {
 	/**
 	 * 必要がある場合、暗号化して送信するようにオーバーライド
 	 */
-	public boolean asyncWrite(Object userContext,ByteBuffer[] buffers){
+	public boolean asyncWrite(ByteBuffer[] buffers,Object userContext){
 		if(sslAdapter==null){
 			//sslContext配下にない場合は、回線に直接投げる
 			if(writePeekStore!=null){
@@ -234,12 +234,12 @@ public abstract class SslHandler extends ChannelHandler {
 				writePeekStore.putBuffer(peekBuffers);
 			}
 			logger.debug("asyncWrite1 cid:"+getChannelId());
-			return super.asyncWrite(userContext, buffers);
+			return super.asyncWrite(buffers, userContext);
 		}
 		if(userContext==SslAdapter.SSLCTX_WRITE_NETWORK){
 			logger.debug("asyncWrite2 cid:"+getChannelId());
 			//SslAdapterから呼び出された場合は、回線に直接投げる
-			return super.asyncWrite(userContext, buffers);
+			return super.asyncWrite(buffers, userContext);
 		}
 		
 		if(writePeekStore!=null){

@@ -99,6 +99,7 @@ public class Store extends PoolBase {
 		isCloseWait=false;
 		isClosePersistance=false;
 		isPutCloseStoreId=false;
+		isCallbackProcessing=false;
 		
 		isOnAsyncBuffer=isOnAsyncBufferRequest=isOnAsyncBufferClose=false;
 		bufferGetter=null;
@@ -760,7 +761,7 @@ public class Store extends PoolBase {
 	private LinkedList<StoreCallback> callbackQueue=new LinkedList<StoreCallback>();
 	private boolean isCallbackProcessing=false;
 	void callbackQueue(StoreCallback storeCallback){
-		logger.debug("callbackQueue");
+		logger.debug("callbackQueue sid:"+getPoolId());
 		synchronized(callbackQueue){
 			callbackQueue.addLast(storeCallback);
 		}
@@ -768,18 +769,22 @@ public class Store extends PoolBase {
 	}
 	
 	void callback(){
-		logger.debug("callback");
+		logger.debug("callback sid:"+getPoolId());
 		StoreCallback storeCallback=null;
 		synchronized(callbackQueue){
 			if(isCallbackProcessing || callbackQueue.size()<=0){
+				logger.debug("callback1 sid:"+getPoolId());
 				return;
 			}
 			isCallbackProcessing=true;
 			storeCallback=callbackQueue.removeFirst();
 		}
 		while(true){
+			logger.debug("callback2 sid:"+getPoolId());
 			storeCallback.callback();
-			storeCallback.unref(true);
+			logger.debug("callback3 sid:"+getPoolId());
+			boolean rc=storeCallback.unref(true);
+			logger.debug("callback4 sid:"+getPoolId()+":"+rc);
 			synchronized(callbackQueue){
 				if(callbackQueue.size()<=0){
 					isCallbackProcessing=false;

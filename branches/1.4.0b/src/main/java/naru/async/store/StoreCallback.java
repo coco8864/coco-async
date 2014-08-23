@@ -2,11 +2,14 @@ package naru.async.store;
 
 import java.nio.ByteBuffer;
 
+import org.apache.log4j.Logger;
+
 import naru.async.BufferGetter;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
 
 public class StoreCallback extends PoolBase{
+	private static Logger logger=Logger.getLogger(StoreCallback.class);
 	/* callbackêßå‰ */
 	private enum CallbackType {
 		BUFFER,
@@ -96,8 +99,8 @@ public class StoreCallback extends PoolBase{
 				callbackBufferGetter.onBufferFailure(callbackUserContext, callbackFailure);
 				break;
 			}
-		}finally{
-//			callbackStore.set(null);
+		}catch(Throwable t){
+			logger.error("StoreCallback#callback error",t);
 		}
 		store.doneCallback(isEnd,onBufferReturn,callbackBufferGetter,callbackUserContext);
 	}

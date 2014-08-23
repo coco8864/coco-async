@@ -47,22 +47,30 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 	State getState(){
 		return state;
 	}
+	
+	void close(){
+		state=State.close;
+	}
 
-	public void setup(SelectableChannel channel){
+	public void setup(SelectableChannel channel,boolean isServer){
 		if(channel==null){
-			state=State.close;
+			close();
 			return;
 		}
 		state=State.init;
-		store=Store.open(false);//storeはここでしか設定しない
-		store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
-		context.ref();//storeが生きている間contextを確保する
-		store.asyncBuffer(this, store);
 		totalReadLength=currentBufferLength=0L;
 		this.channel=channel;
 		this.stastics=context.getChannelStastics();
 		this.writeOperator=context.getWriteOperator();
 		this.orderOperator=context.getOrderOperator();
+		if(isServer){
+			store=null;
+		}else{
+			store=Store.open(false);//storeはここでしか設定しない
+			store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
+			context.ref();//storeが生きている間contextを確保する
+			store.asyncBuffer(this, store);
+		}
 	}
 	
 	public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
@@ -80,13 +88,22 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 				store.asyncBuffer(this, store);
 			}
 		}
+		PoolManager.poolArrayInstance(buffers);
 		return false;
 	}
 
 	public void onBufferEnd(Object userContext) {
+		logger.debug("onBufferEnd.cid:"+context.getPoolId());
+		PoolManager.poolBufferInstance(workBuffer);
+		workBuffer.clear();
+		store.unref();
+		store=null;
+		context.unref();
 	}
 
 	public void onBufferFailure(Object userContext, Throwable failure) {
+		logger.debug("onBufferFailure",failure);
+		onBufferEnd(userContext);
 	}
 
 	/* statusにcloseを設定する場合に呼び出す */
@@ -98,10 +115,10 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 			}
 			state=State.close;
 			orderOperator.checkAndCallbackFinish();
-			context.unref();
+			if(store==null){
+				return;
+			}
 			store.close();
-			store.unref();
-			store=null;
 		}
 	}
 	

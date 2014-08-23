@@ -28,7 +28,6 @@ public class BufferGenerator {
 	private ByteBuffer[] buffers;
 	private String digest;
 	
-	
 	public BufferGenerator(long length,long seed){
 		this();
 		this.length=length;

@@ -162,7 +162,7 @@ public class WriteScheduler extends PoolBase implements Timer{
 		if(isCloseEndBeforeWrite){
 			handler.asyncClose(userContext);
 		}else{
-			handler.asyncWrite(userContext, buffer);
+			handler.asyncWrite(buffer, userContext);
 			actualWriteTime=System.currentTimeMillis();
 			if(isCloseEnd){
 				logger.debug("WriteScheduler asyncClose");

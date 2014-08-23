@@ -86,7 +86,7 @@ public class CoreConnectTest extends TestBase{
 			cUserContext=userContext;
 			connectTime=System.currentTimeMillis();
 //			System.out.println("TestClientHandler onConnected.userContext:"+userContext);
-			asyncWrite(userContext,new ByteBuffer[]{ByteBuffer.wrap("GET".getBytes())});
+			asyncWrite(new ByteBuffer[]{ByteBuffer.wrap("GET".getBytes())},userContext);
 //			asyncClose(userContext);//Ç¢Ç´Ç»ÇËÉNÉçÅ[ÉY
 			synchronized(userContext){
 				userContext.notify();
@@ -169,7 +169,7 @@ public class CoreConnectTest extends TestBase{
 		}
 		for(int i=0;i<tchs.length;i++){
 //			tchs[i].asyncConnect("test", "judus.soft.fujitsu.com", 1280, 100000);
-			tchs[i].asyncConnect("test", "localhost", 1280, 100000);
+			tchs[i].asyncConnect("localhost", 1280, 100000, "test");
 //			Thread.sleep(1);
 		}
 		int count=0;
