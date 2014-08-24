@@ -72,6 +72,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	}
 	
 	public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
+		logger.debug("onBuffer.cid:"+context.getPoolId()+":state:"+state);
 		long length=BuffersUtil.remaining(buffers);
 		synchronized(context){
 			currentBufferLength+=length;
@@ -163,13 +164,10 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	}
 
 	public void doIo() {
+		logger.debug("doIo.cid:"+context.getPoolId()+":state:"+state);
 		ByteBuffer[] prepareBuffers=null;
-		boolean isClosing=false;
-		boolean isAcceptClosing=false;
 		synchronized(context){
 			prepareBuffers=BuffersUtil.toByteBufferArray(workBuffer);
-			isClosing=(state==State.closing);
-			isAcceptClosing=(state==State.acceptClosing);
 		}
 		
 		long prepareBuffersLength=BuffersUtil.remaining(prepareBuffers);
@@ -183,15 +181,22 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 				failure=e;
 				context.closeSocket();
 			}
+		}else{
+			logger.debug("doIo prepareBuffersLength==0.cid:"+context.getPoolId());
 		}
 		PoolManager.poolArrayInstance(prepareBuffers);
-		if(isClosing){
-			context.shutdownOutputSocket();
-		}
-		if(isAcceptClosing){
-			context.closeSocket();
-		}
+		
+		boolean isClosing=false;
+		boolean isAcceptClosing=false;
 		synchronized(context){
+			isClosing=(state==State.closing);
+			isAcceptClosing=(state==State.acceptClosing);
+			if(isClosing){
+				context.shutdownOutputSocket();
+			}
+			if(isAcceptClosing){
+				context.closeSocket();
+			}
 			afterWrite(prepareBuffersLength, writeLength, failure, isClosing,isAcceptClosing);
 		}
 	}
@@ -207,12 +212,13 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 			state=State.writing;
 			IOManager.enqueue(this);
 		case writing:
-			break;
-		case init:
-		case close:
 		case closing:
+			break;
+		case close:
+		case init:
 		case accepting:
 		case acceptClosing:
+			logger.error("asyncWrite but state:"+state);
 			PoolManager.poolBufferInstance(buffers);
 			return false;
 		}
@@ -238,6 +244,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	
 	/* 0í∑éÛêMÇµÇΩèÍçá */
 	boolean onReadEos(){
+		logger.debug("onReadEos.cid:"+context.getPoolId()+":"+state);
 		return asyncClose();
 	}
 	

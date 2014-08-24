@@ -193,6 +193,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 	}
 	
 	public void doIo() {
+		logger.debug("doIo.cid:"+context.getPoolId()+":state:"+state);
 		boolean isConnect;
 		boolean isRead;
 		boolean isClose;

@@ -301,7 +301,7 @@ public abstract class ChannelHandler extends PoolBase{
 		}
 		logger.debug("asyncWrite.cid:"+getChannelId()+":this:"+this);
 		if(logger.isDebugEnabled()){
-			logger.debug("asyncWrite.cid:"+getChannelId()+":this:"+this +":length:"+BuffersUtil.remaining(buffers));
+			logger.debug("asyncWrite.cid:"+getChannelId()+":length:"+BuffersUtil.remaining(buffers));
 		}
 		return context.asyncWrite(buffers, userContext);
 	}
@@ -411,10 +411,10 @@ public abstract class ChannelHandler extends PoolBase{
 	}
 	
 	public final void onAcceptedInternal(ChannelContext context,Object userContext){
-		if(this.context!=null){
-			logger.debug("#onAcceptedInternal context is not null.cid:"+getChannelId());
-			return;
+		if(state!=State.init){
+			logger.debug("#onAcceptedInternal context is not null.cid:"+context.getPoolId());
 		}
+		state=State.connect;
 		setContext(context);
 		onAccepted(userContext);
 	}
