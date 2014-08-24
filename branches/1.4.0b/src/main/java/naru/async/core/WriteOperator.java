@@ -209,8 +209,8 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		case block:
 			break;
 		case writable:
-			state=State.writing;
-			IOManager.enqueue(this);
+//			state=State.writing;
+//			IOManager.enqueue(this);
 		case writing:
 		case closing:
 			break;
