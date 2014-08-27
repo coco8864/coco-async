@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.SelectableChannel;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Iterator;
 
@@ -19,23 +20,58 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	private static Logger logger=Logger.getLogger(WriteOperator.class);
 	private static long bufferMinLimit=8192;
 	public enum State {
-		init,
+		prepare,
 		block,
-		closingBlock,
 		writable,
-		writing,
-		accepting,
-		closing,
-		acceptClosing,
 		close
 	}
 	private State state;
-	private SelectableChannel channel;
+	private boolean isAsyncClose;
 	private Store store;
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private long totalWriteLength;
 	private long currentBufferLength;
-	//private boolean isAsyncClose;
+	
+	/* 1)buf:current/notAll/all
+	 * 2)state:prepare/block/write/close
+	 * 3)isAsyncClose:true/false
+	 * 
+	 * a)current:block:true|false -> wait
+	 * b)current:writable:true|false -> io
+	 * c)notAll:writable:true|false -> wait
+	 * d)all:writable:false -> wait
+	 * e)all:writable:true -> io
+	 * 
+	 * f)all:prepare:false ->wait
+	 * g)all:prepare:true ->io
+	 * h)*:close:* ->wait
+	 */
+	
+	private boolean isIo(){
+		if(state==State.close){
+			return false;
+		}
+		if(currentBufferLength!=0){
+			if(state==State.block){
+				return false;
+			}
+			if(state==State.writable){
+				return true;
+			}
+		}else if(totalWriteLength!=store.getPutLength()){
+			return false;
+		}else{
+			if(isAsyncClose){
+				return true;
+			}else{
+				return false;
+			}
+		}
+		logger.warn("sate:"+state+":isAsyncClose:"+isAsyncClose+":currentBufferLength:"+currentBufferLength);
+		return false;
+	}
+	
+	private SelectableChannel channel;
 	
 	private ChannelContext context;
 	private ChannelStastics stastics;
@@ -50,25 +86,31 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		state=State.close;
 	}
 	
-	public void setup(SelectableChannel channel,boolean isServer){
-		if(channel==null){
+	public void setup(SelectableChannel channel){
+		this.isAsyncClose=false;
+		totalWriteLength=currentBufferLength=0L;
+		if(channel==null){//in case SPDY
 			close();
 			return;
 		}
-		totalWriteLength=currentBufferLength=0L;
 		this.channel=channel;
 		this.stastics=context.getChannelStastics();
 		this.selectOperator=context.getSelectOperator();
 		this.orderOperator=context.getOrderOperator();
-		if(isServer){
-			state=State.accepting;
-			store=null;
-		}else{
-			state=State.writable;
+		if(channel instanceof SocketChannel){
+			SocketChannel socketChannel=(SocketChannel)channel;
+			if(socketChannel.isConnected()){
+				state=State.writable;
+			}else{
+				state=State.prepare;
+			}
 			store=Store.open(false);//storeはここでしか設定しない
 			store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
 			context.ref();//storeが生きている間contextを確保する
 			store.asyncBuffer(this, store);
+		}else{
+			state=State.prepare;
+			store=null;
 		}
 	}
 	
@@ -80,10 +122,9 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 				workBuffer.add(buffer);
 			}
 			if(currentBufferLength==0){
-				if(state==State.writable){
-					state=State.writing;
+				if(isIo()==false){
+					IOManager.enqueue(this);
 				}
-				IOManager.enqueue(this);
 			}
 			currentBufferLength+=length;
 			if(currentBufferLength<bufferMinLimit){
@@ -148,17 +189,14 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		if(currentBufferLength<bufferMinLimit){
 			store.asyncBuffer(this, store);
 		}
+		if(isClose()){
+			return false;
+		}
 		if(currentBufferLength==0){
-			if(state==State.writing){
-				state=State.writable;
-			}
+			state=State.writable;
 			return false;
 		}else if(prepareBuffersLength!=writeLength){
-			if(state==State.writing){
-				state=State.block;
-			}else if(state==State.closing){
-				state=State.closingBlock;
-			}
+			state=State.block;
 			return false;
 		}
 		return true;
@@ -177,11 +215,11 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 				totalWriteLength+=writeLength;
 				orderOperator.doneWrite(totalWriteLength);
 			}
-			if((state==State.closing)&&store.getPutBufferLength()==totalWriteLength){
+			if(isAsyncClose&&(store.getPutBufferLength()==totalWriteLength)){
 				context.shutdownOutputSocket();
 				isHalfClose=true;
 			}
-			if(state==State.acceptClosing||state==State.close){
+			if(isAsyncClose||state==State.close){
 				context.closeSocket();
 				isAllClose=true;
 			}
@@ -221,21 +259,6 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	}
 
 	boolean asyncWrite(ByteBuffer[] buffers){
-		switch(state){
-		case block:
-		case writable:
-		case writing:
-			break;
-		case closing:
-		case closingBlock:
-		case close:
-		case init:
-		case accepting:
-		case acceptClosing:
-			logger.error("asyncWrite but state:"+state);
-			PoolManager.poolBufferInstance(buffers);
-			return false;
-		}
 		store.putBuffer(buffers);
 		return true;
 	}
@@ -263,45 +286,33 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	}
 	
 	boolean asyncClose(){
-		switch(state){
-		case block:
-		case writable:
+		if(isAsyncClose){
+			return true;
+		}
+		boolean isIoBefore=isIo();
+		isAsyncClose=true;
+		boolean isIoAfter=isIo();
+		if(!isIoBefore&&isIoAfter){
 			IOManager.enqueue(this);
-		case writing:
-			state=State.closing;
-			break;
-		case accepting:
-			IOManager.enqueue(this);
-			state=State.acceptClosing;
-			break;
-		case init:
-		case close:
-		case closingBlock:
-		case closing:
-		case acceptClosing:
-			logger.debug("fail to asyncClose.cid:"+context.getPoolId()+":"+state);
-			return false;
 		}
 		return true;
 	}
 	
 	void writable(){
 		logger.debug("writable.cid:"+context.getPoolId());
-		if(state==State.block){
-			state=State.writable;
+		if(isClose()){
+			return;
 		}
-		if(state==State.writable&&currentBufferLength!=0){
-			state=State.writing;
-			IOManager.enqueue(this);
-		}
-		if(state==State.closingBlock){
-			state=State.closing;
+		boolean isIoBefore=isIo();
+		state=State.writable;
+		boolean isIoAfter=isIo();
+		if(!isIoBefore&&isIoAfter){
 			IOManager.enqueue(this);
 		}
 	}
 	
 	boolean isBlock(){
-		return (state==State.block||state==State.closingBlock);
+		return (state==State.block);
 	}
 	boolean isClose(){
 		return (state==State.close);

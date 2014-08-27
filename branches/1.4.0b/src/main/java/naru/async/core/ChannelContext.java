@@ -156,8 +156,8 @@ public class ChannelContext extends PoolBase{
 		context.channel=channel;
 		context.selector=IOManager.getSelectorContext(context);
 		context.orderOperator.setup();
-		context.writeOperator.setup(channel,isServer);
-		context.selectOperator.setup(channel,isServer);
+		context.writeOperator.setup(channel);
+		context.selectOperator.setup(channel);
 		return context;
 	}
 	
@@ -535,8 +535,8 @@ public class ChannelContext extends PoolBase{
 		context.remotePort=orgContext.remotePort;
 		context.localIp=orgContext.localIp;
 		context.localPort=orgContext.localPort;
-		context.selectOperator.setup(null,false);
-		context.writeOperator.setup(null,false);
+		context.selectOperator.setup(null);
+		context.writeOperator.setup(null);
 		context.orderOperator.setup();
 		return context;
 	}

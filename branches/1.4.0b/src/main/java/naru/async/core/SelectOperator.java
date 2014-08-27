@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SelectableChannel;
+import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 
@@ -34,7 +35,6 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 	private Store store;
 	private ArrayList<ByteBuffer> workBuffer=new ArrayList<ByteBuffer>();
 	private long currentBufferLength;
-	private long totalReadLength;
 	private long totalCallbackLength;
 	
 	private ChannelContext context;
@@ -54,18 +54,18 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		state=State.close;
 	}
 
-	public void setup(SelectableChannel channel,boolean isServer){
-		if(channel==null){
+	public void setup(SelectableChannel channel){
+		if(channel==null){//in case SPDY
 			close();
 			return;
 		}
 		state=State.init;
-		totalCallbackLength=totalReadLength=currentBufferLength=0L;
+		totalCallbackLength=currentBufferLength=0L;
 		this.channel=channel;
 		this.stastics=context.getChannelStastics();
 		this.writeOperator=context.getWriteOperator();
 		this.orderOperator=context.getOrderOperator();
-		if(isServer){
+		if(channel instanceof ServerSocketChannel){
 			store=null;
 		}else{
 			store=Store.open(false);//store‚Í‚±‚±‚Å‚µ‚©Ý’è‚µ‚È‚¢
@@ -141,7 +141,6 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 			logger.debug("##executeRead length:"+length +":cid:"+context.getPoolId());
 			if(length>0){
 				buffer.flip();
-				totalReadLength+=length;
 			}else if(length==0){
 				PoolManager.poolBufferInstance(buffer);
 			}else{
@@ -161,7 +160,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 				closed();
 				return false;
 			}else if(isEos){
-				if(orderOperator.isReadOrder()&&totalCallbackLength!=totalReadLength){
+				if(orderOperator.isReadOrder()&&totalCallbackLength!=store.getPutBufferLength()){
 					state=State.closeSuspend;
 				}else{
 					//orderOperator.doneClose(false);
@@ -177,7 +176,10 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 	}
 	
 	public long getTotalReadLength() {
-		return totalReadLength;
+		if(store==null){
+			return 0;
+		}
+		return store.getPutBufferLength();
 	}
 
 	private void finishConnect(){
