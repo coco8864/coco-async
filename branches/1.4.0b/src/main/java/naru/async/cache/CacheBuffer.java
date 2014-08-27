@@ -168,7 +168,7 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 		try{
 			switch(type){
 			case TYPE_ONBUFFER:
-				if(bufferGetter.onBuffer(userContext, buffer)){
+				if(bufferGetter.onBuffer(buffer, userContext)){
 					/* この先でTimer処理になる、推奨しない */
 					asyncBuffer(bufferGetter,position,userContext);
 				}
@@ -177,7 +177,7 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 				bufferGetter.onBufferEnd(userContext);
 				break;
 			case TYPE_ONBUFFER_FAILURE:
-				bufferGetter.onBufferFailure(userContext, failure);
+				bufferGetter.onBufferFailure(failure, userContext);
 				break;
 			}
 		}finally{
@@ -260,7 +260,7 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 		synchronized(this){
 			if(inAsyncRead){//このまま呼ぶと無限ループに落ちる
 				//onBufferが到着しないのにasyncBufferを呼び出した等
-				((BufferGetter)params[0]).onBufferFailure(params[2], new IllegalStateException("AsyncFile secuence"));
+				((BufferGetter)params[0]).onBufferFailure(new IllegalStateException("AsyncFile secuence"), params[2]);
 				return;
 			}
 		}

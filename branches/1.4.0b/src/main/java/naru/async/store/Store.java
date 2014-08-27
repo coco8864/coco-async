@@ -467,7 +467,7 @@ public class Store extends PoolBase {
 	 */
 	
 	private static class DmmyGetter implements BufferGetter{
-		public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
+		public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
 			logger.debug("DmmyGetter onBuffer");
 			return true;
 		}
@@ -477,7 +477,7 @@ public class Store extends PoolBase {
 				userContext.notify();
 			}
 		}
-		public void onBufferFailure(Object userContext, Throwable failure) {
+		public void onBufferFailure(Throwable failure, Object userContext) {
 			logger.debug("DmmyGetter onBufferFailure.",failure);
 			synchronized(userContext){
 				userContext.notify();
@@ -773,18 +773,16 @@ public class Store extends PoolBase {
 		StoreCallback storeCallback=null;
 		synchronized(callbackQueue){
 			if(isCallbackProcessing || callbackQueue.size()<=0){
-				logger.debug("callback1 sid:"+getPoolId());
+				logger.debug("callback loopout sid:"+getPoolId());
 				return;
 			}
 			isCallbackProcessing=true;
 			storeCallback=callbackQueue.removeFirst();
 		}
 		while(true){
-			logger.debug("callback2 sid:"+getPoolId());
 			storeCallback.callback();
-			logger.debug("callback3 sid:"+getPoolId());
 			boolean rc=storeCallback.unref(true);
-			logger.debug("callback4 sid:"+getPoolId()+":"+rc);
+			logger.debug("callback sid:"+getPoolId()+":"+rc);
 			synchronized(callbackQueue){
 				if(callbackQueue.size()<=0){
 					isCallbackProcessing=false;
@@ -792,7 +790,6 @@ public class Store extends PoolBase {
 				}
 				storeCallback=callbackQueue.remove(0);
 			}
-			logger.debug("next callback."+storeCallback);
 		}
 	}
 	

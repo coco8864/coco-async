@@ -167,35 +167,42 @@ public class SelectorHandler implements Runnable {
 		return false;
 	}
 	
+	private long checkOutContext(Set<SelectionKey> selectedKeys,SelectionKey key,ChannelContext context,long timeoutTime,Set<ChannelContext> selectOut){
+		if(!key.isValid()||!context.isSelectionKey()){
+			context.ref();
+			selectOut.add(context);
+		}else if(selectedKeys.contains(key)){
+			logger.debug("checkAll selectedKeys cid:"+context.getPoolId());
+			if(dispatch(key, context)){
+				//dispatchに成功したなら、selectを続ける必要なし
+				context.ref();
+				selectOut.add(context);
+			}
+		}else if(context.select()){
+			logger.debug("checkAll context.select() cid:"+context.getPoolId());
+			long time=context.getNextSelectWakeUp();
+			if(time<timeoutTime){
+				timeoutTime=time;
+			}
+			logger.debug("after select getNextSelectWakeUp.cid:"+context.getPoolId()+":"+(timeoutTime-System.currentTimeMillis()));
+		}else{//参加させられなかった。
+			logger.debug("checkAll fail to add.cid:"+context.getPoolId());
+			context.ref();
+			selectOut.add(context);
+		}
+		return timeoutTime;
+	}
+	
 	private long checkOut(long timeoutTime,Set<ChannelContext> selectOut){
 		Set<SelectionKey> keys=selector.keys();
 		Iterator<SelectionKey> itr=keys.iterator();
 		Set<SelectionKey> selectedKeys=selector.selectedKeys();
 		while(itr.hasNext()){
 			SelectionKey key=itr.next();
-			if(key.isValid()==false){
-				continue;
-			}
 			ChannelContext context=(ChannelContext)key.attachment();
 			logger.debug("checkAll cid:"+context.getPoolId());
-			if(selectedKeys.contains(key)){
-				logger.debug("checkAll selectedKeys cid:"+context.getPoolId());
-				if(dispatch(key, context)){
-					//dispatchに成功したなら、selectを続ける必要なし
-					context.ref();
-					selectOut.add(context);
-				}
-			}else if(context.select()){
-				logger.debug("checkAll context.select() cid:"+context.getPoolId());
-				long time=context.getNextSelectWakeUp();
-				if(time<timeoutTime){
-					timeoutTime=time;
-				}
-				logger.debug("after select getNextSelectWakeUp.cid:"+context.getPoolId()+":"+(timeoutTime-System.currentTimeMillis()));
-			}else{//参加させられなかった。
-				logger.debug("checkAll fail to add.cid:"+context.getPoolId());
-				context.ref();
-				selectOut.add(context);
+			synchronized(context){
+				timeoutTime=checkOutContext(selectedKeys,key,context, timeoutTime, selectOut);
 			}
 		}
 		return timeoutTime;

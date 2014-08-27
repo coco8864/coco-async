@@ -14,6 +14,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -48,6 +49,34 @@ public class ChannelContext extends PoolBase{
 		ChannelContexts.remove(this);
 	}
 	
+	public void recycle() {
+		Iterator itr=attribute.values().iterator();
+		while(itr.hasNext()){
+			Object value=itr.next();
+			if(value instanceof PoolBase){
+				PoolBase poolBase=(PoolBase)value;
+				poolBase.unref();
+			}
+		}
+		attribute.clear();
+		if(socket!=null){
+			try {
+				socket.close();
+			} catch (IOException ignore) {
+			}
+			socket=null;
+		}
+		if(serverSocket!=null){
+			try {
+				serverSocket.close();
+			} catch (IOException ignore) {
+			}
+			serverSocket=null;
+		}
+		setHandler(null);
+		stastics.recycle();
+	}
+	
 	private ChannelStastics stastics=new ChannelStastics();
 	private SelectOperator selectOperator=new SelectOperator(this);
 	private WriteOperator writeOperator=new WriteOperator(this);
@@ -74,6 +103,11 @@ public class ChannelContext extends PoolBase{
 	private ServerSocket serverSocket;
 	
 	void closeSocket(){
+		logger.debug("closeSocket cid:"+getPoolId());
+		if(selectionKey!=null){
+			selectionKey.cancel();
+			selectionKey=null;
+		}
 		try {
 			if(socket!=null){
 				socket.close();
@@ -85,6 +119,7 @@ public class ChannelContext extends PoolBase{
 	}
 	
 	void shutdownOutputSocket(){
+		logger.debug("shutdownOutputSocket cid:"+getPoolId());
 		try {
 			if(socket!=null){
 				socket.shutdownOutput();
@@ -237,6 +272,10 @@ public class ChannelContext extends PoolBase{
 		return ops;
 	}
 	
+	boolean isSelectionKey(){
+		return (selectionKey!=null);
+	}
+	
 	void cancelSelect(){
 		if(selectionKey==null){
 			return;
@@ -250,7 +289,7 @@ public class ChannelContext extends PoolBase{
 		selectOperator.queueIo(State.closing);
 	}
 	
-	synchronized boolean select(){
+	boolean select(){
 		long now=System.currentTimeMillis();
 		nextSelectWakeUp=Long.MAX_VALUE;
 		int ops=0;

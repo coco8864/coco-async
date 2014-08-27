@@ -87,7 +87,7 @@ public class StoreCallback extends PoolBase{
 			case BUFFER:
 				isEnd=false;
 				store.countCallbackBuffer(BuffersUtil.remaining(callbackBuffer));
-				onBufferReturn=callbackBufferGetter.onBuffer(callbackUserContext, callbackBuffer);
+				onBufferReturn=callbackBufferGetter.onBuffer(callbackBuffer, callbackUserContext);
 				callbackBuffer=null;
 				break;
 			case END:
@@ -96,7 +96,7 @@ public class StoreCallback extends PoolBase{
 				break;
 			case FAILURE:
 				store.countCallbackFailure();
-				callbackBufferGetter.onBufferFailure(callbackUserContext, callbackFailure);
+				callbackBufferGetter.onBufferFailure(callbackFailure, callbackUserContext);
 				break;
 			}
 		}catch(Throwable t){

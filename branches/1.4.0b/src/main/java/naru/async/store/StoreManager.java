@@ -182,7 +182,7 @@ public class StoreManager {
 			return true;
 		}
 		
-		public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
+		public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
 			Store store=(Store)userContext;
 			MessageDigest messageDigest=store.getMessageDigest();//messageDigestÇÃèÄîı
 			for(ByteBuffer buffer:buffers){
@@ -206,7 +206,7 @@ public class StoreManager {
 			}
 			endCheck(result);
 		}
-		public void onBufferFailure(Object userContext, Throwable failure) {
+		public void onBufferFailure(Throwable failure, Object userContext) {
 			Store store=(Store)userContext;
 			if(isRecover){
 				removeStore(store.getStoreId());

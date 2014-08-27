@@ -262,7 +262,7 @@ public class StoreGetTest extends TestBase implements BufferGetter{
 		System.out.println("end :time:"+(System.currentTimeMillis()-start));
 	}
 	
-	public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
+	public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
 		BufferGenerator checker=(BufferGenerator)userContext;
 		checker.put(buffers);
 		return true;
@@ -272,7 +272,7 @@ public class StoreGetTest extends TestBase implements BufferGetter{
 		BufferGenerator checker=(BufferGenerator)userContext;
 		checker.end();
 	}
-	public void onBufferFailure(Object userContext, Throwable failure) {
+	public void onBufferFailure(Throwable failure, Object userContext) {
 		System.out.println("onBufferFailure");
 		failure.printStackTrace();
 		BufferGenerator checker=(BufferGenerator)userContext;

@@ -70,7 +70,7 @@ public class GetTester implements BufferGetter{
 		}
 	}
 	
-	public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
+	public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
 		Store store=(Store)userContext;
 		getSize+=BuffersUtil.remaining(buffers);
 		getTester.putBuffer(buffers);
@@ -92,7 +92,7 @@ public class GetTester implements BufferGetter{
 		}
 	}
 
-	public void onBufferFailure(Object userContext, Throwable falure) {
+	public void onBufferFailure(Throwable falure, Object userContext) {
 		error=new Throwable("onBufferFailure",falure);
 	}
 }

@@ -30,7 +30,7 @@ public class FileTest extends TestBase {
 	}
 	
 	private static class Getter implements BufferGetter{
-		public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
+		public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
 			ByteBuffer b=buffers[0];
 			System.out.println("onBuffer.length:"+BuffersUtil.remaining(buffers));
 			System.out.println("hashCode:"+System.identityHashCode(b)+":array:"+b.array());
@@ -41,7 +41,7 @@ public class FileTest extends TestBase {
 			System.out.println("onBufferEnd");
 			((Cache)userContext).close();
 		}
-		public void onBufferFailure(Object userContext, Throwable failure) {
+		public void onBufferFailure(Throwable failure, Object userContext) {
 			System.out.println("onBufferFailure");
 			((Cache)userContext).close();
 		}

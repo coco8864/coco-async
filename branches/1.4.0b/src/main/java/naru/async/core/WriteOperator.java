@@ -21,6 +21,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	public enum State {
 		init,
 		block,
+		closingBlock,
 		writable,
 		writing,
 		accepting,
@@ -71,18 +72,20 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		}
 	}
 	
-	public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
+	public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
 		logger.debug("onBuffer.cid:"+context.getPoolId()+":state:"+state);
 		long length=BuffersUtil.remaining(buffers);
 		synchronized(context){
-			currentBufferLength+=length;
 			for(ByteBuffer buffer:buffers){
 				workBuffer.add(buffer);
 			}
-			if(state==State.writable){
-				state=State.writing;
+			if(currentBufferLength==0){
+				if(state==State.writable){
+					state=State.writing;
+				}
 				IOManager.enqueue(this);
 			}
+			currentBufferLength+=length;
 			if(currentBufferLength<bufferMinLimit){
 				store.asyncBuffer(this, store);
 			}
@@ -95,54 +98,43 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		logger.debug("onBufferEnd.cid:"+context.getPoolId());
 		PoolManager.poolBufferInstance(workBuffer);
 		workBuffer.clear();
+		currentBufferLength=0;
 		store.unref();
 		store=null;
 		context.unref();
 	}
 
-	public void onBufferFailure(Object userContext, Throwable failure) {
+	public void onBufferFailure(Throwable failure, Object userContext) {
 		logger.debug("onBufferFailure",failure);
 		onBufferEnd(userContext);
 	}
 	
 	private long executeWrite(ByteBuffer[] prepareBuffers) throws IOException {
-		Throwable failure=null;
 		GatheringByteChannel channel=(GatheringByteChannel)this.channel;
 		long length=channel.write(prepareBuffers);
 		logger.debug("##executeWrite length:"+length +":cid:"+context.getPoolId());
-		//length‚ª0‚ÌŽ–‚ª‚ ‚é‚ç‚µ‚¢,buffers‚Ì’·‚³‚ª0‚Éˆá‚¢‚È‚¢,bufferÄ—˜—p‚Ì–â‘è‚©H
 		if(logger.isDebugEnabled()){
 			logger.debug("executeWrite."+length +":cid:"+context.getPoolId()+":channel:"+channel);
 		}
 		return length;
 	}
 	
-	private boolean afterWrite(long prepareBuffersLength,long writeLength,Throwable failure,boolean isClosing,boolean isAcceptClosing){
+	private boolean afterWrite(long prepareBuffersLength,long writeLength,Throwable failure,boolean isHalfClose,boolean isAllClose){
 		if(failure!=null){
 			orderOperator.failure(failure);
 			closed();
 			return false;
 		}
-		if(writeLength>0){
-			currentBufferLength-=writeLength;
-			totalWriteLength+=writeLength;
-			orderOperator.doneWrite(totalWriteLength);
-		}
-		if(isClosing){
+		if(isHalfClose){
 			orderOperator.doneClose(true);
 			closed();
 			return false;
 		}
-		if(isAcceptClosing){
+		if(isAllClose){
 			selectOperator.close();
 			orderOperator.doneClose(false);
 			closed();
 			return false;
-		}
-		if(prepareBuffersLength==writeLength){
-			state=State.writable;
-		}else{
-			state=State.block;
 		}
 		Iterator<ByteBuffer> itr=workBuffer.iterator();
 		while(itr.hasNext()){
@@ -156,48 +148,72 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		if(currentBufferLength<bufferMinLimit){
 			store.asyncBuffer(this, store);
 		}
+		if(currentBufferLength==0){
+			if(state==State.writing){
+				state=State.writable;
+			}
+			return false;
+		}else if(prepareBuffersLength!=writeLength){
+			if(state==State.writing){
+				state=State.block;
+			}else if(state==State.closing){
+				state=State.closingBlock;
+			}
+			return false;
+		}
 		return true;
 	}
 
 	public long getTotalWriteLength() {
 		return totalWriteLength;
 	}
-
-	public void doIo() {
-		logger.debug("doIo.cid:"+context.getPoolId()+":state:"+state);
-		ByteBuffer[] prepareBuffers=null;
+	
+	private boolean completeIo(long prepareBuffersLength,long writeLength,Throwable failure){
+		boolean isHalfClose=false;
+		boolean isAllClose=false;
 		synchronized(context){
-			prepareBuffers=BuffersUtil.toByteBufferArray(workBuffer);
-		}
-		
-		long prepareBuffersLength=BuffersUtil.remaining(prepareBuffers);
-		long writeLength=0;
-		Throwable failure=null;
-		if(prepareBuffersLength>0){
-			try {
-				writeLength=executeWrite(prepareBuffers);
-			} catch (IOException e) {
-				logger.warn("fail to write.channel:"+channel+":cid:"+context.getPoolId(),e);
-				failure=e;
-				context.closeSocket();
+			if(writeLength>0){
+				currentBufferLength-=writeLength;
+				totalWriteLength+=writeLength;
+				orderOperator.doneWrite(totalWriteLength);
 			}
-		}else{
-			logger.debug("doIo prepareBuffersLength==0.cid:"+context.getPoolId());
-		}
-		PoolManager.poolArrayInstance(prepareBuffers);
-		
-		boolean isClosing=false;
-		boolean isAcceptClosing=false;
-		synchronized(context){
-			isClosing=(state==State.closing);
-			isAcceptClosing=(state==State.acceptClosing);
-			if(isClosing){
+			if((state==State.closing)&&store.getPutBufferLength()==totalWriteLength){
 				context.shutdownOutputSocket();
+				isHalfClose=true;
 			}
-			if(isAcceptClosing){
+			if(state==State.acceptClosing||state==State.close){
 				context.closeSocket();
+				isAllClose=true;
 			}
-			afterWrite(prepareBuffersLength, writeLength, failure, isClosing,isAcceptClosing);
+			return afterWrite(prepareBuffersLength, writeLength, failure, isHalfClose,isAllClose);
+		}
+	}
+	
+	public void doIo() {
+		logger.debug("doIo.cid:"+context.getPoolId()+":state:"+state+":currentBufferLength:"+currentBufferLength);
+		while(true){
+			ByteBuffer[] prepareBuffers=null;
+			synchronized(context){
+				prepareBuffers=BuffersUtil.toByteBufferArray(workBuffer);
+			}
+			long prepareBuffersLength=BuffersUtil.remaining(prepareBuffers);
+			long writeLength=0;
+			Throwable failure=null;
+			if(prepareBuffersLength>0){
+				try {
+					writeLength=executeWrite(prepareBuffers);
+				} catch (IOException e) {
+					logger.warn("fail to write.channel:"+channel+":cid:"+context.getPoolId(),e);
+					failure=e;
+					context.closeSocket();
+				}
+			}else{
+				logger.debug("doIo prepareBuffersLength==0.cid:"+context.getPoolId()+":state:"+state);
+			}
+			PoolManager.poolArrayInstance(prepareBuffers);
+			if(completeIo(prepareBuffersLength, writeLength, failure)==false){
+				break;
+			}
 		}
 	}
 	public ChannelContext getContext() {
@@ -207,13 +223,11 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	boolean asyncWrite(ByteBuffer[] buffers){
 		switch(state){
 		case block:
-			break;
 		case writable:
-//			state=State.writing;
-//			IOManager.enqueue(this);
 		case writing:
-		case closing:
 			break;
+		case closing:
+		case closingBlock:
 		case close:
 		case init:
 		case accepting:
@@ -262,6 +276,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 			break;
 		case init:
 		case close:
+		case closingBlock:
 		case closing:
 		case acceptClosing:
 			logger.debug("fail to asyncClose.cid:"+context.getPoolId()+":"+state);
@@ -272,19 +287,21 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	
 	void writable(){
 		logger.debug("writable.cid:"+context.getPoolId());
-		synchronized(context){
-			if(state==State.block){
-				state=State.writable;
-			}
-			if(state==State.writable&&currentBufferLength!=0){
-				state=State.writing;
-				IOManager.enqueue(this);
-			}
+		if(state==State.block){
+			state=State.writable;
+		}
+		if(state==State.writable&&currentBufferLength!=0){
+			state=State.writing;
+			IOManager.enqueue(this);
+		}
+		if(state==State.closingBlock){
+			state=State.closing;
+			IOManager.enqueue(this);
 		}
 	}
 	
 	boolean isBlock(){
-		return (state==State.block);
+		return (state==State.block||state==State.closingBlock);
 	}
 	boolean isClose(){
 		return (state==State.close);
