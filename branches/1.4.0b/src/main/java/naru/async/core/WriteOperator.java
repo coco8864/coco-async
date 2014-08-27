@@ -82,15 +82,11 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		this.context=context;
 	}
 
-	void close(){
-		state=State.close;
-	}
-	
 	public void setup(SelectableChannel channel){
 		this.isAsyncClose=false;
 		totalWriteLength=currentBufferLength=0L;
 		if(channel==null){//in case SPDY
-			close();
+			state=State.close;
 			return;
 		}
 		this.channel=channel;
