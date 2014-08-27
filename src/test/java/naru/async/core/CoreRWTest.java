@@ -70,8 +70,8 @@ public class CoreRWTest extends TestBase{
 		}
 		
 		@Override
-		public void onRead(Object userContext, ByteBuffer[] buffers) {
-			super.onRead(userContext,buffers);
+		public void onRead(ByteBuffer[] buffers, Object userContext) {
+			super.onRead(buffers,userContext);
 			logger.info("onRead.cid:"+getChannelId() + " length:"+tester.getLength());
 			if( !asyncRead("asyncRead:"+getChannelId()) ){//ä˘Ç…closeçœÇ›
 			}
@@ -86,7 +86,7 @@ public class CoreRWTest extends TestBase{
 			setReadTimeout(1000);
 			setWriteTimeout(1000);
 			System.out.println("onConnected.userContext:"+userContext);
-			asyncWrite("asyncWrite:"+getChannelId(),BuffersUtil.flipBuffers(tester.getBuffers()));
+			asyncWrite(BuffersUtil.flipBuffers(tester.getBuffers()),"asyncWrite:"+getChannelId());
 		}
 		@Override
 		public void onWritten(Object userContext) {
@@ -95,7 +95,7 @@ public class CoreRWTest extends TestBase{
 				asyncClose(userContext);
 				return;
 			}
-			asyncWrite("asyncWrite:"+getChannelId(),BuffersUtil.flipBuffers(tester.getBuffers()));
+			asyncWrite(BuffersUtil.flipBuffers(tester.getBuffers()),"asyncWrite:"+getChannelId());
 		}
 	}
 	
@@ -110,9 +110,9 @@ public class CoreRWTest extends TestBase{
 		CoreRWTest.coreTester=new CoreTester();
 		InetAddress inetAdder=InetAddress.getLocalHost();
 		InetSocketAddress address=new InetSocketAddress(inetAdder, 1234);
-		ChannelHandler ah=ChannelHandler.accept("ChannelHandler.accept", address, 1024, TestServerHandler.class);
+		ChannelHandler ah=ChannelHandler.accept(TestServerHandler.class, address, 1024, "ChannelHandler.accept");
 		for(int i=0;i<CHANNEL_COUNT;i++){
-			if( ChannelHandler.connect(TestClientHandler.class, i, address, 1000)==null ){
+			if( ChannelHandler.connect(TestClientHandler.class, address, 1000, i)==null ){
 				fail("ChannelHandler.connect fail");
 			}
 			Thread.sleep(10);

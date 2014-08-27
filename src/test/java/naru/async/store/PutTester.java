@@ -118,7 +118,7 @@ public class PutTester implements BufferGetter,Timer{
 	}
 
 	//asyncClose‚ğ—˜—p‚µ‚½ê‡‚Ég‚¤
-	public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
+	public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
 		return false;
 	}
 
@@ -131,7 +131,7 @@ public class PutTester implements BufferGetter,Timer{
 		}
 	}
 
-	public void onBufferFailure(Object userContext, Throwable falure) {
+	public void onBufferFailure(Throwable falure, Object userContext) {
 		error=new Throwable("onBufferFailure",falure);
 		synchronized(this){
 			isEnd=true;

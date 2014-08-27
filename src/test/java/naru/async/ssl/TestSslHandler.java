@@ -50,7 +50,7 @@ public abstract class TestSslHandler extends SslHandler {
 	}
 
 	@Override
-	public void onReadPlain(Object userContext, ByteBuffer[] buffers) {
+	public void onReadPlain(ByteBuffer[] buffers, Object userContext) {
 		logger.info("onRead:"+name);
 		readPlainCount++;
 		tester.putBuffer(buffers);
@@ -76,7 +76,7 @@ public abstract class TestSslHandler extends SslHandler {
 	}
 
 	@Override
-	public void onFailure(Object userContext,Throwable t) {
+	public void onFailure(Throwable t,Object userContext) {
 		logger.info("onFailure:"+name+":userContext:"+userContext,t);
 		failureCount++;
 		asyncClose(userContext);
@@ -86,7 +86,7 @@ public abstract class TestSslHandler extends SslHandler {
 	 * onConnectFailureは、普通のonFailureとは違ってServerにリクエストが到着していない
 	 */
 	@Override
-	public void onConnectFailure(Object userContext, Throwable t) {
+	public void onConnectFailure(Throwable t, Object userContext) {
 		logger.info("onConnectFailure:"+name+":userContext:"+userContext,t);
 		connectFailureCount++;
 		asyncClose(userContext);

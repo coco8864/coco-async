@@ -40,7 +40,7 @@ public class StoreStream extends PoolBase implements BufferGetter {
 		return failure;
 	}
 		
-	public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
+	public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
 		if(os==null){//o—Í‚©“ü—Í‚©‚ğØ‚è•ª‚¯‚é‚½‚ß‚É‚Ég—p
 			return true;
 		}
@@ -65,7 +65,7 @@ public class StoreStream extends PoolBase implements BufferGetter {
 			notify();
 		}
 	}
-	public void onBufferFailure(Object userContext, Throwable failure) {
+	public void onBufferFailure(Throwable failure, Object userContext) {
 		synchronized(this){
 			isComplete=true;
 			result=false;

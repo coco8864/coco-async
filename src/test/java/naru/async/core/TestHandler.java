@@ -22,7 +22,7 @@ public abstract class TestHandler extends ChannelHandler {
 	private int connectFailureCount;
 	
 	public void sendBuffer(){
-		asyncWrite("sendBuffer.cid:"+getChannelId(),BuffersUtil.flipBuffers(tester.getBuffers()));
+		asyncWrite(BuffersUtil.flipBuffers(tester.getBuffers()),"sendBuffer.cid:"+getChannelId());
 	}
 	
 	public void reciveBuffer(){
@@ -59,7 +59,7 @@ public abstract class TestHandler extends ChannelHandler {
 	}
 
 	@Override
-	public void onRead(Object userContext, ByteBuffer[] buffers) {
+	public void onRead(ByteBuffer[] buffers, Object userContext) {
 		logger.info("onRead:"+name);
 		readCount++;
 		tester.putBuffer(buffers);
@@ -81,33 +81,36 @@ public abstract class TestHandler extends ChannelHandler {
 	public void onTimeout(Object userContext) {
 		logger.info("onTimeout:"+name+":userContext:"+userContext);
 		timeoutCount++;
-		asyncClose("asyncClose from onTimeout:"+name);
+		boolean ret=asyncClose("asyncClose from onTimeout:"+name);
+		logger.info("asyncClose return:"+ret);
 	}
 
 	@Override
-	public void onFailure(Object userContext,Throwable t) {
+	public void onFailure(Throwable t,Object userContext) {
 		logger.info("onFailure:"+name+":userContext:"+userContext,t);
 		failureCount++;
-		asyncClose("asyncClose from onFailure:"+name);
+		boolean ret=asyncClose("asyncClose from onFailure:"+name);
+		logger.info("asyncClose return:"+ret);
 	}
 	
 	/**
 	 * onConnectFailureは、普通のonFailureとは違ってServerにリクエストが到着していない
 	 */
 	@Override
-	public void onConnectFailure(Object userContext, Throwable t) {
+	public void onConnectFailure(Throwable t, Object userContext) {
 		this.name=this.getClass().getName()+ ":cid:"+getChannelId();
 		logger.info("onConnectFailure:"+name+":userContext:"+userContext,t);
 		connectFailureCount++;
 //		coreTester.outTest(this);
-		asyncClose("asyncClose from onConnectFailure:"+name);
+		boolean ret=asyncClose("asyncClose from onConnectFailure:"+name);
+		logger.info("asyncClose return:"+ret);
 	}
 
 	@Override
 	public void onFinished() {
-		System.out.println("onFinished.cid:"+getChannelId()+":length:"+tester.getLength());
+		System.out.println("onFinished.cid:"+getChannelId());
 		if(tester!=null){
-			logger.info("onFinished:"+name +":"+tester.getSeed());
+			logger.info("onFinished:"+name +":"+tester.getSeed()+":length:"+tester.getLength());
 		}else{
 			logger.info("onFinished:"+name +":tester is null");
 		}

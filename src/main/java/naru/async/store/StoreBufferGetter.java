@@ -26,7 +26,7 @@ public class StoreBufferGetter extends PoolBase implements BufferGetter {
 		super.recycle();
 	}
 	
-	public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
+	public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
 		buffersList.add(buffers);
 		return true;
 	}
@@ -38,7 +38,7 @@ public class StoreBufferGetter extends PoolBase implements BufferGetter {
 		}
 	}
 
-	public void onBufferFailure(Object userContext, Throwable falure) {
+	public void onBufferFailure(Throwable falure, Object userContext) {
 		logger.error("StoreBufferGetter error.store:"+userContext,falure);
 		synchronized(this){
 			isEnd=true;

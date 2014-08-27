@@ -17,11 +17,11 @@ import naru.async.store.StoreCallback;
 import naru.async.store.PersistenceStore.StoreEntry;
 
 public class Store extends PoolBase {
-	public static final long FREE_ID=-1;
 	private static Logger logger=Logger.getLogger(Store.class);
-	
 	//persistenceStore群を管理する(同一stoerIdに対して複数openする場合がある)
 	private static PersistenceStore persistenceStore;
+	public static final long FREE_ID=-1;
+	
 	public static void init(PersistenceStore persistenceStore){
 		Store.persistenceStore=persistenceStore;
 	}
@@ -99,6 +99,7 @@ public class Store extends PoolBase {
 		isCloseWait=false;
 		isClosePersistance=false;
 		isPutCloseStoreId=false;
+		isCallbackProcessing=false;
 		
 		isOnAsyncBuffer=isOnAsyncBufferRequest=isOnAsyncBufferClose=false;
 		bufferGetter=null;
@@ -336,7 +337,7 @@ public class Store extends PoolBase {
 	 * GETモードを途中でcloseしたい場合に使用
 	 */
 	public synchronized void close(){
-		close(true);
+		close(false);
 	}
 
 	/**
@@ -466,7 +467,7 @@ public class Store extends PoolBase {
 	 */
 	
 	private static class DmmyGetter implements BufferGetter{
-		public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
+		public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
 			logger.debug("DmmyGetter onBuffer");
 			return true;
 		}
@@ -476,7 +477,7 @@ public class Store extends PoolBase {
 				userContext.notify();
 			}
 		}
-		public void onBufferFailure(Object userContext, Throwable failure) {
+		public void onBufferFailure(Throwable failure, Object userContext) {
 			logger.debug("DmmyGetter onBufferFailure.",failure);
 			synchronized(userContext){
 				userContext.notify();
@@ -760,7 +761,7 @@ public class Store extends PoolBase {
 	private LinkedList<StoreCallback> callbackQueue=new LinkedList<StoreCallback>();
 	private boolean isCallbackProcessing=false;
 	void callbackQueue(StoreCallback storeCallback){
-		logger.debug("callbackQueue");
+		logger.debug("callbackQueue sid:"+getPoolId());
 		synchronized(callbackQueue){
 			callbackQueue.addLast(storeCallback);
 		}
@@ -768,10 +769,11 @@ public class Store extends PoolBase {
 	}
 	
 	void callback(){
-		logger.debug("callback");
+		logger.debug("callback sid:"+getPoolId());
 		StoreCallback storeCallback=null;
 		synchronized(callbackQueue){
 			if(isCallbackProcessing || callbackQueue.size()<=0){
+				logger.debug("callback loopout sid:"+getPoolId());
 				return;
 			}
 			isCallbackProcessing=true;
@@ -779,7 +781,8 @@ public class Store extends PoolBase {
 		}
 		while(true){
 			storeCallback.callback();
-			storeCallback.unref(true);
+			boolean rc=storeCallback.unref(true);
+			logger.debug("callback sid:"+getPoolId()+":"+rc);
 			synchronized(callbackQueue){
 				if(callbackQueue.size()<=0){
 					isCallbackProcessing=false;
@@ -787,7 +790,6 @@ public class Store extends PoolBase {
 				}
 				storeCallback=callbackQueue.remove(0);
 			}
-			logger.debug("next callback."+storeCallback);
 		}
 	}
 	

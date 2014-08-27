@@ -146,7 +146,7 @@ public class Store2Test extends TestBase implements BufferGetter{
 		}
 	}
 	
-	public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
+	public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
 		onBufferSize+=BuffersUtil.remaining(buffers);
 		System.out.println("onBuffer:onBufferSize:"+onBufferSize);
 		tester.putBuffer(buffers);
@@ -162,7 +162,7 @@ public class Store2Test extends TestBase implements BufferGetter{
 			notify();
 		}
 	}
-	public void onBufferFailure(Object userContext, Throwable falure) {
+	public void onBufferFailure(Throwable falure, Object userContext) {
 		Store store=(Store)userContext;
 		store.close();
 		error=falure;

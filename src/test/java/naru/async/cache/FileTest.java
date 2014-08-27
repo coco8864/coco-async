@@ -30,7 +30,7 @@ public class FileTest extends TestBase {
 	}
 	
 	private static class Getter implements BufferGetter{
-		public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
+		public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
 			ByteBuffer b=buffers[0];
 			System.out.println("onBuffer.length:"+BuffersUtil.remaining(buffers));
 			System.out.println("hashCode:"+System.identityHashCode(b)+":array:"+b.array());
@@ -39,11 +39,11 @@ public class FileTest extends TestBase {
 		}
 		public void onBufferEnd(Object userContext) {
 			System.out.println("onBufferEnd");
-			((CacheBuffer)userContext).close();
+			((Cache)userContext).close();
 		}
-		public void onBufferFailure(Object userContext, Throwable failure) {
+		public void onBufferFailure(Throwable failure, Object userContext) {
 			System.out.println("onBufferFailure");
-			((CacheBuffer)userContext).close();
+			((Cache)userContext).close();
 		}
 	}
 	
@@ -54,8 +54,8 @@ public class FileTest extends TestBase {
 	}
 	
 	public void qtest1() throws Throwable{
-		CacheBuffer asyncFile=CacheBuffer.open(new File("pom.xml"));
-		asyncFile.asyncGet(new Getter(), asyncFile);
+		Cache asyncFile=Cache.open(new File("pom.xml"));
+		asyncFile.asyncBuffer(new Getter(), asyncFile);
 	}
 	
 	@Test
@@ -65,12 +65,12 @@ public class FileTest extends TestBase {
 	}
 	
 	public void qtest2() throws Throwable{
-		CacheBuffer asyncFile=CacheBuffer.open(new File("pom.xml"));
-		CacheBuffer asyncFile2=CacheBuffer.open(new File("pom.xml"));
-		CacheBuffer asyncFile3=CacheBuffer.open(new File("pom.xml"));
-		asyncFile.asyncGet(new Getter(), asyncFile);
-		asyncFile2.asyncGet(new Getter(), asyncFile2);
-		asyncFile3.asyncGet(new Getter(), asyncFile3);
+		Cache asyncFile=Cache.open(new File("pom.xml"));
+		Cache asyncFile2=Cache.open(new File("pom.xml"));
+		Cache asyncFile3=Cache.open(new File("pom.xml"));
+		asyncFile.asyncBuffer(new Getter(), asyncFile);
+		asyncFile2.asyncBuffer(new Getter(), asyncFile2);
+		asyncFile3.asyncBuffer(new Getter(), asyncFile3);
 		Thread.sleep(1000);
 	}
 	
@@ -80,13 +80,13 @@ public class FileTest extends TestBase {
 		callTest("qtest3",Long.MAX_VALUE);
 	}
 	public void qtest3() throws Throwable{
-		CacheBuffer asyncFile=CacheBuffer.open();
+		Cache asyncFile=Cache.open();
 		asyncFile.putBuffer(ByteBuffer.wrap("abcdefg".getBytes()));
 		asyncFile.putBuffer(ByteBuffer.wrap("ABCDEFG".getBytes()));
 		asyncFile.flip();
 		ByteBuffer b[]=asyncFile.popTopBuffer();
 		System.out.println(BuffersUtil.toStringFromBuffer(b[0], "utf-8"));
-		asyncFile.asyncGet(new Getter(), asyncFile);
+		asyncFile.asyncBuffer(new Getter(), asyncFile);
 		Thread.sleep(1000);
 	}
 	

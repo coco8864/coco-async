@@ -5,12 +5,12 @@ import java.nio.ByteBuffer;
 public interface BufferGetter {
 	/**
 	 * データ受信側
-	 * 
-	 * @param userContext
 	 * @param buffers
+	 * @param userContext
+	 * 
 	 * @return 続けて同じパラメタでasyncBufferする場合true
 	 */
-	public boolean onBuffer(Object userContext,ByteBuffer[] buffers);
+	public boolean onBuffer(ByteBuffer[] buffers,Object userContext);
 	
 	/**
 	 * 終端を通知
@@ -22,9 +22,8 @@ public interface BufferGetter {
 	/**
 	 * Storeのエラー発生を通知
 	 * 通知されたStoreは、回収対象となる。(参照数ref関数を呼び出す事で対応可)
-	 * 
-	 * @param userContext
 	 * @param failure
+	 * @param userContext
 	 */
-	public void onBufferFailure(Object userContext,Throwable failure);
+	public void onBufferFailure(Throwable failure,Object userContext);
 }

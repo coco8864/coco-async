@@ -42,7 +42,7 @@ public class ArrayPoolTest extends TestBase {
 		assertEquals(1,p.getSequence());
 		assertEquals(0,p.getPoolBackCount());
 		assertEquals(1,p.getInstanceCount());
-		assertEquals(128,p.getLimit());
+		assertEquals(16,p.getLimit());
 		assertEquals(0,p.getGcCount());
 		
 		Object o2=PoolManager.getArrayInstance(byte.class,1234);
@@ -76,7 +76,7 @@ public class ArrayPoolTest extends TestBase {
 		assertEquals(1,p.getSequence());
 		assertEquals(0,p.getPoolBackCount());
 		assertEquals(1,p.getInstanceCount());
-		assertEquals(128,p.getLimit());
+		assertEquals(16,p.getLimit());
 		assertEquals(0,p.getGcCount());
 		
 		Object o2=PoolManager.getArrayInstance(String.class,1234);
@@ -114,7 +114,7 @@ public class ArrayPoolTest extends TestBase {
 		assertEquals(1,p.getSequence());
 		assertEquals(1,p.getPoolBackCount());
 		assertEquals(1,p.getInstanceCount());
-		assertEquals(128,p.getLimit());
+		assertEquals(16,p.getLimit());
 		assertEquals(0,p.getGcCount());
 		p.info(true);
 	}
@@ -139,7 +139,7 @@ public class ArrayPoolTest extends TestBase {
 		assertEquals(limit+11,p.getSequence());
 		assertEquals(0,p.getPoolBackCount());
 		assertEquals(limit+11,p.getInstanceCount());
-		assertEquals(128,p.getLimit());
+		assertEquals(16,p.getLimit());
 		assertEquals(0,p.getGcCount());
 		
 		for(int i=0;i<limit+10;i++){
@@ -178,7 +178,7 @@ public class ArrayPoolTest extends TestBase {
 		System.gc();
 		Thread.sleep(200);
 		
-		assertEquals(128,p.getLimit());
+		assertEquals(16,p.getLimit());
 		assertEquals(0,p.getGcCount());//array‚ÍAGC’Ê’m‚³‚ê‚È‚¢
 		p.info(true);
 	}

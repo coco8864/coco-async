@@ -1,6 +1,5 @@
 package naru.async.pool;
 
-import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -34,7 +33,7 @@ public class ReferenceLife extends WeakReference {
 	protected int countOfGet=0;
 	protected int countOfPool=0;
 	protected volatile int refCounter=0;//参照数(0の状態でのみpoolInstance可能
-
+	
 	public ReferenceLife(Object referent) {
 		super(referent,PoolManager.getReferenceQueue());
 	}
@@ -57,37 +56,34 @@ public class ReferenceLife extends WeakReference {
 		return refCounter;
 	}
 	
+	private long referentId;
 	synchronized void ref(){
-		/*特定クラスのライフサイクルを見る場合
-		if(pool!=null && pool.getPoolClass()==FileSystemHandler.class){
-			logger.debug("ref instance:"+get(),new Throwable());
-		}
-		*/
 		if(refCounter==0){
-			/*以下が成立しない事は、ありえないのでチェックしない
-			if(countOfGet==countOfPool){
-				//error
-			}
-			*/
 			timeOfGet=System.currentTimeMillis();
 			if(logger.isDebugEnabled()){
 				stackOfGet=new Throwable(poolClassName);
+			}
+			Object o=get();
+			if(o instanceof PoolBase){
+				referentId=((PoolBase)o).getPoolId();
+			}else if(o!=null){
+				referentId=o.hashCode();
+			}else{
+				referentId=0;
 			}
 			threadNameOfGet=Thread.currentThread().getName();
 			countOfGet++;
 		}
 		refCounter++;
-//		if("naru.async.store2.Store".equals(poolClassName)){
-//			new Throwable("ref:"+ this + ":refCounter:"+refCounter).printStackTrace();
-//		}
+		if(pool!=null){
+			pool.lifeInfo(referentId, refCounter, true);
+		}
 	}
 	
 	synchronized boolean unref(){
-		/*特定クラスのライフサイクルを見る場合
-		if(pool!=null &&pool.getPoolClass()==FileSystemHandler.class){
-			logger.debug("unref instance:"+get(),new Throwable());
+		if(pool!=null){
+			pool.lifeInfo(referentId, refCounter, false);
 		}
-		*/
 		if(refCounter==0){
 			//2重開放
 			logger.error("unref duplicate pool poolClassName:"+poolClassName +":"+System.identityHashCode(get()));
@@ -97,9 +93,6 @@ public class ReferenceLife extends WeakReference {
 			return false;//エラーpoolに入れてはいけない
 		}
 		refCounter--;
-//		if("naru.async.store2.Store".equals(poolClassName)){
-//			new Throwable("unref:"+ this + ":refCounter:"+refCounter).printStackTrace();
-//		}
 		if(refCounter==0){
 			timeOfPool=System.currentTimeMillis();
 			if(logger.isDebugEnabled()){
@@ -107,9 +100,9 @@ public class ReferenceLife extends WeakReference {
 			}
 			threadNameOfPool=Thread.currentThread().getName();
 			countOfPool++;
-			return true;//poolに入れてよい
+			return true;//pool this
 		}
-		return false;//まだ使用中、poolに入れてはいけない
+		return false;//using not yet pool this
 	}
 	
 	public void info(){

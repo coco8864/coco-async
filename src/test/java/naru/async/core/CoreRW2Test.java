@@ -10,8 +10,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.sound.midi.Receiver;
-
 import naru.async.ChannelHandler;
 import naru.async.pool.BuffersUtil;
 import naru.queuelet.test.TestBase;
@@ -83,8 +81,8 @@ public class CoreRW2Test extends TestBase{
 		}
 		
 		@Override
-		public void onRead(Object userContext, ByteBuffer[] buffers) {
-			super.onRead(userContext,buffers);
+		public void onRead(ByteBuffer[] buffers, Object userContext) {
+			super.onRead(buffers,userContext);
 			logger.info("onRead.cid:"+getChannelId() + " length:"+tester.getLength());
 			reciveBuffer();
 		}
@@ -128,9 +126,9 @@ public class CoreRW2Test extends TestBase{
 		CoreRW2Test.coreTester=new CoreTester();
 		InetAddress inetAdder=InetAddress.getLocalHost();
 		InetSocketAddress address=new InetSocketAddress(inetAdder, 1234);
-		ChannelHandler ah=ChannelHandler.accept("ChannelHandler.accept", address, 1024, TestServerHandler.class);
+		ChannelHandler ah=ChannelHandler.accept(TestServerHandler.class, address, 1024, "ChannelHandler.accept");
 		for(int i=0;i<CHANNEL_COUNT;i++){
-			if( ChannelHandler.connect(TestClientHandler.class, i, address, 1000)==null ){
+			if( ChannelHandler.connect(TestClientHandler.class, address, 1000, i)==null ){
 				fail("ChannelHandler.connect fail");
 			}
 			synchronized(lock){

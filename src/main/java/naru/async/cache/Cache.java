@@ -27,23 +27,23 @@ import naru.async.timer.TimerManager;
  * @author Owner
  *
  */
-public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
-	private static Logger logger=Logger.getLogger(CacheBuffer.class);
+public class Cache extends PoolBase implements AsyncBuffer,Timer{
+	private static Logger logger=Logger.getLogger(Cache.class);
 	private static FileCache fileCache=FileCache.getInstance();
 	private static BufferCache bufferCache=BufferCache.getInstance();
 	private static long BUF_SIZE=PoolManager.getDefaultBufferSize();
 	
 	/* write mode */
-	public static CacheBuffer open(){
-		CacheBuffer asyncFile=(CacheBuffer)PoolManager.getInstance(CacheBuffer.class);
+	public static Cache open(){
+		Cache asyncFile=(Cache)PoolManager.getInstance(Cache.class);
 		asyncFile.useCache=true;//
 		asyncFile.isReadMode=false;//
 		return asyncFile;
 	}
 	
 	/* bufferは消費される */
-	public static CacheBuffer open(ByteBuffer[] buffer){
-		CacheBuffer asyncFile=(CacheBuffer)PoolManager.getInstance(CacheBuffer.class);
+	public static Cache open(ByteBuffer[] buffer){
+		Cache asyncFile=(Cache)PoolManager.getInstance(Cache.class);
 		asyncFile.useCache=false;//
 		asyncFile.isReadMode=true;//
 		asyncFile.topBuffer=buffer;//
@@ -53,14 +53,14 @@ public class CacheBuffer extends PoolBase implements AsyncBuffer,Timer{
 	}
 
 	/* read modeでのopen */
-	public static CacheBuffer open(File file){
+	public static Cache open(File file){
 		return open(file,true);
 	}
 
 	/* read modeでのopen */
 	/* 再利用の可能性がないファイルはcacheを使わない */
-	public static CacheBuffer open(File file,boolean useCache){
-		CacheBuffer asyncFile=(CacheBuffer)PoolManager.getInstance(CacheBuffer.class);
+	public static Cache open(File file,boolean useCache){
+		Cache asyncFile=(Cache)PoolManager.getInstance(Cache.class);
 		asyncFile.init(file, useCache);
 		return asyncFile;
 	}

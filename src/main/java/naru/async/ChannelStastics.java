@@ -11,8 +11,6 @@ public class ChannelStastics {
 	private long writeLength;
 	private int asyncCloseCount;
 	private int asyncCloseFailCount;
-	private int asyncCancelCount;
-	private int asyncCancelFailCount;
 	
 	//ê≥èÌånÉÅÉ\ÉbÉhåQ
 	private int onAcceptableCount;
@@ -28,7 +26,6 @@ public class ChannelStastics {
 	private int onWriteFailureCount;
 	private int onReadFailureCount;
 	private int onCloseFailureCount;
-	private int onCancelFailureCount;
 	
 	//onTimeoutÉÅÉ\ÉbÉhåQ
 	private int onConnectTimeoutCount;
@@ -41,17 +38,16 @@ public class ChannelStastics {
 	private int onWriteClosedCount;
 	private int onReadClosedCount;
 	private int onCloseClosedCount;
-	private int onCancelClosedCount;
 	
 	private int onFinishedCount;
 	
 	public void recycle(){
 		onAcceptableCount=asyncConnectCount=asyncAcceptCount=asyncReadCount=asyncReadFailCount=asyncWriteCount
-		=asyncWriteFailCount=asyncCloseCount=asyncCloseFailCount=asyncCancelCount=asyncCancelFailCount
+		=asyncWriteFailCount=asyncCloseCount=asyncCloseFailCount
 		=onAcceptedCount=onConnectedCount=onReadCount=onWrittenCount
-		=onAcceptFailureCount=onConnectFailureCount=onWriteFailureCount=onReadFailureCount=onCloseFailureCount=onCancelFailureCount
+		=onAcceptFailureCount=onConnectFailureCount=onWriteFailureCount=onReadFailureCount=onCloseFailureCount
 		=onConnectTimeoutCount=onWriteTimeoutCount=onReadTimeoutCount
-		=onAcceptClosedCount=onConnectClosedCount=onWriteClosedCount=onReadClosedCount=onCloseClosedCount=onCancelClosedCount
+		=onAcceptClosedCount=onConnectClosedCount=onWriteClosedCount=onReadClosedCount=onCloseClosedCount
 		=onFinishedCount
 		=0;
 		asyncWriteLength=onReadLength=writeLength=0L;
@@ -66,8 +62,6 @@ public class ChannelStastics {
 		asyncWriteFailCount+=s.asyncWriteFailCount;
 		asyncCloseCount+=s.asyncCloseCount;
 		asyncCloseFailCount+=s.asyncCloseFailCount;
-		asyncCancelCount+=s.asyncCancelCount;
-		asyncCancelFailCount+=s.asyncCancelFailCount;
 		
 		onAcceptableCount+=s.onAcceptableCount;
 		onAcceptedCount+=s.onAcceptedCount;
@@ -80,7 +74,6 @@ public class ChannelStastics {
 		onWriteFailureCount+=s.onWriteFailureCount;
 		onReadFailureCount+=s.onReadFailureCount;
 		onCloseFailureCount+=s.onCloseFailureCount;
-		onCancelFailureCount+=s.onCancelFailureCount;
 		onConnectTimeoutCount+=s.onConnectTimeoutCount;
 		onWriteTimeoutCount+=s.onWriteTimeoutCount;
 		onReadTimeoutCount+=s.onReadTimeoutCount;
@@ -89,7 +82,6 @@ public class ChannelStastics {
 		onWriteClosedCount+=s.onWriteClosedCount;
 		onReadClosedCount+=s.onReadClosedCount;
 		onCloseClosedCount+=s.onCloseClosedCount;
-		onCancelClosedCount+=s.onCancelClosedCount;
 		onFinishedCount+=s.onFinishedCount;
 		
 		asyncWriteLength+=s.asyncWriteLength;
@@ -138,14 +130,6 @@ public class ChannelStastics {
 		return asyncCloseFailCount;
 	}
 
-	public int getAsyncCancelCount() {
-		return asyncCancelCount;
-	}
-
-	public int getAsyncCancelFailCount() {
-		return asyncCancelFailCount;
-	}
-
 	public int getOnAcceptedCount() {
 		return onAcceptedCount;
 	}
@@ -188,10 +172,6 @@ public class ChannelStastics {
 		return onCloseFailureCount;
 	}
 
-	public int getOnCancelFailureCount() {
-		return onCancelFailureCount;
-	}
-
 	public int getOnConnectTimeoutCount() {
 		return onConnectTimeoutCount;
 	}
@@ -222,10 +202,6 @@ public class ChannelStastics {
 
 	public int getOnCloseClosedCount() {
 		return onCloseClosedCount;
-	}
-
-	public int getOnCancelClosedCount() {
-		return onCancelClosedCount;
 	}
 
 	public int getOnFinishedCount() {
@@ -274,14 +250,6 @@ public class ChannelStastics {
 	public void asyncCloseFail() {
 		this.asyncCloseFailCount++;
 	}
-
-	public void asyncCancel() {
-		this.asyncCancelCount++;
-	}
-
-	public void asyncCancelFail() {
-		this.asyncCancelFailCount++;
-	}
 	
 	public void onAcceptable(){
 		onAcceptableCount++;
@@ -328,10 +296,6 @@ public class ChannelStastics {
 		this.onCloseFailureCount++;
 	}
 
-	public void onCancelFailure() {
-		this.onCancelFailureCount++;
-	}
-
 	public void onConnectTimeout() {
 		this.onConnectTimeoutCount++;
 	}
@@ -362,10 +326,6 @@ public class ChannelStastics {
 
 	public void onCloseClosed() {
 		this.onCloseClosedCount++;
-	}
-
-	public void onCancelClosed() {
-		this.onCancelClosedCount++;
 	}
 
 	public void onFinished() {

@@ -34,8 +34,8 @@ public class DispatchManager implements Queuelet {
 	}
 
 	public boolean service(Object req) {
-		ChannelContext channelContext=(ChannelContext)req;
-		channelContext.callback();
+		OrderOperator orderOperator=(OrderOperator)req;
+		orderOperator.callback();
 		return true;
 	}
 }

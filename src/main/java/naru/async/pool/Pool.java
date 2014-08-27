@@ -64,6 +64,8 @@ public class Pool {
 	static final int TYPE_ARRAY = 3;// 配列
 	static final int TYPE_GENERAL = 4;// 一般Class,数個のオブジェクトを使いまわすのに効率
 	private int type;
+	private Logger lifeLogger;//for debug
+	private String dispName;//identifire for debug 
 
 	// private boolean isArray;//配列か否か？
 	private int length;// 配列の場合の配列数
@@ -85,9 +87,7 @@ public class Pool {
 	private boolean isDelayRecycle = false;// 遅延recycle
 
 	public synchronized ByteArrayLife getByteArrayLife(byte[] array) {
-//		synchronized (byteArrayLifes) {
-			return byteArrayLifes.get(array);
-//		}
+		return byteArrayLifes.get(array);
 	}
 
 	/* 統計情報の返却 */
@@ -118,7 +118,6 @@ public class Pool {
 	public long getPoolCount() {
 		return poolStack.size();
 	}
-	
 
 	public long getInstanceCount() {
 		return instanceCount;
@@ -181,10 +180,15 @@ public class Pool {
 		if (this.poolClass == null) {
 			this.poolClass = poolClass;
 		}
+		Logger lifeLogger=Logger.getLogger("life."+this.poolClass.getName());
+		if(lifeLogger.isDebugEnabled()){
+			this.lifeLogger=lifeLogger;
+		}else{
+			this.lifeLogger=null;
+		}
 		this.instantiateArgs = instantiateArgs;
 		if (recycleMethodName != null) {
-			recycleMethod = this.poolClass.getMethod(recycleMethodName,
-					NO_TYPES);
+			recycleMethod = this.poolClass.getMethod(recycleMethodName,NO_TYPES);
 		}
 		// this.isArray=isArray;
 		this.type = type;
@@ -201,11 +205,24 @@ public class Pool {
 			increment = 1;
 		}
 		this.increment = increment;
-		
 		addInstance(this.initial);
-		
 		this.isDelayRecycle = isDelayRecycle;
 		this.maxUseCount=0;
+		
+		//for debug
+		StringBuilder sb = new StringBuilder(this.poolClass.getName());
+		if (this.type == TYPE_ARRAY) {
+			sb.append("[");
+			sb.append(length);
+			sb.append("]");
+		} else if (this.instantiateArgs != null) {
+			sb.append("(");
+			for (int i = 0; i < instantiateArgs.length; i++) {
+				sb.append(instantiateArgs[i]);
+			}
+			sb.append(")");
+		}
+		this.dispName=sb.toString();		
 	}
 
 	Class getPoolClass() {
@@ -236,8 +253,7 @@ public class Pool {
 		int addCount = 0;
 		for (int i = 0; i < count; i++) {
 			if (limit > 0 && poolStack.size() >= limit) {
-				logger.warn("pool is full.poolCount:" + instanceCount
-						+ ":poolClass:" + poolClass.getName());
+				logger.warn("pool is full.poolCount:" + instanceCount+ ":dispName:" + dispName);
 				return addCount;
 			}
 			Object obj = instantiate();
@@ -252,15 +268,6 @@ public class Pool {
 		gcCount++;
 		poolLifes.remove(referenceLife);
 	}
-
-	// poolは、arrayに対するpoolのはず
-	/*
-	 * byteBufferLifeは、GCされてもarrayから復活させる。GCによりpool数が減ることはない
-	public synchronized void gcLife(ByteBufferLife byteBufferLife) {
-		gcCount++;
-		// arrayLifes.remove(byteBufferLife.getArray());
-	}
-	*/
 
 	private Object instantiateArray() {
 		Object obj = null;
@@ -309,15 +316,7 @@ public class Pool {
 			synchronized (poolLifes) {
 				poolLifes.add(life);
 				break;
-				/*
-				if (poolLifesMap.get(obj) == null) {
-					poolLifesMap.put(obj, life);
-					break;
-				}
-				*/
 			}
-//			logger.warn("instantiateGeneral hash code retry.hashCode:" + obj);
-//			obj = null;
 		}
 		if (obj == null) {
 			// このオブジェクトは一旦Poolに入るが戻って来たときに管理外と判断される
@@ -385,10 +384,8 @@ public class Pool {
 		}
 		if (obj == null) {
 			if (addInstance(increment) == 0) {
-				logger.error("fail to getInstance." + "poolClass:"
-						+ poolClass.getName());
-				throw new RuntimeException("fail to getInstance."
-						+ "poolClass:" + poolClass.getName());
+				logger.error("fail to getInstance." + dispName);
+				throw new RuntimeException("fail to getInstance."+dispName);
 			}
 			return getInstance();
 		}
@@ -402,8 +399,8 @@ public class Pool {
 		switch (type) {
 		case TYPE_POOL_BASE:
 			PoolBase poolObj = (PoolBase) obj;
-			poolObj.ref();// 参照数を1にする
 			poolObj.setPoolId(sequence);
+			poolObj.ref();// 参照数を1にする
 			poolObj.activate();
 			break;
 		case TYPE_BYTE_BUFFER:
@@ -424,9 +421,6 @@ public class Pool {
 			referenceLife.ref();
 			break;
 		}
-//		if(type==TYPE_ARRAY&&poolClass==ByteBuffer.class&&length==1){
-//			logger.info("getInstance:bufsid:"+System.identityHashCode(obj));
-//		}		
 		return obj;
 	}
 
@@ -436,8 +430,7 @@ public class Pool {
 			try {
 				poolObj.inactivate();
 			} catch (Exception e) {
-				logger.error("fail to inactivate.poolClass:"
-						+ poolClass.getName(), e);
+				logger.error("fail to inactivate."+dispName, e);
 				return;
 			}
 		}
@@ -448,8 +441,7 @@ public class Pool {
 			try {
 				recycleMethod.invoke(obj, NO_ARGS);
 			} catch (Exception e) {
-				logger.error("fail to recyncle.poolClass:"
-						+ poolClass.getName(), e);
+				logger.error("fail to recyncle."+ dispName, e);
 				return;
 			}
 		}
@@ -493,14 +485,6 @@ public class Pool {
 	}
 
 	public void recycleInstance(Object obj) {
-		// if(logger.isDebugEnabled()){
-		// if(poolStack.contains(obj)){
-		// logger.error("duplicate
-		// poolInstance.obj:"+obj+":poolClass:"+poolClass.getName(),new
-		// Exception());
-		// return;
-		// }
-		// }
 		callRecycle(obj);
 		synchronized (this) {
 			poolBackCount++;
@@ -511,7 +495,6 @@ public class Pool {
 			}
 			poolStack.addFirst(obj);
 		}
-//		logger.debug("recycleInstance:" + poolClass.getName() + "#" + sequence + "#" + instanceCount);
 	}
 
 	ReferenceLife getArrayLife(Object obj){
@@ -528,19 +511,6 @@ public class Pool {
 		}
 		if (life == null || life.get() != obj) {
 			logger.warn("poolArrayGeneralInstance not in pool.obj:" + obj+":" +life+":"+length +":"+System.identityHashCode(obj),new Exception());
-			/*
-			 * poolLifesMapの排他をとらないとpoolLifesMap.getがnullを返却する事がある。
-			life = poolLifesMap.get(obj);
-			if(obj instanceof ByteBuffer[] && length==1){
-				ByteBuffer b=((ByteBuffer[])obj)[0];
-				if(b!=null){
-					logger.warn("poolArrayGeneralInstance peekBuffer ByteBuffer:"+ b);
-					b.position(0);
-					b.limit(b.capacity());
-					BuffersUtil.peekBuffer((ByteBuffer[])obj);
-				}
-			}
-			*/
 			if(obj instanceof ByteBuffer[] && length==1){
 				ByteBuffer b=((ByteBuffer[])obj)[0];
 				if(b!=null){
@@ -553,9 +523,6 @@ public class Pool {
 			return;// 管理外
 		}
 		if(life.unref()){//正常に開放できた場合poolに戻す
-//			if(type==TYPE_ARRAY&&poolClass==ByteBuffer.class&&length==1){
-//				logger.info("poolArrayGeneralInstance:bufsid:"+System.identityHashCode(obj));
-//			}
 			poolInstance(obj);
 		}
 	}
@@ -572,26 +539,32 @@ public class Pool {
 	/*　ByteBufferPoolの場合,poolに入っているのは代表だけなので放置するとGCされてしまう */
 	public void term(){
 		Iterator<ByteArrayLife> itr=byteArrayLifes.values().iterator();
-		
 	}
 
+	void lifeInfo(long referentId,long refCounter,boolean isRef){
+		if(lifeLogger==null){
+			return;
+		}
+		StringBuilder sb = new StringBuilder(dispName);
+		sb.append(":id-");
+		sb.append(referentId);
+		sb.append(":ref:");
+		if(isRef){
+			sb.append("+");
+			sb.append(refCounter);
+		}else{
+			sb.append(refCounter);
+			sb.append("-");
+		}
+		lifeLogger.debug(sb.toString(),new Throwable(dispName));
+	}
+	
 	public void info() {
 		info(false);
 	}
 
 	public void info(boolean isDitail) {
-		StringBuilder sb = new StringBuilder(poolClass.getName());
-		if (type == TYPE_ARRAY) {
-			sb.append("[");
-			sb.append(length);
-			sb.append("]");
-		} else if (instantiateArgs != null) {
-			sb.append("(");
-			for (int i = 0; i < instantiateArgs.length; i++) {
-				sb.append(instantiateArgs[i]);
-			}
-			sb.append(")");
-		}
+		StringBuilder sb = new StringBuilder(dispName);
 		sb.append(":");
 		sb.append(sequence);//通算要求数
 		sb.append(":");
@@ -606,7 +579,6 @@ public class Pool {
 		sb.append(limit);//pool limit
 		sb.append(":");
 		sb.append(gcCount);//GC数
-		// バッファサイズ、総割り当て数、総作成数、使用数
 		logger.info(sb.toString());
 		Object[] lifes = poolLifes.toArray();
 		for (int i = 0; i < lifes.length; i++) {

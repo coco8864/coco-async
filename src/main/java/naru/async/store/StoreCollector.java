@@ -41,7 +41,7 @@ public class StoreCollector extends PoolBase implements BufferGetter {
 		return buffers;
 	}
 
-	public boolean onBuffer(Object userContext, ByteBuffer[] buffers) {
+	public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
 		for(ByteBuffer buffer:buffers){
 			collectBuffers.add(buffer);
 		}
@@ -56,7 +56,7 @@ public class StoreCollector extends PoolBase implements BufferGetter {
 		}
 	}
 
-	public void onBufferFailure(Object userContext, Throwable failure) {
+	public void onBufferFailure(Throwable failure, Object userContext) {
 		logger.error("StoreCollector store read error.",failure);
 		Iterator<ByteBuffer> itr=collectBuffers.iterator();
 		while(itr.hasNext()){

@@ -95,16 +95,17 @@ public class CoreTest extends TestBase{
 	public void qtestReadTimeout() throws Throwable{
 		InetAddress inetAdder=InetAddress.getLocalHost();
 		InetSocketAddress address=new InetSocketAddress(inetAdder, 1234);
-		ChannelHandler ah=ChannelHandler.accept("ChannelHandler.accept", address, 1024, TestServerHandler.class);
+		ChannelHandler ah=ChannelHandler.accept(TestServerHandler.class, address, 1024, "ChannelHandler.accept");
 		CoreTest.coreTester=new CoreTester();
 		int i=0;
-		for(i=0;i<1000;i++){
+		for(i=0;i<10;i++){
 			Thread.sleep(50);
-			if( ChannelHandler.connect(TestClientHandler.class, i, address, 1000)==null ){
+			if( ChannelHandler.connect(TestClientHandler.class, address, 1000, i)==null ){
 				fail("ChannelHandler.connect fail");
 			}
 		}
 		coreTester.waitAndCheck(i*2);
 		ah.asyncClose("test");
+		Thread.sleep(2000);
 	}
 }

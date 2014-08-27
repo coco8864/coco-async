@@ -211,7 +211,7 @@ public class CoreSslRWConnectTest extends TestBase{
 		
 		
 		@Override
-		public void onReadPlain(Object userContext, ByteBuffer[] buffers) {
+		public void onReadPlain(ByteBuffer[] buffers, Object userContext) {
 			tester.putBuffer(buffers);
 			logger.info("onRead.cid:"+getChannelId() + " length:"+tester.getLength());
 			if( !asyncRead(userContext) ){//ä˘Ç…closeçœÇ›
@@ -219,7 +219,7 @@ public class CoreSslRWConnectTest extends TestBase{
 			}
 		}
 		@Override
-		public void onFailure(Object userContext, Throwable t) {
+		public void onFailure(Throwable t,Object userContext) {
 			System.out.println("TestServerHandler onFailure.cid:"+getChannelId());
 			t.printStackTrace();
 			logger.info("TestServerHandler onFailure.cid:"+getChannelId(),t);
@@ -261,7 +261,7 @@ public class CoreSslRWConnectTest extends TestBase{
 		
 		@Override
 		public boolean onHandshaked() {
-			asyncWrite("onHandshaked",BuffersUtil.flipBuffers(tester.getBuffers()));
+			asyncWrite(BuffersUtil.flipBuffers(tester.getBuffers()),"onHandshaked");
 			return false;
 		}
 
@@ -271,7 +271,7 @@ public class CoreSslRWConnectTest extends TestBase{
 				asyncClose(userContext);
 				return;
 			}
-			asyncWrite(userContext,BuffersUtil.flipBuffers(tester.getBuffers()));
+			asyncWrite(BuffersUtil.flipBuffers(tester.getBuffers()),userContext);
 		}
 		@Override
 		public void onFinished() {
@@ -283,7 +283,7 @@ public class CoreSslRWConnectTest extends TestBase{
 		}
 
 		@Override
-		public void onFailure(Object userContext, Throwable t) {
+		public void onFailure(Throwable t,Object userContext) {
 			System.out.println("TestClientHandler onFailure.cid:"+getChannelId());
 			t.printStackTrace();
 			logger.info("TestClientHandler onFailure.cid:"+getChannelId(),t);
@@ -302,14 +302,14 @@ public class CoreSslRWConnectTest extends TestBase{
 	public void qtest0() throws Throwable{
 		InetAddress inetAdder=InetAddress.getLocalHost();
 		InetSocketAddress address=new InetSocketAddress(inetAdder, 1234);
-		ChannelHandler ah=ChannelHandler.accept("test", address, 1024, TestServerHandler.class);
+		ChannelHandler ah=ChannelHandler.accept(TestServerHandler.class, address, 1024, "test");
 		long start=System.currentTimeMillis();
 //		int callCount=512; //NG,acceptà»ç~ë“ÇƒÇ«ïÈÇÁÇπÇ«readâ¬î\Ç…Ç»ÇÁÇ»Ç¢socketÇ™Ç†ÇÈÅB
 //		int callCount=256;
 		int callCount=32; //OK
 //		int callCount=1; //OK
 		for(int i=0;i<callCount;i++){
-			ChannelHandler.connect(TestClientHandler.class, i, address, 1000);
+			ChannelHandler.connect(TestClientHandler.class, address, 1000, i);
 //			Thread.sleep(1000);
 		}
 		synchronized(lock){

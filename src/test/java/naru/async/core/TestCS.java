@@ -17,8 +17,8 @@ public class TestCS {
 	public TestCS(int port) throws UnknownHostException {
 		InetAddress inetAdder = InetAddress.getLocalHost();
 		selfServerAddress = new InetSocketAddress(inetAdder, port);
-		acceptHandler = ChannelHandler.accept("test", selfServerAddress, 100,
-				TestServerHandler.class);
+		acceptHandler = ChannelHandler.accept(TestServerHandler.class, selfServerAddress, 100,
+				"test");
 	}
 
 	public static class TestServerHandler extends ChannelHandler {
@@ -42,7 +42,7 @@ public class TestCS {
 		}
 
 		@Override
-		public void onFailure(Object userContext, Throwable t) {
+		public void onFailure(Throwable t, Object userContext) {
 			System.out.println("TestServerHandler onFailure.cid:"
 					+ getChannelId());
 			t.printStackTrace();
@@ -91,7 +91,7 @@ public class TestCS {
 		}
 
 		@Override
-		public void onFailure(Object userContext, Throwable t) {
+		public void onFailure(Throwable t, Object userContext) {
 			System.out.println("TestClientHandler onFailure.cid:"
 					+ getChannelId());
 			t.printStackTrace();
@@ -158,7 +158,7 @@ public class TestCS {
 		int connectChannelCount = 0;
 		for (int i = 0; i < count; i++) {
 			TestClientHandler clientHandle = (TestClientHandler) ChannelHandler
-					.connect(TestClientHandler.class, "test", address, 1000);
+					.connect(TestClientHandler.class, address, 1000, "test");
 			if (clientHandle == null) {
 				System.out.println("fail connect:" + i + ":time:"+ (System.currentTimeMillis() - start));
 				disconnects();
@@ -212,7 +212,7 @@ public class TestCS {
 	public ChannelHandler syncConnect(InetSocketAddress address)
 			throws UnknownHostException {
 		TestClientHandler clientHandler = (TestClientHandler) ChannelHandler
-				.connect(TestClientHandler.class, "test", address, 1000);
+				.connect(TestClientHandler.class, address, 1000, "test");
 		if (clientHandler == null) {
 			System.out.println("fail connect1");
 			return null;

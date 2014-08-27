@@ -77,9 +77,9 @@ public class CoreCloseTest extends TestBase{
 		CoreCloseTest.coreTester=new CoreTester();
 		InetAddress inetAdder=InetAddress.getLocalHost();
 		InetSocketAddress address=new InetSocketAddress(inetAdder, 1234);
-		ChannelHandler ah=ChannelHandler.accept("ChannelHandler.accept", address, 1024, TestServerHandler.class);
+		ChannelHandler ah=ChannelHandler.accept(TestServerHandler.class, address, 1024, "ChannelHandler.accept");
 		for(int i=0;i<1;i++){
-			if( ChannelHandler.connect(TestClientHandler.class, i, address, 1000)==null ){
+			if( ChannelHandler.connect(TestClientHandler.class, address, 1000, i)==null ){
 				fail("ChannelHandler.connect fail");
 			}
 		}
@@ -101,7 +101,7 @@ public class CoreCloseTest extends TestBase{
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}//‚¿‚å‚Á‚Æ‘Ò‚Á‚Ä
-			asyncWrite("asyncWrite:"+getChannelId(),tester.getBuffers());
+			asyncWrite(tester.getBuffers(),"asyncWrite:"+getChannelId());
 		}
 	}
 	
@@ -117,9 +117,9 @@ public class CoreCloseTest extends TestBase{
 		CoreCloseTest.coreTester=new CoreTester();
 		InetAddress inetAdder=InetAddress.getLocalHost();
 		InetSocketAddress address=new InetSocketAddress(inetAdder, 1234);
-		ChannelHandler ah=ChannelHandler.accept("ChannelHandler.accept", address, 1024, TestServerHandler.class);
+		ChannelHandler ah=ChannelHandler.accept(TestServerHandler.class, address, 1024, "ChannelHandler.accept");
 		for(int i=0;i<1;i++){
-			if( ChannelHandler.connect(TestWriteClientHandler.class, i, address, 1000)==null ){
+			if( ChannelHandler.connect(TestWriteClientHandler.class, address, 1000, i)==null ){
 				fail("ChannelHandler.connect fail");
 			}
 		}
@@ -152,9 +152,9 @@ public class CoreCloseTest extends TestBase{
 		CoreCloseTest.coreTester=new CoreTester();
 		InetAddress inetAdder=InetAddress.getLocalHost();
 		InetSocketAddress address=new InetSocketAddress(inetAdder, 1234);
-		ChannelHandler ah=ChannelHandler.accept("ChannelHandler.accept", address, 1024, TestServerHandler.class);
+		ChannelHandler ah=ChannelHandler.accept(TestServerHandler.class, address, 1024, "ChannelHandler.accept");
 		for(int i=0;i<1;i++){
-			if( ChannelHandler.connect(TestNotClientHandler.class, i, address, 1000)==null ){
+			if( ChannelHandler.connect(TestNotClientHandler.class, address, 1000, i)==null ){
 				fail("ChannelHandler.connect fail");
 			}
 		}

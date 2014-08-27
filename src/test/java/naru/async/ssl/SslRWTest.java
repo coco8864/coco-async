@@ -168,8 +168,8 @@ public class SslRWTest extends TestBase{
 		}
 		
 		@Override
-		public void onReadPlain(Object userContext, ByteBuffer[] buffers) {
-			super.onReadPlain(userContext,buffers);
+		public void onReadPlain(ByteBuffer[] buffers, Object userContext) {
+			super.onReadPlain(buffers,userContext);
 			logger.info("onRead.cid:"+getChannelId());
 			if( !asyncRead(userContext) ){//ä˘Ç…closeçœÇ›
 				//asyncClose(userContext);
@@ -196,7 +196,7 @@ public class SslRWTest extends TestBase{
 		
 		@Override
 		public boolean onHandshaked() {
-			asyncWrite("onHandshaked",BuffersUtil.flipBuffers(tester.getBuffers()));
+			asyncWrite(BuffersUtil.flipBuffers(tester.getBuffers()),"onHandshaked");
 			return false;
 		}
 
@@ -207,7 +207,7 @@ public class SslRWTest extends TestBase{
 				asyncClose(userContext);
 				return;
 			}
-			asyncWrite(userContext,BuffersUtil.flipBuffers(tester.getBuffers()));
+			asyncWrite(BuffersUtil.flipBuffers(tester.getBuffers()),userContext);
 		}
 
 		@Override
@@ -226,10 +226,10 @@ public class SslRWTest extends TestBase{
 		
 		InetAddress inetAdder=InetAddress.getLocalHost();
 		InetSocketAddress address=new InetSocketAddress(inetAdder, 1234);
-		ChannelHandler ah=ChannelHandler.accept("test", address, 1024, TestServerHandler.class);
+		ChannelHandler ah=ChannelHandler.accept(TestServerHandler.class, address, 1024, "test");
 		SslRWTest.sslTester=new SslTester();
 		for(int i=0;i<CHANNEL_COUNT;i++){
-			if( ChannelHandler.connect(TestClientHandler.class, i, address, 1000)==null ){
+			if( ChannelHandler.connect(TestClientHandler.class, address, 1000, i)==null ){
 				fail("ChannelHandler.connect fail");
 			}
 		}

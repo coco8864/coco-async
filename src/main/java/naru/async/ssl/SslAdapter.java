@@ -315,7 +315,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 				networkWriteCounter++;
 				logger.debug("asyncWrite1 cid:"+handler.getChannelId() +":networkWriteCounter:"+networkWriteCounter);
 				putOnWrittenMap(networkWriteCounter, userContext);
-				return handler.asyncWrite(SSLCTX_WRITE_NETWORK, dmmyBuffers);
+				return handler.asyncWrite(dmmyBuffers, SSLCTX_WRITE_NETWORK);
 			}
 			if (logger.isDebugEnabled()) {
 				// ByteBuffer buffer=buffers[0];
@@ -337,7 +337,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 					}
 					networkWriteCounter++;
 					logger.debug("asyncWrite2 cid:"+handler.getChannelId() +":networkWriteCounter:"+networkWriteCounter);
-					if (handler.asyncWrite(SSLCTX_WRITE_NETWORK, BuffersUtil.toByteBufferArray(sslBuffer))) {
+					if (handler.asyncWrite(BuffersUtil.toByteBufferArray(sslBuffer), SSLCTX_WRITE_NETWORK)) {
 						result = true;
 					}
 					if (BuffersUtil.remaining(buffers) == 0) {
