@@ -9,19 +9,17 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
 
 import naru.async.core.ChannelContext;
 import naru.async.pool.BuffersUtil;
+import naru.async.pool.Context;
 import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
 
-public abstract class ChannelHandler extends PoolBase{
+public abstract class ChannelHandler extends Context{
 	private static Logger logger=Logger.getLogger(ChannelHandler.class);
 	public enum State {
 		init,
@@ -37,8 +35,6 @@ public abstract class ChannelHandler extends PoolBase{
 	private long totalReadLength=0;//contextが無くなった後,context情報を保持
 	private long totalWriteLength=0;//contextが無くなった後,context情報を保持
 	
-	private Map attribute=new HashMap();//handlerに付随する属性
-	
 	public static class AcceptHandler extends ChannelHandler{
 		public void onFinished() {
 			logger.debug("AcceptHandler#finished.cid:"+getChannelId());
@@ -47,7 +43,6 @@ public abstract class ChannelHandler extends PoolBase{
 	
 	public void recycle() {
 		state=State.init;
-		attribute.clear();
 		setContext(null);
 		totalReadLength=totalWriteLength=0;
 		super.recycle();
@@ -135,23 +130,8 @@ public abstract class ChannelHandler extends PoolBase{
 		context.setWriteTimeout(writeTimeout);
 	}
 	
-	/* handler単位の属性 */
-	public Object getHandlerAttribute(String name){
-		return attribute.get(name);
-	}
-	
-	public void setHandlerAttribute(String name, Object value) {
-		synchronized(attribute){
-			attribute.put(name, value);
-		}
-	}
-	
-	public Iterator getHandlerAttributeNames(){
-		return attribute.keySet().iterator();
-	}
-	
 	/* channelContext単位の属性 */
-	public Object getAttribute(String name){
+	public Object getChannelAttribute(String name){
 		if(context==null){
 			logger.error("getAttribute error.context is null.name:"+name+":" +this.getClass().getName(),new Exception());
 			return null;
@@ -159,12 +139,20 @@ public abstract class ChannelHandler extends PoolBase{
 		return context.getAttribute(name);
 	}
 	
-	public void setAttribute(String name, Object value) {
+	public void setChannelAttribute(String name, Object value) {
 		if(context==null){
 			logger.error("setAttribute error.context is null.name:"+name+":value:"+value+":" +this.getClass().getName(),new Exception());
 			return;
 		}
 		context.setAttribute(name, value);
+	}
+	
+	public void endowChannelAttribute(String name, PoolBase value) {
+		if(context==null){
+			logger.error("setAttribute error.context is null.name:"+name+":value:"+value+":" +this.getClass().getName(),new Exception());
+			return;
+		}
+		context.endowAttribute(name, value);
 	}
 	
 	public String getRemoteIp(){
@@ -202,8 +190,8 @@ public abstract class ChannelHandler extends PoolBase{
 	 * @return
 	 */
 	public ChannelHandler forwardHandler(ChannelHandler handler){
-		if(context==null){
-			logger.warn("fail to forwardHandler already closed handle.cid:"+getPoolId());
+		if(state!=State.connect){
+			logger.warn("fail to forwardHandler already closed handle.cid:"+getPoolId()+":"+state);
 			handler.unref();//forwardに失敗したため、handlerは有効にならない
 			return null;
 		}
@@ -218,7 +206,11 @@ public abstract class ChannelHandler extends PoolBase{
 	
 	public ChannelHandler forwardHandler(Class handlerClass){
 		ChannelHandler handler=allocHandler(handlerClass);
-		return forwardHandler(handler);
+		if(forwardHandler(handler)==null){
+			handler.unref();
+			handler=null;
+		}
+		return handler;
 	}
 	
 	//isBlockOutOfList　whiteListに載ってない、けどbackListに載ってなければ許可
@@ -548,6 +540,7 @@ public abstract class ChannelHandler extends PoolBase{
 		ChannelHandler child=(ChannelHandler)PoolManager.getInstance(childHandlerClass);
 		childContext.setHandler(child);
 		child.setContext(childContext);
+		child.state=State.connect;
 		return child;
 	}
 	
@@ -565,7 +558,6 @@ public abstract class ChannelHandler extends PoolBase{
 	
 	public void dump(Logger logger){
 		logger.debug("$cid:"+getChannelId() + ":poolId:"+getPoolId() +":className:" +getClass().getName());
-		logger.debug("$attribute:"+attribute);
 	}
 	
 	public String toString(){

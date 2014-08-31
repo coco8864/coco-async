@@ -48,7 +48,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	 */
 	
 	private boolean isIo(){
-		if(state==State.close){
+		if(state==State.close||state==State.prepare){
 			return false;
 		}
 		if(currentBufferLength!=0){
@@ -214,8 +214,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 			if(isAsyncClose&&(store.getPutBufferLength()==totalWriteLength)){
 				context.shutdownOutputSocket();
 				isHalfClose=true;
-			}
-			if(isAsyncClose||state==State.close){
+			}else if(!isAsyncClose&&state==State.close){
 				context.closeSocket();
 				isAllClose=true;
 			}
@@ -226,6 +225,10 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	public void doIo() {
 		logger.debug("doIo.cid:"+context.getPoolId()+":state:"+state+":currentBufferLength:"+currentBufferLength);
 		while(true){
+			if(isClose()){
+				logger.warn("doIo when close");
+				return;
+			}
 			ByteBuffer[] prepareBuffers=null;
 			synchronized(context){
 				prepareBuffers=BuffersUtil.toByteBufferArray(workBuffer);
@@ -255,6 +258,9 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	}
 
 	boolean asyncWrite(ByteBuffer[] buffers){
+		if(isClose()){
+			return false;
+		}
 		store.putBuffer(buffers);
 		return true;
 	}
@@ -283,7 +289,10 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	
 	boolean asyncClose(){
 		if(isAsyncClose){
-			return true;
+			return false;
+		}
+		if(isClose()){
+			return false;
 		}
 		boolean isIoBefore=isIo();
 		isAsyncClose=true;
