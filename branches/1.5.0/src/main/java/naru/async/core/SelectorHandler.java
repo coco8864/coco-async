@@ -143,7 +143,8 @@ public class SelectorHandler implements Runnable {
 		Object userAcceptContext=context.getAcceptUserContext();
 		acceptContext.accepted(userAcceptContext);
 		stastics.read();
-		acceptContext.getSelectOperator().queueSelect(State.selectReading);
+		//acceptContext.getSelectOperator().queueSelect(State.selectReading);
+		acceptContext.getSelectOperator().readable();
 	}
 	
 	private boolean dispatch(SelectionKey key,ChannelContext context){
