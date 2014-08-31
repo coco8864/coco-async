@@ -149,10 +149,10 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 			}
 		} catch (IOException e) {
 			PoolManager.poolBufferInstance(buffer);
-			context.closeSocket();
 			failure=e;
 			context.dump();
 			logger.warn("fail to read.cid:"+context.getPoolId() +":channel:"+ channel,failure);
+			context.closeSocket();
 		}
 		synchronized(context){
 			if(failure!=null){
@@ -163,7 +163,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 				if(orderOperator.isReadOrder()&&totalCallbackLength!=store.getPutBufferLength()){
 					state=State.closeSuspend;
 				}else{
-					//orderOperator.doneClose(false);
+					orderOperator.doneClose(false);
 					writeOperator.onReadEos();
 					closed();
 				}

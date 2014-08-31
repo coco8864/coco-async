@@ -32,7 +32,9 @@ public class IOManager implements Queuelet {
 			return;
 		}
 		if(req!=STOP_REQUEST){
-			((ChannelIO)req).getContext().ref();
+			ChannelContext ctx=((ChannelIO)req).getContext();
+			ctx.ref();
+			logger.debug("enqueue.cid:"+ctx.getPoolId()+":type:"+req);
 		}
 		queueletContext.enque(req);
 	}

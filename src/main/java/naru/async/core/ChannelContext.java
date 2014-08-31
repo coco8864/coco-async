@@ -12,10 +12,7 @@ import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,10 +23,11 @@ import naru.async.ChannelStastics;
 import naru.async.core.Order.OrderType;
 import naru.async.core.SelectOperator.State;
 import naru.async.pool.BuffersUtil;
+import naru.async.pool.Context;
 import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
 
-public class ChannelContext extends PoolBase{
+public class ChannelContext extends Context{
 	private static Logger logger=Logger.getLogger(ChannelContext.class);
 	private static HashSet<ChannelContext> ChannelContexts=new HashSet<ChannelContext>();
 	private static ChannelStastics totalChannelStastics=new  ChannelStastics();
@@ -50,15 +48,6 @@ public class ChannelContext extends PoolBase{
 	}
 	
 	public void recycle() {
-		Iterator itr=attribute.values().iterator();
-		while(itr.hasNext()){
-			Object value=itr.next();
-			if(value instanceof PoolBase){
-				PoolBase poolBase=(PoolBase)value;
-				poolBase.unref();
-			}
-		}
-		attribute.clear();
 		if(socket!=null){
 			try {
 				socket.close();
@@ -75,6 +64,7 @@ public class ChannelContext extends PoolBase{
 		}
 		setHandler(null);
 		stastics.recycle();
+		super.recycle();
 	}
 	
 	private ChannelStastics stastics=new ChannelStastics();
@@ -135,7 +125,6 @@ public class ChannelContext extends PoolBase{
 	private String localIp=null;
 	private int localPort=-1;
 	
-	private Map attribute=new HashMap();//handlerÇ…ïtêèÇ∑ÇÈëÆê´
 	private SelectorHandler selector;
 	private SelectionKey selectionKey;//IO_SELECTÇÃèÍçáóLå¯
 	private long nextSelectWakeUp;
@@ -356,16 +345,6 @@ public class ChannelContext extends PoolBase{
 			handler.ref();
 		}
 		this.handler=handler;
-	}
-	
-	public Object getAttribute(String name){
-		return attribute.get(name);
-	}
-	
-	public void setAttribute(String name, Object value) {
-		synchronized(attribute){
-			attribute.put(name, value);
-		}
 	}
 	
 	/* acceptä÷òA */
@@ -591,17 +570,4 @@ public class ChannelContext extends PoolBase{
 		orderOperator.dump(logger);
 		logger.debug("]");
 	}
-	/*
-	@Override
-	public void ref(){
-		super.ref();
-		logger.debug("#+#.cid:"+getPoolId(),new Throwable());
-	}
-	@Override
-	public boolean unref(){
-		logger.debug("#-#.cid:"+getPoolId(),new Throwable());
-		return super.unref();
-	}
-	*/
-	
 }
