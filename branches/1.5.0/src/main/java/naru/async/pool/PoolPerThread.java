@@ -36,6 +36,9 @@ public class PoolPerThread {
 	
 	private String ThreadName;
 	private int refreshCount=0;
+	private class Pool{
+		
+	}
 	
 	
 
