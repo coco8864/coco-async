@@ -31,6 +31,9 @@ public class PoolPerThread {
 		PoolPerThread pool=get();
 		int bufferSize=buffer.capacity();
 		Counter counter=pool.bufferPool.get(bufferSize);
+		if(counter==null){
+			return false;
+		}
 		counter.usedPool.add(buffer);
 		counter.poolCount++;
 	}
