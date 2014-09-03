@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import org.apache.log4j.Logger;
 
 import naru.async.BufferGetter;
+import naru.async.Log;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
 
@@ -72,16 +73,10 @@ public class StoreCallback extends PoolBase{
 	 * callbackがリカーシブルするとまずいが、callbackは直接呼び出さず、dispatcher経由なのでない
 	 * close()からの直接呼び出しはあるが...
 	 */
-//	private static ThreadLocal<Store> callbackStore=new ThreadLocal<Store>();
-//	public static boolean isCallbackProcessing(Store store){
-//		return (store==callbackStore.get());
-//	}
-	
 	public void callback(){
-//		store.beforeCallback();
+		Log.debug(logger, "callback.sid:",store.getPoolId(),":callbackType:"+callbackType);
 		boolean isEnd=true;
 		boolean onBufferReturn=false;
-//		callbackStore.set(store);
 		try{
 			switch(callbackType){
 			case BUFFER:

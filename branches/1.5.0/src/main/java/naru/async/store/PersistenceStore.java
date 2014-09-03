@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import naru.async.Log;
 import naru.queuelet.QueueletContext;
 
 import org.apache.log4j.Logger;
@@ -134,7 +135,7 @@ public class PersistenceStore implements Serializable {
 			}
 			isUpdate=false;
 		}
-		logger.debug("save() start");
+		Log.debug(logger,"save() start");
 		this.isNomalEnd=isTerm;
 		OutputStream os=null;
 		try {
@@ -146,7 +147,7 @@ public class PersistenceStore implements Serializable {
 		}catch (IOException e) {
 			logger.error("persistenceStore save eroor",e);
 		}finally{
-			logger.debug("save() end");
+			Log.debug(logger,"save() end");
 			if(os!=null){
 				try {
 					os.close();

@@ -12,6 +12,7 @@ import org.apache.log4j.Logger;
 
 import naru.async.BufferGetter;
 import naru.async.ChannelStastics;
+import naru.async.Log;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolManager;
 import naru.async.store.Store;
@@ -103,6 +104,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 			store=Store.open(false);//storeはここでしか設定しない
 			store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
 			context.ref();//storeが生きている間contextを確保する
+			Log.debug(logger,"setup.cid:",context.getPoolId(),":sid:",store.getStoreId() );
 			store.asyncBuffer(this, store);
 		}else{
 			state=State.prepare;
@@ -111,7 +113,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	}
 	
 	public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
-		logger.debug("onBuffer.cid:"+context.getPoolId()+":state:"+state);
+		Log.debug(logger,"onBuffer.cid:",context.getPoolId(),":state:",state);
 		long length=BuffersUtil.remaining(buffers);
 		synchronized(context){
 			for(ByteBuffer buffer:buffers){
@@ -132,7 +134,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	}
 
 	public void onBufferEnd(Object userContext) {
-		logger.debug("onBufferEnd.cid:"+context.getPoolId());
+		Log.debug(logger,"onBufferEnd.cid:",context.getPoolId());
 		PoolManager.poolBufferInstance(workBuffer);
 		workBuffer.clear();
 		currentBufferLength=0;
@@ -142,16 +144,16 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	}
 
 	public void onBufferFailure(Throwable failure, Object userContext) {
-		logger.debug("onBufferFailure",failure);
+		Log.debug(logger,"onBufferFailure",failure);
 		onBufferEnd(userContext);
 	}
 	
 	private long executeWrite(ByteBuffer[] prepareBuffers) throws IOException {
 		GatheringByteChannel channel=(GatheringByteChannel)this.channel;
 		long length=channel.write(prepareBuffers);
-		logger.debug("##executeWrite length:"+length +":cid:"+context.getPoolId());
+		Log.debug(logger,"##executeWrite length:",length,":cid:",context.getPoolId());
 		if(logger.isDebugEnabled()){
-			logger.debug("executeWrite."+length +":cid:"+context.getPoolId()+":channel:"+channel);
+			Log.debug(logger,"executeWrite.",length,":cid:",context.getPoolId(),":channel:",channel);
 		}
 		return length;
 	}
@@ -192,7 +194,9 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 			state=State.writable;
 			return false;
 		}else if(prepareBuffersLength!=writeLength){
+			Log.debug(logger,"write block.cid:",context.getPoolId());
 			state=State.block;
+			context.getSelector().wakeup();
 			return false;
 		}
 		return true;
@@ -205,28 +209,34 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	private boolean completeIo(long prepareBuffersLength,long writeLength,Throwable failure){
 		boolean isHalfClose=false;
 		boolean isAllClose=false;
-		synchronized(context){
-			if(writeLength>0){
-				currentBufferLength-=writeLength;
-				totalWriteLength+=writeLength;
-				orderOperator.doneWrite(totalWriteLength);
+		try{
+			synchronized(context){
+				if(writeLength>0){
+					currentBufferLength-=writeLength;
+					totalWriteLength+=writeLength;
+					orderOperator.doneWrite(totalWriteLength);
+				}
+				if(isAsyncClose&&(store.getPutBufferLength()==totalWriteLength)){
+					isHalfClose=true;
+				}else if(!isAsyncClose&&state==State.close){
+					isAllClose=true;
+				}
+				return afterWrite(prepareBuffersLength, writeLength, failure, isHalfClose,isAllClose);
 			}
-			if(isAsyncClose&&(store.getPutBufferLength()==totalWriteLength)){
+		}finally{
+			if(isHalfClose){
 				context.shutdownOutputSocket();
-				isHalfClose=true;
-			}else if(!isAsyncClose&&state==State.close){
+			}else if(isAllClose){
 				context.closeSocket();
-				isAllClose=true;
 			}
-			return afterWrite(prepareBuffersLength, writeLength, failure, isHalfClose,isAllClose);
 		}
 	}
 	
 	public void doIo() {
-		logger.debug("doIo.cid:"+context.getPoolId()+":state:"+state+":currentBufferLength:"+currentBufferLength);
+		Log.debug(logger,"doIo.cid:",context.getPoolId(),":state:",state,":currentBufferLength:",currentBufferLength);
 		while(true){
 			if(isClose()){
-				logger.warn("doIo when close");
+				logger.warn("doIo when close.cid:"+context.getPoolId());
 				return;
 			}
 			ByteBuffer[] prepareBuffers=null;
@@ -245,7 +255,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 					context.closeSocket();
 				}
 			}else{
-				logger.debug("doIo prepareBuffersLength==0.cid:"+context.getPoolId()+":state:"+state);
+				Log.debug(logger,"doIo prepareBuffersLength==0.cid:",context.getPoolId(),":state:",state);
 			}
 			PoolManager.poolArrayInstance(prepareBuffers);
 			if(completeIo(prepareBuffersLength, writeLength, failure)==false){
@@ -259,6 +269,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 
 	boolean asyncWrite(ByteBuffer[] buffers){
 		if(isClose()){
+			PoolManager.poolBufferInstance(buffers);
 			return false;
 		}
 		store.putBuffer(buffers);
@@ -267,23 +278,22 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	
 	/* statusにcloseを設定する場合に呼び出す */
 	private void closed(){
-		logger.debug("closed.cid:"+context.getPoolId());
+		Log.debug(logger,"closed.cid:",context.getPoolId());
 		synchronized(context){
 			if(isClose()){
 				return;
 			}
 			state=State.close;
 			orderOperator.checkAndCallbackFinish();
-			if(store==null){
-				return;
+			if(store!=null){
+				store.close(this,null);
 			}
-			store.close();
 		}
 	}
 	
 	/* 0長受信した場合 */
 	boolean onReadEos(){
-		logger.debug("onReadEos.cid:"+context.getPoolId()+":"+state);
+		Log.debug(logger,"onReadEos.cid:",context.getPoolId(),":",state);
 		return asyncClose();
 	}
 	
@@ -293,6 +303,13 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		}
 		if(isClose()){
 			return false;
+		}
+		if(state==State.prepare){//accept or connect
+			state=State.close;
+			if(store!=null){
+				store.close(this,null);
+			}
+			return true;
 		}
 		boolean isIoBefore=isIo();
 		isAsyncClose=true;
@@ -304,7 +321,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	}
 	
 	void writable(){
-		logger.debug("writable.cid:"+context.getPoolId());
+		Log.debug(logger,"writable.cid:",context.getPoolId());
 		if(isClose()){
 			return;
 		}

@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SelectableChannel;
-import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 
@@ -12,6 +11,7 @@ import org.apache.log4j.Logger;
 
 import naru.async.BufferGetter;
 import naru.async.ChannelStastics;
+import naru.async.Log;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolManager;
 import naru.async.store.Store;
@@ -65,13 +65,14 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		this.stastics=context.getChannelStastics();
 		this.writeOperator=context.getWriteOperator();
 		this.orderOperator=context.getOrderOperator();
-		if(channel instanceof ServerSocketChannel){
-			store=null;
-		}else{
+		if(channel instanceof SocketChannel){
 			store=Store.open(false);//storeはここでしか設定しない
 			store.ref();//store処理が終わってもこのオブジェクトが生きている間保持する
 			context.ref();//storeが生きている間contextを確保する
+			Log.debug(logger,"setup.cid:",context.getPoolId(),":sid:",store.getStoreId() );
 			store.asyncBuffer(this, store);
+		}else{
+			store=null;
 		}
 	}
 	
@@ -88,8 +89,10 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 				currentBufferLength=0;
 			}
 			if(state==State.closeSuspend){
+				orderOperator.doneClose(false);
 				writeOperator.onReadEos();
 				closed();
+				Log.debug(logger,"closeSuspend->",state,":cid:",context.getPoolId(),":totalCallbackLength:",totalCallbackLength);
 			}else if(currentBufferLength<bufferMinLimit){
 				store.asyncBuffer(this, store);
 			}
@@ -99,7 +102,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 	}
 
 	public void onBufferEnd(Object userContext) {
-		logger.debug("onBufferEnd.cid:"+context.getPoolId());
+		Log.debug(logger,"onBufferEnd.cid:",context.getPoolId());
 		PoolManager.poolBufferInstance(workBuffer);
 		workBuffer.clear();
 		currentBufferLength=0;
@@ -109,23 +112,22 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 	}
 
 	public void onBufferFailure(Throwable failure, Object userContext) {
-		logger.debug("onBufferFailure",failure);
+		Log.debug(logger,"onBufferFailure",failure);
 		onBufferEnd(userContext);
 	}
 
 	/* statusにcloseを設定する場合に呼び出す */
 	private void closed(){
-		logger.debug("closed.cid:"+context.getPoolId());
+		Log.debug(logger,"closed.cid:",context.getPoolId());
 		synchronized(context){
 			if(isClose()){
 				return;
 			}
 			state=State.close;
 			orderOperator.checkAndCallbackFinish();
-			if(store==null){
-				return;
+			if(store!=null){
+				store.close(this,null);
 			}
-			store.close();
 		}
 	}
 	
@@ -138,13 +140,15 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 			//http://docs.oracle.com/javase/jp/6/api/java/nio/channels/ReadableByteChannel.html#read(java.nio.ByteBuffer)
 			//EOS(End Of Stream)=-1 0はEOSじゃない
 			length=((ReadableByteChannel)channel).read(buffer);
-			logger.debug("##executeRead length:"+length +":cid:"+context.getPoolId());
+			Log.debug(logger,"##executeRead length:",length,":cid:",context.getPoolId());
 			if(length>0){
 				buffer.flip();
 			}else if(length==0){
 				PoolManager.poolBufferInstance(buffer);
+				buffer=null;
 			}else{
 				PoolManager.poolBufferInstance(buffer);
+				buffer=null;
 				isEos=true;
 			}
 		} catch (IOException e) {
@@ -157,10 +161,12 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		synchronized(context){
 			if(failure!=null){
 				orderOperator.failure(failure);
+				writeOperator.onReadEos();
 				closed();
 				return false;
 			}else if(isEos){
 				if(orderOperator.isReadOrder()&&totalCallbackLength!=store.getPutBufferLength()){
+					Log.debug(logger,"closeSuspend.cid:",context.getPoolId(),":totalCallbackLength:",totalCallbackLength,":store.getPutBufferLength():",store.getPutBufferLength());
 					state=State.closeSuspend;
 				}else{
 					orderOperator.doneClose(false);
@@ -168,7 +174,9 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 					closed();
 				}
 			}else{
-				store.putBuffer(BuffersUtil.toByteBufferArray(buffer));
+				if(buffer!=null){
+					store.putBuffer(BuffersUtil.toByteBufferArray(buffer));
+				}
 				queueSelect(State.selectReading);
 			}
 		}
@@ -202,11 +210,14 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 	
 	private void forceClose(){
 		context.closeSocket();
-		closed();
+		synchronized(context){
+			orderOperator.doneClose(false);
+			closed();
+		}
 	}
 	
 	public void doIo() {
-		logger.debug("doIo.cid:"+context.getPoolId()+":state:"+state);
+		Log.debug(logger,"doIo.cid:",context.getPoolId(),":state:",state);
 		boolean isConnect;
 		boolean isRead;
 		boolean isClose;
@@ -232,7 +243,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		if(this.state==State.close||this.state==State.selectReading){
 			return;
 		}
-		logger.debug("queueSelect.cid:"+context.getPoolId()+":"+this.state+">" +state);
+		Log.debug(logger,"queueSelect.cid:",context.getPoolId(),":",this.state,">",state);
 		this.state=state;
 		context.getSelector().queueSelect(context);
 	}
@@ -241,7 +252,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		if(this.state==State.close){
 			return;
 		}
-		logger.debug("queueIo.cid:"+context.getPoolId()+":"+this.state+">" +state);
+		Log.debug(logger,"queueIo.cid:",context.getPoolId(),":",this.state,">",state);
 		this.state=state;
 		IOManager.enqueue(this);
 	}
@@ -260,6 +271,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		}
 		ByteBuffer[] bufs=BuffersUtil.toByteBufferArray(workBuffer);
 		workBuffer.clear();
+		totalCallbackLength+=currentBufferLength;
 		currentBufferLength=0;
 		order.setBuffers(bufs);
 		orderOperator.queueCallback(order);
@@ -267,12 +279,12 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 	}
 	
 	void readable(){
-		logger.debug("readable.cid:"+context.getPoolId());
+		Log.debug(logger,"readable.cid:",context.getPoolId());
 		queueIo(State.reading);
 	}
 	
 	void connectable(){
-		logger.debug("connectable.cid:"+context.getPoolId());
+		Log.debug(logger,"connectable.cid:",context.getPoolId());
 		queueIo(State.connecting);
 	}
 	

@@ -9,6 +9,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 
 import org.apache.log4j.Logger;
 
+import naru.async.Log;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolManager;
 
@@ -75,7 +76,7 @@ public class StoreFile {
 	
 	public void read(ByteBuffer buffer,long offset){
 		long bufferLength=buffer.remaining();
-//		logger.debug("read:offset:"+offset +":length:"+bufferLength);
+//		Log.debug(logger,"read:offset:"+offset +":length:"+bufferLength);
 		FileChannel readChannel=null;
 		try {
 			readChannel=popReadChannel();
@@ -98,7 +99,7 @@ public class StoreFile {
 	
 	public void read(ByteBuffer[] buffer,long offset){
 		long bufferLength=BuffersUtil.remaining(buffer);
-		logger.debug("read:offset:"+offset +":length:"+bufferLength);
+		Log.debug(logger,"read:offset:",offset,":length:",bufferLength);
 		FileChannel readChannel=null;
 		try {
 			readChannel=popReadChannel();
@@ -174,7 +175,7 @@ public class StoreFile {
 	
 	public long write(ByteBuffer buffer,long offset){
 		long bufferLength=buffer.remaining();
-		logger.debug("write:offset:"+offset +":length:"+bufferLength);
+		Log.debug(logger,"write:offset:",offset,":length:",bufferLength);
 		FileChannel writeChannel=null;
 		try {
 			writeChannel=popWriteChannel();

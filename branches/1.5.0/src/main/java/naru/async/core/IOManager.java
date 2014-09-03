@@ -5,6 +5,7 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 
+import naru.async.Log;
 import naru.queuelet.Queuelet;
 import naru.queuelet.QueueletContext;
 
@@ -34,7 +35,7 @@ public class IOManager implements Queuelet {
 		if(req!=STOP_REQUEST){
 			ChannelContext ctx=((ChannelIO)req).getContext();
 			ctx.ref();
-			logger.debug("enqueue.cid:"+ctx.getPoolId()+":type:"+req);
+			Log.debug(logger,"enqueue.cid:",ctx.getPoolId(),":type:",req);
 		}
 		queueletContext.enque(req);
 	}

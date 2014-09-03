@@ -7,6 +7,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import naru.async.Log;
 import naru.async.cache.BufferCache;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
@@ -35,7 +36,7 @@ public class Page extends PoolBase{
 		for(int i=0;i<INIT_FREE_PAGE;i++){
 			Page freePage=getSafeFreePage(persistenceStore.getTopFreePageId());
 			if(freePage!=null){
-//				logger.debug("$$$1 in:"+freePage.getPageId());
+//				Log.debug(logger,"$$$1 in:"+freePage.getPageId());
 				freePages.put(freePage.getPageId(),freePage);
 				persistenceStore.setTopFreePageId(freePage.getNextPageId());
 			}else{
@@ -83,7 +84,7 @@ public class Page extends PoolBase{
 		if(pageFile==null){
 			return;
 		}
-		logger.debug("saveFreePage freePage.size:"+freePages.size());
+		Log.debug(logger,"saveFreePage freePage.size:",freePages.size());
 		int limit=128;//一回の呼び出しでfreepageする限界数
 		synchronized(pageFile){
 			Iterator<Page> itr=freePages.values().iterator();
@@ -94,7 +95,7 @@ public class Page extends PoolBase{
 				}
 				Page freePage=itr.next();
 				itr.remove();
-//				logger.debug("$$$2 out:"+freePage.pageId);
+//				Log.debug(logger,"$$$2 out:"+freePage.pageId);
 				freePage.nextPageId=persistenceStore.getTopFreePageId();
 				freePage.save();
 				persistenceStore.setTopFreePageId(freePage.getPageId());
@@ -209,7 +210,7 @@ public class Page extends PoolBase{
 	}
 	
 	public void setStore(Store store){
-//		logger.debug("setStore.store:"+store +":this.store:"+this.store);
+//		Log.debug(logger,"setStore.store:",store,":this.store:",this.store);
 		if(store!=null){
 			store.ref();
 		}
@@ -228,7 +229,7 @@ public class Page extends PoolBase{
 	 * @return
 	 */
 	public static Page loadPage(Store store,long pageId){
-//		logger.debug("loadPage.pageId:"+pageId);
+//		Log.debug(logger,"loadPage.pageId:",pageId);
 		if(pageFile==null){
 			throw new IllegalStateException("aleardy stoped StoreSystem.");
 		}
@@ -285,7 +286,7 @@ public class Page extends PoolBase{
 				Entry<Long,Page> entry=itr.next();
 				itr.remove();
 				freePage=entry.getValue();
-//				logger.debug("$$$1 out:"+freePage.pageId);
+//				Log.debug(logger,"$$$1 out:"+freePage.pageId);
 			}else if(topFreePageId!=FREE_ID){
 				freePage=getSafeFreePage(topFreePageId);
 				if(freePage!=null){
@@ -313,7 +314,7 @@ public class Page extends PoolBase{
 			prev.nextPageId=page.pageId;
 		}
 		addPlainPage(page);
-		logger.debug("allocPage.page:"+page);
+		Log.debug(logger,"allocPage.page:",page);
 //		logger.warn("allocPage.page.pageId:"+page.pageId);
 		return page;
 	}
@@ -329,7 +330,7 @@ public class Page extends PoolBase{
 	}
 	
 	public void save(){
-		logger.debug("save."+this);
+		Log.debug(logger,"save.",this);
 		ByteBuffer pageBuffer=PoolManager.getBufferInstance(PAGE_SIZE);
 		//格納構造を決定している
 		pageBuffer.putLong(filePosition);//8
@@ -353,13 +354,13 @@ public class Page extends PoolBase{
 	 * 
 	 */
 	public synchronized void free(boolean isPageFile,boolean isSaveFree){
-//		logger.debug("free."+this);
+//		Log.debug(logger,"free."+this);
 		//ファイルに実態がない場合、物理位置(pageId)を再利用する必要がある。
 		setStore(null);
 		removePlainPage(this);//plainPageに有る場合は削除
 		storeId=Store.FREE_ID;
 		if(buffer!=null){
-			logger.debug("free but remain buffer.");
+			Log.debug(logger,"free but remain buffer.");
 			PoolManager.poolBufferInstance(buffer);
 			buffer=null;
 		}
@@ -367,7 +368,7 @@ public class Page extends PoolBase{
 		if(isPageFile){
 			synchronized(pageFile){
 				//ここでPageがたまりすぎる
-//				logger.debug("$$$2 in:"+pageId);
+//				Log.debug(logger,"$$$2 in:",pageId);
 				Page prevPage=freePages.put(pageId,this);
 //				logger.warn("pageFile in.pageId:"+pageId,new Exception());
 				if(prevPage!=null){
@@ -433,7 +434,7 @@ public class Page extends PoolBase{
 	public synchronized boolean putBuffer(ByteBuffer[] buffer,boolean isExpand){
 //		logger.info("putBuffer this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
 		long length=BuffersUtil.remaining(buffer);
-		logger.debug("putBuffer."+this +":" + bufferLength +":"+length);
+		Log.debug(logger,"putBuffer.",this ,":",bufferLength,":",length);
 		if(this.buffer==null||this.buffer.length==0){
 			this.buffer=buffer;
 			this.isLastBufferWrite=false;//もらったbufferは変更してはだめ
@@ -441,7 +442,7 @@ public class Page extends PoolBase{
 			//PoolManager.checkArrayInstance(buffer);
 //			checkLastBuffer();小さなbufferは削除しようとしたが、中止
 			this.bufferLength+=length;
-			logger.debug("putBuffer org buffer null. result length"+this.bufferLength);
+			Log.debug(logger,"putBuffer org buffer null. result length",this.bufferLength);
 			return true;
 		}
 		ByteBuffer lastBuffer=getLastBuffer();
@@ -459,7 +460,7 @@ public class Page extends PoolBase{
 			lastBuffer.flip();
 			lastBuffer.position(orgPosition);
 			this.bufferLength+=length;
-			//logger.debug("putBuffer concat buffer. result length:"+this.bufferLength);
+			//Log.debug(logger,"putBuffer concat buffer. result length:"+this.bufferLength);
 			return true;
 		}
 		if(!isExpand){
@@ -550,7 +551,7 @@ public class Page extends PoolBase{
 	}
 	
 	public synchronized ByteBuffer[] getBuffer(){
-		logger.debug("getBuffer."+this +":" + bufferLength);
+		Log.debug(logger,"getBuffer.",this,":",bufferLength);
 		ByteBuffer[] buffer=this.buffer;
 		this.bufferLength=0;
 		
@@ -567,7 +568,7 @@ public class Page extends PoolBase{
 	 * @throws IOException
 	 */
 	public synchronized void fillBuffer(StoreFile bufferFile) throws IOException{
-		logger.debug("fillBuffer."+this);
+		Log.debug(logger,"fillBuffer.",this);
 		/* 実際に読む前にcacheを検索 */
 		ByteBuffer[] cacheBuffer=bufferCache.get(this);
 		if(cacheBuffer!=null){
@@ -597,7 +598,7 @@ public class Page extends PoolBase{
 	 * @throws IOException
 	 */
 	public void flushBuffer(int fileId,StoreFile bufferFile) throws IOException{
-		logger.debug("flushBuffer."+this);
+		Log.debug(logger,"flushBuffer.",this);
 		if( logger.isDebugEnabled() ){
 			long l=BuffersUtil.remaining(buffer);
 			if(l!=bufferLength){
@@ -640,20 +641,20 @@ public class Page extends PoolBase{
 //		if(pageCache.put(this, false)){
 //			return;
 //		}
-//		logger.debug("pageOut.storeId:"+storeId +":pageId:"+pageId+":digest:"+BuffersUtil.digestString(buffer));
+//		Log.debug(logger,"pageOut.storeId:"+storeId +":pageId:"+pageId+":digest:"+BuffersUtil.digestString(buffer));
 //		logger.info("pageOut this:"+System.identityHashCode(this)+":bufsid:"+System.identityHashCode(buffer));
 		StoreManager.asyncWritePage(this);
 	}
 	
 	public void pageIn(){
-		logger.debug("pageIn."+this);
+		Log.debug(logger,"pageIn.",this);
 		StoreManager.asyncReadPage(this);
 	}
 	
 //	private PageCache pageCache;
 	
 	public void onPageOut(){
-		logger.debug("onPageOut.this:"+this);
+		Log.debug(logger,"onPageOut.this:",this);
 		save();
 		removePlainPage(this);
 		if(store!=null){
@@ -662,7 +663,7 @@ public class Page extends PoolBase{
 	}
 	
 	public void onPageIn(){
-//		logger.debug("onPageIn.storeId:"+storeId +":pageId:"+pageId+":digest:"+BuffersUtil.digestString(buffer));
+//		Log.debug(logger,"onPageIn.storeId:"+storeId +":pageId:"+pageId+":digest:"+BuffersUtil.digestString(buffer));
 		if(store!=null){
 			store.onPageIn(this);
 		}else{

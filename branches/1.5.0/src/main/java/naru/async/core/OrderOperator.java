@@ -7,6 +7,7 @@ import java.util.LinkedList;
 
 import naru.async.ChannelHandler;
 import naru.async.ChannelStastics;
+import naru.async.Log;
 import naru.async.core.Order.OrderType;
 import naru.async.core.SelectOperator.State;
 import naru.async.pool.BuffersUtil;
@@ -41,6 +42,9 @@ public class OrderOperator {
 	private ChannelStastics stastics;
 	private SelectOperator selectOperator;
 	private WriteOperator writeOperator;
+	private boolean isHalfClose;
+	private boolean isAllClose;
+	
 
 	public OrderOperator(ChannelContext context){
 		this.context=context;
@@ -56,7 +60,7 @@ public class OrderOperator {
 		writeOrders.clear();
 		closeOrder=null;
 		failure=null;
-		isFinished=false;
+		isFinished=isHalfClose=isAllClose=false;
 	}
 	
 	/* callback関連 */
@@ -65,7 +69,7 @@ public class OrderOperator {
 	private boolean inCallback=false;
 	public synchronized void queueCallback(Order order){
 		callbackOrders.add(order);
-		logger.debug("queueCallback cid:"+context.getPoolId() +":size:"+callbackOrders.size()+":"+order.getOrderType());
+		Log.debug(logger,"queueCallback cid:",context.getPoolId(),":size:",callbackOrders.size(),":",order.getOrderType());
 		if(order.getOrderType()==OrderType.non){
 			logger.error("!!!",new Exception());
 		}
@@ -76,7 +80,7 @@ public class OrderOperator {
 	}
 	
 	synchronized boolean checkAndCallbackFinish(){
-		logger.debug("checkAndCallbackFinish.cid:"+context.getPoolId());
+		Log.debug(logger,"checkAndCallbackFinish.cid:",context.getPoolId());
 		if(isFinished){
 			return false;
 		}
@@ -90,13 +94,16 @@ public class OrderOperator {
 			return false;
 		}
 		isFinished=true;
-		logger.debug("checkAndCallbackFinish done.cid:"+context.getPoolId());
+		Log.debug(logger,"checkAndCallbackFinish done.cid:",context.getPoolId());
 		queueCallback(Order.create(context.getHandler(), OrderType.finish, null));
 		return true;
 	}
 	
+	boolean isFinished(){
+		return isFinished;
+	}
+	
 	private synchronized Order popOrder(){
-		logger.debug("callback cid:"+context.getPoolId() +":size:"+callbackOrders.size());
 		if(callbackOrders.size()==0){
 			inCallback=false;
 			return null;
@@ -115,6 +122,7 @@ public class OrderOperator {
 		try{
 			while(true){
 				order=popOrder();
+				Log.debug(logger,"callback cid:",context.getPoolId(),":order:",order);
 				if(order==null){
 					break;
 				}
@@ -131,15 +139,15 @@ public class OrderOperator {
 				}
 			}
 		}finally{
+			Log.debug(logger,"callback isFinishCallback=true.cid:",context.getPoolId());
 			synchronized(context){
-				checkAndCallbackFinish();
-				if(isFinishCallback==false){
-					return;
+				if(isFinishCallback){
+					finishHandler.unref();
+					context.setHandler(null);
+					context.unref();
+				}else if(orderCount()==0){
+					checkAndCallbackFinish();
 				}
-				logger.debug("callback isFinishCallback=true.cid:"+context.getPoolId());
-				finishHandler.unref();
-				context.setHandler(null);
-				context.unref();
 			}
 		}
 	}
@@ -351,16 +359,17 @@ public class OrderOperator {
 			closeOrder=null;
 		}
 		if(isAsyncClose){
+			isHalfClose=true;
 			if(selectOperator.isClose()){
 				return count;
 			}
 			/*　正常系ではしばらく待つと0長受信するはず,0長受信を一定期間待つ */
-			if(readOrder!=null){
-				readOrder.setTimeoutTime(System.currentTimeMillis()+CLOSE_INTERVAL);
-			}else{
+			if(readOrder==null){
 				readOrder=Order.create(DUMMY_HANDLER, OrderType.read, null);
 			}
+			readOrder.setTimeoutTime(System.currentTimeMillis()+CLOSE_INTERVAL);
 		}else{
+			isAllClose=true;
 			closeOrder();
 		}
 		return count;
@@ -390,10 +399,10 @@ public class OrderOperator {
 				break;
 			}
 			itr.remove();
-			logger.debug("doneWrite queueCallback cid:"+context.getPoolId()+":userContext:"+order.getUserContext());
+			Log.debug(logger,"doneWrite queueCallback cid:",context.getPoolId(),":userContext:",order.getUserContext());
 			queueCallback(order);
 		}
-		logger.debug("doneWrite cid:"+context.getPoolId()+" writeOrderCount:"+writeOrders.size());
+		Log.debug(logger,"doneWrite cid:",context.getPoolId()," writeOrderCount:",writeOrders.size());
 		return true;
 	}
 	
@@ -440,6 +449,12 @@ public class OrderOperator {
 		}
 		readOrder=Order.create(context.getHandler(), OrderType.read, userContext);
 		readOrder.setTimeoutTime(timeoutTime);
+		if(isAllClose){
+			readOrder.closeOrder();
+			queueCallback(readOrder);
+			readOrder=null;
+			return true;
+		}
 		if(selectOperator.asyncRead(readOrder)){
 			readOrder=null;
 		}
@@ -454,6 +469,11 @@ public class OrderOperator {
 		order.setWriteStartOffset(asyncWriteStartOffset);
 		order.setWriteEndOffset(asyncWriteStartOffset+length);
 		order.setTimeoutTime(timeoutTime);
+		if(isAllClose||isHalfClose){
+			order.closeOrder();
+			queueCallback(order);
+			return true;
+		}
 		writeOrders.add(order);
 		return true;
 	}
@@ -463,6 +483,9 @@ public class OrderOperator {
 			return false;
 		}
 		if( writeOperator.asyncClose()==false){
+			return false;
+		}
+		if(isAllClose||isHalfClose){
 			return false;
 		}
 		closeOrder=Order.create(context.getHandler(), OrderType.close, userContext);

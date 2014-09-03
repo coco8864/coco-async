@@ -15,6 +15,7 @@ import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLEngineResult.Status;
 
+import naru.async.Log;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
@@ -112,7 +113,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 					return false;
 				}
 			} catch (SSLException e) {//証明書確認画面が出る場合など正常系である
-				logger.debug("SslContext server open error.", e);
+				Log.debug(logger,"SslContext server open error.", e);
 				return false;
 			}
 		} else {
@@ -151,7 +152,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 				sslEngine.closeInbound();
 				onRead(SSLCTX_PLAIN_DATA, dmmyBuffers);
 			} catch (SSLException ignore) {
-				logger.debug("SslContext closeInbound error.", ignore);
+				Log.debug(logger,"SslContext closeInbound error.", ignore);
 			}
 		}
 	}
@@ -202,7 +203,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 
 	/* 復帰バッファは、writeモード ,orgDstもwriteモード */
 	private ByteBuffer unwrap(ByteBuffer src,ByteBuffer orgDst) throws SSLException {
-		logger.debug("unwrap");
+		Log.debug(logger,"unwrap");
 		if(sslEngine==null){
 			RuntimeException re=new IllegalStateException("unwrap sslEngine is null");
 			logger.error("unwrap sslEngine is null",re);
@@ -228,7 +229,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 			networkBuffers.remove(src);
 			PoolManager.poolBufferInstance(src);
 		}
-		// logger.debug("unwrap:"+sslResult.getStatus() +
+		// Log.debug(logger,"unwrap:"+sslResult.getStatus() +
 		// ":"+sslResult.getHandshakeStatus()+":"+src);
 		HandshakeStatus handshakeStatus = sslResult.getHandshakeStatus();
 		Status sslStatus = sslResult.getStatus();
@@ -252,7 +253,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 	}
 
 	private ByteBuffer wrap(ByteBuffer[] buffers) throws SSLException {
-		logger.debug("wrap");
+		Log.debug(logger,"wrap");
 		ByteBuffer dst = PoolManager.getBufferInstance(packetSize);
 		sslResult = sslEngine.wrap(buffers, dst);
 		// logger.info("wrap:"+sslResult.getStatus() +
@@ -265,7 +266,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 	}
 
 	private boolean handshake() throws SSLException {
-		logger.debug("nextHandshake");
+		Log.debug(logger,"nextHandshake");
 		HandshakeStatus handshakeStatus = sslResult.getHandshakeStatus();
 		while (handshakeStatus != HandshakeStatus.FINISHED
 				&& handshakeStatus != HandshakeStatus.NOT_HANDSHAKING) {
@@ -313,13 +314,13 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 			if (sslEngine == null) {
 				// close後にasyncWriteされた場合のダミー処理か？必要性不明
 				networkWriteCounter++;
-				logger.debug("asyncWrite1 cid:"+handler.getChannelId() +":networkWriteCounter:"+networkWriteCounter);
+				Log.debug(logger,"asyncWrite1 cid:",handler.getChannelId() +":networkWriteCounter:"+networkWriteCounter);
 				putOnWrittenMap(networkWriteCounter, userContext);
 				return handler.asyncWrite(dmmyBuffers, SSLCTX_WRITE_NETWORK);
 			}
 			if (logger.isDebugEnabled()) {
 				// ByteBuffer buffer=buffers[0];
-				// logger.debug("asyncWrite."+new
+				// Log.debug(logger,"asyncWrite."+new
 				// String(buffer.array(),0,buffer.limit()));
 			}
 			boolean result = false;
@@ -336,7 +337,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 						break;
 					}
 					networkWriteCounter++;
-					logger.debug("asyncWrite2 cid:"+handler.getChannelId() +":networkWriteCounter:"+networkWriteCounter);
+					Log.debug(logger,"asyncWrite2 cid:",handler.getChannelId() ,":networkWriteCounter:",networkWriteCounter);
 					if (handler.asyncWrite(BuffersUtil.toByteBufferArray(sslBuffer), SSLCTX_WRITE_NETWORK)) {
 						result = true;
 					}
@@ -357,7 +358,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 
 	/* SSL通信を考慮してclose要求をおこなう */
 	public boolean asyncClose(Object userContext) {
-		logger.debug("asyncClose cid:"+handler.getChannelId() +":userContext:"+userContext);
+		Log.debug(logger,"asyncClose cid:",handler.getChannelId() ,":userContext:",userContext);
 		closeOutbound();
 		if (handler != null) {
 			//closeOutbound()でwriteして,そのresponseをreadすべき
@@ -368,9 +369,9 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 			//asyncRead済みならasyncClose();
 			//TODO userContextをアプリに通知したい
 			if(handler.asyncRead(SSLCTX_CLOSE_NETWORK)){
-				logger.debug("asyncClose -> asyncRead OK cid:"+handler.getChannelId());
+				Log.debug(logger,"asyncClose -> asyncRead OK cid:",handler.getChannelId());
 			}else{
-				logger.debug("asyncClose -> asyncRead NG cid:"+handler.getChannelId());
+				Log.debug(logger,"asyncClose -> asyncRead NG cid:",handler.getChannelId());
 			}
 			return handler.asyncClose(SSLCTX_CLOSE_NETWORK);
 		}
@@ -431,7 +432,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 		}
 		if (list == null) {
 			// 中途半端なデータしかないのだから、次のデータを読み込む
-			logger.debug("unwrap return null.cid:" + handler.getChannelId());
+			Log.debug(logger,"unwrap return null.cid:",handler.getChannelId());
 			handler.asyncRead(userContext);
 			return;
 		}
@@ -459,15 +460,15 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 	private void putOnWrittenMap(long counter, Object userContext) {
 		if (userContext == SSLCTX_PLAIN_DATA
 				|| userContext == SSLCTX_WRITE_NETWORK) {
-			logger.debug("putOnWrittenMap not put cid:" + handler.getChannelId()
-					+ ":userContext:" + userContext + ":onWrittenCounter:" + counter);
+			Log.debug(logger,"putOnWrittenMap not put cid:",handler.getChannelId()
+					,":userContext:",userContext,":onWrittenCounter:",counter);
 			return;
 		}
 		if (userContext == null) {
 			userContext = SSLCTX_DUMMY_USER_CONTEXT;
 		}
-		logger.debug("putOnWrittenMap cid:" + handler.getChannelId()
-				+ ":userContext:" + userContext + ":onWrittenCounter:" + counter);
+		Log.debug(logger,"putOnWrittenMap cid:",handler.getChannelId()
+				,":userContext:",userContext,":onWrittenCounter:",counter);
 		onWrittenMap.put(counter, userContext);
 	}
 
@@ -480,9 +481,9 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 			}
 			onWrittenCounter++;
 			userContext = onWrittenMap.remove(onWrittenCounter);
-			logger.debug("onWritten cid:" + handler.getChannelId()
-				+ ":userContext:" + userContext + ":onWrittenCounter:"
-				+ onWrittenCounter);
+			Log.debug(logger,"onWritten cid:",handler.getChannelId()
+				,":userContext:",userContext,":onWrittenCounter:"
+				,onWrittenCounter);
 		}
 		//ここまでlockに入っていたが、onWrittenPlainの延長で、WebServerHandlerのlockを取得してデットロック
 		if (userContext != null) {
@@ -496,7 +497,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 
 	//forward時に未受信のonWrttenは受信した事にする
 	public void forwardHandler(SslHandler handler) {
-		logger.debug("forwardHandler cid:"+handler.getChannelId()+":onWrittenCounter:"+onWrittenCounter+":networkWriteCounter:"+networkWriteCounter);
+		Log.debug(logger,"forwardHandler cid:",handler.getChannelId(),":onWrittenCounter:",onWrittenCounter,":networkWriteCounter:",networkWriteCounter);
 		setHandler(handler);
 		synchronized (lock) {
 			onWrittenCounter=networkWriteCounter;
@@ -530,7 +531,7 @@ public class SslAdapter extends PoolBase/*implements ServerProvider*/{
 	}
 
 	public void unsupported() {
-		logger.debug("npn unsupported");
+		Log.debug(logger,"npn unsupported");
 	}
 	*/
 }
