@@ -20,6 +20,7 @@ import org.apache.log4j.Logger;
 
 import naru.async.ChannelHandler;
 import naru.async.ChannelStastics;
+import naru.async.Log;
 import naru.async.core.Order.OrderType;
 import naru.async.core.SelectOperator.State;
 import naru.async.pool.BuffersUtil;
@@ -93,7 +94,7 @@ public class ChannelContext extends Context{
 	private ServerSocket serverSocket;
 	
 	void closeSocket(){
-		logger.debug("closeSocket cid:"+getPoolId());
+		Log.debug(logger,"closeSocket cid:",getPoolId());
 		if(selectionKey!=null){
 			selectionKey.cancel();
 			selectionKey=null;
@@ -109,7 +110,7 @@ public class ChannelContext extends Context{
 	}
 	
 	void shutdownOutputSocket(){
-		logger.debug("shutdownOutputSocket cid:"+getPoolId());
+		Log.debug(logger,"shutdownOutputSocket cid:",getPoolId());
 		try {
 			if(socket!=null){
 				socket.shutdownOutput();
@@ -278,7 +279,7 @@ public class ChannelContext extends Context{
 		selectOperator.queueIo(State.closing);
 	}
 	
-	boolean select(){
+	synchronized boolean select(){
 		long now=System.currentTimeMillis();
 		nextSelectWakeUp=Long.MAX_VALUE;
 		int ops=0;
@@ -333,8 +334,12 @@ public class ChannelContext extends Context{
 		return socket.isConnected();
 	}
 	
-	public synchronized void foward(ChannelHandler handler){
+	public synchronized boolean foward(ChannelHandler handler){
+		if(orderOperator.isFinished()){//readŠ®—¹Œã‚·‚®‚ÉØ’f‚³‚ê‚½ê‡
+			return false;
+		}
 		setHandler(handler);
+		return true;
 	}
 	
 	public void setHandler(ChannelHandler handler){
@@ -376,6 +381,9 @@ public class ChannelContext extends Context{
 	}
 	
 	public synchronized boolean asyncRead(Object userContext){
+		if(orderOperator.isFinished()){
+			return false;
+		}
 		long timeoutTime=Long.MAX_VALUE;
 		if(readTimeout>0){
 			timeoutTime=System.currentTimeMillis()+readTimeout;
@@ -388,6 +396,10 @@ public class ChannelContext extends Context{
 	}
 	
 	public synchronized boolean asyncWrite(ByteBuffer[] buffers,Object userContext){
+		if(orderOperator.isFinished()){
+			PoolManager.poolBufferInstance(buffers);
+			return false;
+		}
 		long length=BuffersUtil.remaining(buffers);
 		long asyncWriteStartOffset=stastics.getAsyncWriteLength();
 		long timeoutTime=Long.MAX_VALUE;
@@ -403,6 +415,9 @@ public class ChannelContext extends Context{
 	}
 	
 	public synchronized boolean asyncClose(Object userContext){
+		if(orderOperator.isFinished()){
+			return false;
+		}
 		if( orderOperator.closeOrder(userContext)==false ){
 			return false;
 		}
@@ -522,7 +537,7 @@ public class ChannelContext extends Context{
 	
 	/* spdy‘Î‰ž‚ÅŽÀconnection‚ª‚È‚¢Context‚Ìfinish */
 	public synchronized void finishChildContext(){
-		logger.debug("finishChildChannel.cid:"+getPoolId());
+		Log.debug(logger,"finishChildChannel.cid:",getPoolId());
 		orderOperator.doneClose(false);
 		if(handler==null){//TODO ‚È‚ñ‚Ä‚±‚Á‚½
 			logger.warn("finishChildChannel.cid="+getPoolId()+":"+this);

@@ -16,6 +16,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import org.apache.log4j.Logger;
 
 import naru.async.BufferGetter;
+import naru.async.Log;
 import naru.async.Timer;
 import naru.async.timer.TimerManager;
 import naru.queuelet.Queuelet;
@@ -351,7 +352,7 @@ public class StoreManager {
 		}
 		
 		private void compressPage(int compressFileId) throws IOException{
-			logger.debug("compress.start.compressBufferId:"+compressFileId);
+			Log.debug(logger,"compress.start.compressBufferId:",compressFileId);
 			Page compressPage=null;
 			long pageId=Page.FREE_ID;
 			while(true){
@@ -361,7 +362,7 @@ public class StoreManager {
 				}
 				synchronized(compressLock){//終了コマンドを受け付けたら即座に復帰する
 					if(isEnd){
-						logger.debug("compress recive end request.compressBufferId:"+compressFileId);
+						Log.debug(logger,"compress recive end request.compressBufferId:",compressFileId);
 						return;
 					}
 				}
@@ -385,7 +386,7 @@ public class StoreManager {
 				compressFileId=0;
 			}
 			persistenceStore.setCompressFileId(compressFileId);
-			logger.debug("compress.end.compressBufferId:"+compressFileId);
+			Log.debug(logger,"compress.end.compressBufferId:",compressFileId);
 		}
 		
 		//他処理が無いことを前提で強制的にcompressする
@@ -490,12 +491,12 @@ public class StoreManager {
 		//Storeをコンプレス、メンテするためのイベント
 		public void onTimer(Object userContext) {
 			long callbackCount=storeStastics.getCallbackCount();
-			logger.debug("callbackCount:"+callbackCount);
+			Log.debug(logger,"callbackCount:",callbackCount);
 			//timer間隔の間のcallback数で負荷量を推測、暇なときにcompressやpersistenceStore.saveする
 			if(callbackCount==lastCallbackCount){
-				logger.debug("persistenceStore.save() lastCallbackCount:"+lastCallbackCount);
+				Log.debug(logger,"persistenceStore.save() lastCallbackCount:",lastCallbackCount);
 				persistenceStore.save(false);
-				logger.debug("persistenceStore.save() return");
+				Log.debug(logger,"persistenceStore.save() return");
 			}
 			lastCallbackCount=callbackCount;
 //			infoStastics();

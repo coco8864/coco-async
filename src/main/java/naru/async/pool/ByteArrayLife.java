@@ -8,6 +8,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
+import naru.async.Log;
 import naru.async.pool.ByteBufferLife.SearchKey;
 
 import org.apache.log4j.Logger;
@@ -39,7 +40,6 @@ public class ByteArrayLife extends ReferenceLife {
 	/*　初回getBufferInstanceの延長で呼び出される事を想定 */
 	ByteBuffer getFirstByteBuffer(ByteBuffer byteBuffer){
 		synchronized(useLifes){
-//			logger.debug("getOnlyByteBuffer:size:" +byteBufferLifes.size() +":refCounter:"+refCounter);
 			if(freeLifes.size()<1){
 				logger.error("fail to getFirstByteBuffer no freeLifes",new IllegalStateException());
 				return null;//pool中が壊れていただけであり、呼び出し者は被害者、インスタンス取得を再試行
@@ -65,7 +65,6 @@ public class ByteArrayLife extends ReferenceLife {
 	/*　poolから溢れて参照を開放する場合に呼び出される */
 	void releaseLife(){
 		synchronized(useLifes){
-//			logger.debug("getOnlyByteBuffer:size:" +userLifes.size() +":refCounter:"+refCounter);
 			if(useLifes.size()!=0){
 				throw new IllegalStateException("byteBufferLifes.size()="+useLifes.size());
 			}
@@ -99,7 +98,6 @@ public class ByteArrayLife extends ReferenceLife {
 			ByteBuffer byteBuffer=ByteBuffer.wrap(array);
 			ByteBufferLife byteBufferLife=new ByteBufferLife(byteBuffer,this);
 			byteBufferLife.ref();
-//			logger.debug("getByteBuffer:size:" +userLifes.size() +":refCounter:"+refCounter);
 			if(useLifes.add(byteBufferLife)==false){
 				logger.error("byteBufferLifes.add return false",new Throwable());
 			}
@@ -158,7 +156,6 @@ public class ByteArrayLife extends ReferenceLife {
 	}
 	
 	private ByteBufferLife 	removeByteBuffer(ByteBuffer buffer){
-//		logger.debug("removeByteBuffer:size:" +userLifes.size() +":refCounter:"+refCounter);
 		synchronized(useLifes){
 			searchKey.setByteBuffer(buffer);
 			if(useLifes.remove(searchKey)){
@@ -212,13 +209,13 @@ public class ByteArrayLife extends ReferenceLife {
 	public void info(boolean isDetail){
 		Object[] bfls=useLifes.toArray();
 //		Iterator<ByteBufferLife> itr=byteBufferLifes.iterator();
-		logger.debug("array:"+array +":ref:"+ getRef());
+		Log.debug(logger,"array:",array ,":ref:", getRef());
 		for(int i=0;i<bfls.length;i++){
 			ByteBufferLife bbl=(ByteBufferLife)bfls[i];
 			if(isDetail){
-				logger.debug("referent:"+bbl.get() +":refCount:"+bbl.getRef()+":getInstance date:"+fomatLogDate(new Date(timeOfGet))+":thread:"+bbl.threadNameOfGet,bbl.stackOfGet);
+				Log.debug(logger,"referent:",bbl.get() ,":refCount:",bbl.getRef(),":getInstance date:",fomatLogDate(new Date(timeOfGet)),":thread:",bbl.threadNameOfGet,bbl.stackOfGet);
 			}else{
-				logger.debug("referent:"+bbl.get() +":refCount:"+bbl.getRef()+":getInstance date:"+fomatLogDate(new Date(timeOfGet))+":thread:"+bbl.threadNameOfGet/*,stackOfGet*/);
+				Log.debug(logger,"referent:",bbl.get() ,":refCount:",bbl.getRef(),":getInstance date:",fomatLogDate(new Date(timeOfGet)),":thread:",bbl.threadNameOfGet/*,stackOfGet*/);
 			}
 		}
 	}

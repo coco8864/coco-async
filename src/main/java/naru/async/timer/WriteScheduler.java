@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import org.apache.log4j.Logger;
 
 import naru.async.ChannelHandler;
+import naru.async.Log;
 import naru.async.Timer;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
@@ -129,7 +130,7 @@ public class WriteScheduler extends PoolBase implements Timer{
 		}
 		this.scheduleWriteTime=writeTime+System.currentTimeMillis();
 //		long now=System.currentTimeMillis();
-		logger.debug("writeTime="+(writeTime));
+		Log.debug(logger,"writeTime=",(writeTime));
 		if(writeTime<=0){
 			if(prevSceduler!=null){
 				writeTime=prevSceduler.scheduleWriteTime-System.currentTimeMillis();
@@ -144,7 +145,7 @@ public class WriteScheduler extends PoolBase implements Timer{
 	}
 
 	public void onTimer(Object timeoutUserContext) {
-		logger.debug("onTimeout.cid"+handler.getChannelId());
+		Log.debug(logger,"onTimeout.cid",handler.getChannelId());
 		if(prevSceduler!=null){
 			synchronized(prevSceduler){
 				while(true){
@@ -165,7 +166,7 @@ public class WriteScheduler extends PoolBase implements Timer{
 			handler.asyncWrite(buffer, userContext);
 			actualWriteTime=System.currentTimeMillis();
 			if(isCloseEnd){
-				logger.debug("WriteScheduler asyncClose");
+				Log.debug(logger,"WriteScheduler asyncClose");
 				handler.asyncClose(userContext);
 			}
 		}

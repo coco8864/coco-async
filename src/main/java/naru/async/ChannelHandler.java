@@ -37,7 +37,7 @@ public abstract class ChannelHandler extends Context{
 	
 	public static class AcceptHandler extends ChannelHandler{
 		public void onFinished() {
-			logger.debug("AcceptHandler#finished.cid:"+getChannelId());
+			Log.debug(logger,"AcceptHandler#finished.cid:",getChannelId());
 		}
 	}
 	
@@ -55,7 +55,7 @@ public abstract class ChannelHandler extends Context{
 		if(this.context!=null){
 			totalReadLength=this.context.getTotalReadLength();			
 			totalWriteLength=this.context.getTotalReadLength();			
-			logger.debug("setContext endHandler.cid:"+this.context.getPoolId()+":this:"+this+":newContext:"+context);
+			Log.debug(logger,"setContext endHandler.cid:",this.context.getPoolId(),":this:",this,":newContext:",context);
 			this.context.unref();
 			synchronized(lock){
 				if(context==null&&this.state==State.connect){
@@ -195,7 +195,11 @@ public abstract class ChannelHandler extends Context{
 			handler.unref();//forwardに失敗したため、handlerは有効にならない
 			return null;
 		}
-		context.foward(handler);//Handler=Contextライフサイクルの同期を行う
+		if(context.foward(handler)==false){//すでにこのhandlerに対してfinishを発行済み
+			logger.warn("fail to forwardHandler already finish but not event yet.cid:"+getPoolId()+":"+state);
+			handler.unref();//forwardに失敗したため、handlerは有効にならない
+			return null;
+		}
 		handler.setContext(context);
 		setContext(null);
 		state=State.forwarded;
@@ -207,7 +211,6 @@ public abstract class ChannelHandler extends Context{
 	public ChannelHandler forwardHandler(Class handlerClass){
 		ChannelHandler handler=allocHandler(handlerClass);
 		if(forwardHandler(handler)==null){
-			handler.unref();
 			handler=null;
 		}
 		return handler;
@@ -232,7 +235,7 @@ public abstract class ChannelHandler extends Context{
 		ChannelContext serverContext=null;
 		synchronized(lock){
 			if(state!=State.init){
-				logger.debug("asyncAccept error state:"+state +":cid:"+getChannelId());
+				Log.debug(logger,"asyncAccept error state:",state,":cid:",getChannelId());
 				return false;
 			}
 			serverContext=ChannelContext.serverChannelCreate(this, address,backlog);
@@ -261,7 +264,7 @@ public abstract class ChannelHandler extends Context{
 		ChannelContext socketContext=null;
 		synchronized(lock){
 			if(state!=State.init){
-				logger.debug("asyncConnect error state:"+state +":cid:"+getChannelId());
+				Log.debug(logger,"asyncConnect error state:",state,":cid:",getChannelId());
 				return false;
 			}
 			socketContext=ChannelContext.socketChannelCreate(this, address);
@@ -276,10 +279,10 @@ public abstract class ChannelHandler extends Context{
 	
 	public boolean asyncRead(Object userContext){
 		if(state!=State.connect){
-			logger.debug("asyncRead error state:"+state +":cid:"+getChannelId());
+			Log.debug(logger,"asyncRead error state:",state,":cid:",getChannelId());
 			return false;
 		}
-		logger.debug("asyncRead.cid:"+getChannelId()+":userContext:"+userContext);
+		Log.debug(logger,"asyncRead.cid:",getChannelId(),":userContext:",userContext);
 		return context.asyncRead(userContext);
 	}
 	
@@ -287,26 +290,23 @@ public abstract class ChannelHandler extends Context{
 		synchronized(lock){
 			if(state!=State.connect){
 				PoolManager.poolBufferInstance(buffers);//失敗した場合もbuffersは消費する
-				logger.debug("asyncWrite error state:"+state +":cid:"+getChannelId());
+				Log.debug(logger,"asyncWrite error state:",state,":cid:",getChannelId());
 				return false;
 			}
 		}
-		logger.debug("asyncWrite.cid:"+getChannelId()+":this:"+this);
-		if(logger.isDebugEnabled()){
-			logger.debug("asyncWrite.cid:"+getChannelId()+":length:"+BuffersUtil.remaining(buffers));
-		}
+		Log.debug(logger,"asyncWrite.cid:",getChannelId(),":length:",BuffersUtil.remaining(buffers));
 		return context.asyncWrite(buffers, userContext);
 	}
 	
 	public boolean asyncClose(Object userContext){
 		synchronized(lock){
 			if(state!=State.connect){
-				logger.debug("asyncClose error state:"+state +":cid:"+getChannelId());
+				Log.debug(logger,"asyncClose error state:",state,":cid:",getChannelId());
 				return false;
 			}
 			state=State.close;
 		}
-		logger.debug("asyncClose.cid:"+getChannelId()+":this:"+this);
+		Log.debug(logger,"asyncClose.cid:",getChannelId(),":this:",this);
 		return context.asyncClose(userContext);
 	}
 	
@@ -390,7 +390,7 @@ public abstract class ChannelHandler extends Context{
 	 * @param userContext
 	 */
 	public void onAcceptable(Object userContext){
-		logger.debug("#acceptable.cid:"+getChannelId());
+		Log.debug(logger,"#acceptable.cid:",getChannelId());
 	}
 	
 	/**
@@ -399,12 +399,12 @@ public abstract class ChannelHandler extends Context{
 	 * @param userContext
 	 */
 	public void onAccepted(Object userContext){
-		logger.debug("#accepted.cid:"+getChannelId());
+		Log.debug(logger,"#accepted.cid:",getChannelId());
 	}
 	
 	public final void onAcceptedInternal(ChannelContext context,Object userContext){
 		if(state!=State.init){
-			logger.debug("#onAcceptedInternal context is not null.cid:"+context.getPoolId());
+			Log.debug(logger,"#onAcceptedInternal context is not null.cid:",context.getPoolId());
 		}
 		state=State.connect;
 		setContext(context);
@@ -412,15 +412,15 @@ public abstract class ChannelHandler extends Context{
 	}
 	
 	public void onConnected(Object userContext){
-		logger.debug("#connected.cid:"+getChannelId());
+		Log.debug(logger,"#connected.cid:",getChannelId());
 	}
 	
 	public void onRead(ByteBuffer[] buffers,Object userContext){
-		logger.debug("#read.cid:"+getChannelId());
+		Log.debug(logger,"#read.cid:",getChannelId());
 	}
 	
 	public void onWritten(Object userContext){
-		logger.debug("#written.cid:"+getChannelId());
+		Log.debug(logger,"#written.cid:",getChannelId());
 	}
 	
 	/**
@@ -435,7 +435,7 @@ public abstract class ChannelHandler extends Context{
 	 * @param userContexts
 	 */
 	public void onClosed(){
-		logger.debug("#closed.cid:"+getChannelId());
+		Log.debug(logger,"#closed.cid:",getChannelId());
 	}
 	public void onClosed(Object userContext){
 		onClosed();
@@ -464,7 +464,7 @@ public abstract class ChannelHandler extends Context{
 	 * @param t
 	 */
 	public void onFailure(Throwable t){
-		logger.debug("#failure.cid:"+getChannelId(),t);
+		Log.debug(logger,"#failure.cid:",getChannelId(),t);
 		//asyncClose(null);
 	}
 	public void onFailure(Throwable t,Object userContext){
@@ -497,7 +497,7 @@ public abstract class ChannelHandler extends Context{
 	 * @param userContexts
 	 */
 	public void onTimeout() {
-		logger.debug("#timeout.cid:"+getChannelId());
+		Log.debug(logger,"#timeout.cid:",getChannelId());
 		//asyncClose(null);
 	}
 	public void onTimeout(Object userContext) {

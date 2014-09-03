@@ -8,6 +8,7 @@ import javax.net.ssl.SSLException;
 import org.apache.log4j.Logger;
 
 import naru.async.ChannelHandler;
+import naru.async.Log;
 import naru.async.pool.PoolManager;
 import naru.async.store.Store;
 /**
@@ -82,7 +83,7 @@ public abstract class SslHandler extends ChannelHandler {
 		long cid=getChannelId();
 		SslHandler handler= (SslHandler)super.forwardHandler(handlerClass);
 		if(handler==null){//既にcloseされている等でforwardに失敗
-			logger.debug("forwardHandler ng.cid:"+cid);
+			Log.debug(logger,"forwardHandler ng.cid:",cid);
 			this.sslAdapter=sslAdapter;
 			this.readPeekStore=readPeekStore;
 			this.writePeekStore=writePeekStore;
@@ -92,7 +93,7 @@ public abstract class SslHandler extends ChannelHandler {
 		handler.readPeekStore=readPeekStore;
 		handler.writePeekStore=writePeekStore;
 		if(sslAdapter!=null){
-			logger.debug("forwardHandler ok.cid:"+cid);
+			Log.debug(logger,"forwardHandler ok.cid:",cid);
 //			sslAdapter.setHandler(handler);
 			sslAdapter.forwardHandler(handler);
 		}
@@ -119,7 +120,7 @@ public abstract class SslHandler extends ChannelHandler {
 	}
 	
 	public final void onWritten(Object userContext){
-		logger.debug("onWritten cid:" + getChannelId() + ":userContext:"+userContext +":sslAdapter:"+sslAdapter);
+		Log.debug(logger,"onWritten cid:", getChannelId(),":userContext:",userContext,":sslAdapter:",sslAdapter);
 		if(sslAdapter==null){
 			onWrittenPlain(userContext);
 			return;
@@ -204,7 +205,7 @@ public abstract class SslHandler extends ChannelHandler {
 	
 	//SSLEngineにまだデータが残っているかもしれない。
 	public void onClosed(Object userContext) {
-		logger.debug("#closed.cid:" + getChannelId());
+		Log.debug(logger,"#closed.cid:",getChannelId());
 		if(sslAdapter!=null){
 			/* この延長でonReadが呼び出されるかもしれない */
 			sslAdapter.closeInbound();
@@ -213,7 +214,7 @@ public abstract class SslHandler extends ChannelHandler {
 	}
 
 	public void onFinished() {
-		logger.debug("#finished.cid:" + getChannelId() +":sslAdapter:" +sslAdapter);
+		Log.debug(logger,"#finished.cid:",getChannelId(),":sslAdapter:",sslAdapter);
 		synchronized(closeLock){
 			if(sslAdapter!=null){
 				sslAdapter.unref(true);
@@ -233,11 +234,11 @@ public abstract class SslHandler extends ChannelHandler {
 				ByteBuffer[] peekBuffers=PoolManager.duplicateBuffers(buffers);
 				writePeekStore.putBuffer(peekBuffers);
 			}
-			logger.debug("asyncWrite1 cid:"+getChannelId());
+			Log.debug(logger,"asyncWrite1 cid:",getChannelId());
 			return super.asyncWrite(buffers, userContext);
 		}
 		if(userContext==SslAdapter.SSLCTX_WRITE_NETWORK){
-			logger.debug("asyncWrite2 cid:"+getChannelId());
+			Log.debug(logger,"asyncWrite2 cid:",getChannelId());
 			//SslAdapterから呼び出された場合は、回線に直接投げる
 			return super.asyncWrite(buffers, userContext);
 		}

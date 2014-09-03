@@ -13,6 +13,7 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 
+import naru.async.Log;
 import naru.async.Timer;
 import naru.async.cache.BufferCache;
 import naru.async.cache.FileCache;
@@ -645,7 +646,7 @@ public class PoolManager implements Queuelet,Timer{
 	
 	private long timerCount=0;
 	public void onTimer(Object userContext) {
-		logger.debug("PoolManager onTimer.interval:"+interval);
+		Log.debug(logger,"PoolManager onTimer.interval:",interval);
 		timerCount++;
 		try{
 			delayRecycleObjects(delayRecycleArray);//’x‰„‰ñû‚ÌÀs
@@ -683,6 +684,8 @@ public class PoolManager implements Queuelet,Timer{
 //		PoolManager.defaultBufferSize=defaultBufferSize;
 //	}
 	
+	private boolean debug=false;
+	
 	public static ByteBuffer getBufferInstance(int bufferSize) {
 		if(bufferSize==0){
 			return ZERO_BUFFER;
@@ -690,7 +693,7 @@ public class PoolManager implements Queuelet,Timer{
 		int actualBufferSize=(((bufferSize-1)/(BUFFER_SIZE_UNIT))+1)*BUFFER_SIZE_UNIT;//1024‚Ì”{”‚É’²®‚·‚é
 		Pool pool=null;
 //		synchronized(instance.byteBufferPoolMap){
-		if(instance==null){//testÀs‚Ìê‡
+		if(instance==null||instance.debug){//testÀs‚Ìê‡
 			return ByteBuffer.allocate(bufferSize);
 		}
 		pool=instance.byteBufferPoolMap.get(actualBufferSize);
@@ -785,7 +788,7 @@ public class PoolManager implements Queuelet,Timer{
 	}
 	
 	public static void poolBufferInstance(ByteBuffer buffer) {
-		if(instance==null){//test‚Ìê‡
+		if(instance==null||instance.debug){//test‚Ìê‡
 			return;
 		}
 		if(buffer==null||buffer==ZERO_BUFFER){

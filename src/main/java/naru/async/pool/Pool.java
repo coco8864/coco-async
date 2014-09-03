@@ -394,7 +394,7 @@ public class Pool {
 		if(useCount>maxUseCount){
 			maxUseCount=useCount;
 		}
-//		logger.debug("getInstance:" + poolClass.getName() + "#" + sequence + "#" + instanceCount);
+//		Log.debug("getInstance:" + poolClass.getName() + "#" + sequence + "#" + instanceCount);
 		ReferenceLife referenceLife=null;
 		switch (type) {
 		case TYPE_POOL_BASE:

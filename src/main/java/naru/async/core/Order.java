@@ -6,6 +6,7 @@ import org.apache.log4j.Logger;
 
 import naru.async.ChannelHandler;
 import naru.async.ChannelStastics;
+import naru.async.Log;
 import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
 
@@ -46,7 +47,7 @@ public class Order extends PoolBase{
 	}
 	public static Order create(ChannelHandler handler,OrderType orderType,Object userContext,ByteBuffer[] buffers){
 		Order order=(Order)PoolManager.getInstance(Order.class);
-		logger.debug("Order#create:"+handler.getPoolId()+":"+orderType+ ":" +order);
+		Log.debug(logger,"Order#create:",handler.getPoolId(),":",orderType,":",order);
 		order.setHandler(handler);
 		order.orderType=orderType;
 		order.userContext=userContext;
@@ -208,7 +209,7 @@ public class Order extends PoolBase{
 	}
 	
 	public void callback(ChannelStastics ststics){
-		logger.debug("callback."+orderType + ":" + handler);
+		Log.debug(logger,"callback.",orderType,":",handler);
 		if(handler==null){
 			logger.error("Illegal order.this:"+this,new Exception());
 			return;
@@ -219,7 +220,7 @@ public class Order extends PoolBase{
 			//ここに来たときhandlerは、foward後かもしれない
 			logger.warn("callback return throwable.",t);
 		}finally{
-			logger.debug("callbacked.cid:"+handler.getChannelId()+":type:"+orderType);
+			Log.debug(logger,"callbacked.cid:",handler.getChannelId(),":type:",orderType);
 			unref(true);//orderは通知したら寿命が切れる,orderは、handlerを所有しているのでorderの開放と共にhandlerの参照は減算される
 		}
 	}

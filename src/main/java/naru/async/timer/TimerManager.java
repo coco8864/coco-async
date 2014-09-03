@@ -9,6 +9,7 @@ import java.util.TreeSet;
 
 import org.apache.log4j.Logger;
 
+import naru.async.Log;
 import naru.async.Timer;
 import naru.queuelet.Queuelet;
 import naru.queuelet.QueueletContext;
@@ -68,19 +69,19 @@ public class TimerManager implements Queuelet,Runnable{
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
-		logger.debug("TimerManager trem phase 1");
+		Log.debug(logger,"TimerManager trem phase 1");
 		while(queueletContext.queueLength()>0){
 			Object o=queueletContext.deque();
 			service(o);
 		}
-		logger.debug("TimerManager trem phase 2");
+		Log.debug(logger,"TimerManager trem phase 2");
 		List<TimerEntry> entrys=selectTimeoutEntry(0);
 		if(entrys!=null){
 			for(TimerEntry entry:entrys){
 				service(entry);
 			}
 		}
-		logger.debug("TimerManager trem end");
+		Log.debug(logger,"TimerManager trem end");
 	}
 	
 	private boolean enqueSafe(TimerEntry entry){
@@ -127,7 +128,7 @@ public class TimerManager implements Queuelet,Runnable{
 	}
 	
 	private static synchronized List<TimerEntry> selectTimeoutEntry(long time){
-//		logger.debug("time:"+time);
+//		Log.debug(logger,"time:"+time);
 		List<TimerEntry> result=null;
 		Iterator<TimerEntry> itr=orderByTime.iterator();
 		while(itr.hasNext()){
@@ -165,7 +166,7 @@ public class TimerManager implements Queuelet,Runnable{
 			timers.put(timerId, entry);
 			orderByTime.add(entry);
 		}
-//		logger.debug("setTimeout interval:"+interval + ":userContext:" +userContext +":timerId:" +timerId);
+//		Log.debug(logger,"setTimeout interval:"+interval + ":userContext:" +userContext +":timerId:" +timerId);
 		return timerId;
 	}
 	
@@ -175,10 +176,10 @@ public class TimerManager implements Queuelet,Runnable{
 	 * @return cancelÇ…ê¨å˜ÇµÇΩèÍçátrue
 	 */
 	public static synchronized boolean clearTimeout(long timerId) {
-		logger.debug("clearTimeout timerId:"+timerId);
+		Log.debug(logger,"clearTimeout timerId:",timerId);
 		TimerEntry entry=timers.remove(timerId);
 		if(entry==null){
-			logger.debug("clearTimeout return false.");
+			Log.debug(logger,"clearTimeout return false.");
 			return false;
 		}
 		orderByTime.remove(entry);

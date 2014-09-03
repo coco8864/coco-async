@@ -10,6 +10,7 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 
 import naru.async.BufferGetter;
+import naru.async.Log;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
@@ -133,7 +134,7 @@ public class Store extends PoolBase {
 			store.gettingPage=store.puttingPage;
 		}
 		register(store);
-		logger.debug("open.isPersistence:"+isPersistence+":sid:"+store.getStoreId()+":this:"+store);
+		Log.debug(logger,"open.isPersistence:",isPersistence,":sid:",store.getStoreId(),":this:",store);
 		return store;
 	}
 	public static Store open(String digest){
@@ -169,7 +170,7 @@ public class Store extends PoolBase {
 		store.getLength=0;
 		store.digest=se.getDigest();
 		se.addStore(store);
-		logger.debug("open.storeId:"+store.storeId+":sid:"+store.getStoreId()+":this:"+store);
+		Log.debug(logger,"open.storeId:",store.storeId,":sid:",store.getStoreId(),":this:",store);
 		return store;
 	}
 //	public static void remove(long storeId){
@@ -268,7 +269,7 @@ public class Store extends PoolBase {
 			isPutCloseStoreId=true;
 		}
 		if(bufferGetter!=null){//イベントがないのにcallbackだけが登録されている
-			logger.debug("checkFin asyncBufferEnd");
+			Log.debug(logger,"checkFin asyncBufferEnd");
 			if(isClosed){
 				return false;
 			}
@@ -436,7 +437,7 @@ public class Store extends PoolBase {
 			break;
 		}
 		if(bufferGetter==null){
-			logger.debug("close use dmmyGetter");
+			Log.debug(logger,"close use dmmyGetter");
 			bufferGetter=dmmyGetter;
 			userContext=this;
 		}
@@ -468,17 +469,17 @@ public class Store extends PoolBase {
 	
 	private static class DmmyGetter implements BufferGetter{
 		public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
-			logger.debug("DmmyGetter onBuffer");
+			Log.debug(logger,"DmmyGetter onBuffer");
 			return true;
 		}
 		public void onBufferEnd(Object userContext) {
-			logger.debug("DmmyGetter onBufferEnd");
+			Log.debug(logger,"DmmyGetter onBufferEnd");
 			synchronized(userContext){
 				userContext.notify();
 			}
 		}
 		public void onBufferFailure(Throwable failure, Object userContext) {
-			logger.debug("DmmyGetter onBufferFailure.",failure);
+			Log.debug(logger,"DmmyGetter onBufferFailure.",failure);
 			synchronized(userContext){
 				userContext.notify();
 			}
@@ -489,7 +490,7 @@ public class Store extends PoolBase {
 	private static DmmyGetter dmmyGetter=new DmmyGetter();
 	
 	public synchronized void putBuffer(ByteBuffer[] buffers){
-		logger.debug("putBuffer.sid:"+getStoreId());
+		Log.debug(logger,"putBuffer.sid:",getStoreId());
 		if(isCloseReceived()){
 			logger.error("putBuffer aleady close");
 			return;
@@ -540,10 +541,10 @@ public class Store extends PoolBase {
 	 */
 	public synchronized boolean asyncBuffer(BufferGetter bufferGetter,Object userContext){
 		if(isCloseReceived()){
-			logger.debug("asyncBuffer aleady close");//ときどき発生する
+			Log.debug(logger,"asyncBuffer aleady close");//ときどき発生する
 			return false;
 		}
-		logger.debug("asyncBuffer.isOnAsyncBuffer:"+isOnAsyncBuffer + ":bufferGetter:"+bufferGetter+":this:"+this);
+		Log.debug(logger,"asyncBuffer.isOnAsyncBuffer:",isOnAsyncBuffer,":bufferGetter:",bufferGetter,":this:",this);
 		if(isOnAsyncBuffer){
 			if(this.bufferGetter==null){
 				this.bufferGetter=bufferGetter;
@@ -552,28 +553,28 @@ public class Store extends PoolBase {
 			}else if(this.bufferGetter!=bufferGetter){
 				logger.error("not same bufferGetter.",new Throwable());
 			}
-			logger.debug("callbackGetter return false isOnAsyncBuffer:true");
+			Log.debug(logger,"callbackGetter return false isOnAsyncBuffer:true");
 			return false;
 		}
 		isOnAsyncBuffer=true;
 		this.bufferGetter=bufferGetter;
 		this.userContext=userContext;
 		if(callbackGetter()){
-			logger.debug("callbackGetter return true");
+			Log.debug(logger,"callbackGetter return true");
 			return true;
 		}
-		logger.debug("callbackGetter return false");
+		Log.debug(logger,"callbackGetter return false");
 		return false;
 	}
 	
 	//Pageから呼び出される
 	synchronized void onPageOut(naru.async.store.Page page) {
-		logger.debug("onPageOut.page:" + page +":sid:"+getStoreId());
+		Log.debug(logger,"onPageOut.page:",page,":sid:",getStoreId());
 		long pageOutLength=page.getBufferLength();
 		pageOutSumLength+=pageOutLength;
 		if(page==loadingPage){//save中にloadが呼び出された
 			//bufferは既に失われているので再読み込みの必要がある
-//			logger.debug("//bufferは既に失われているので再読み込みの必要がある");
+//			Log.debug(logger,"//bufferは既に失われているので再読み込みの必要がある");
 			StoreManager.preparePageIn(page);
 			loadingPage.pageIn();
 			return;
@@ -606,7 +607,7 @@ public class Store extends PoolBase {
 	}
 	
 	synchronized void onPageIn(naru.async.store.Page page) {
-		logger.debug("onPageIn.page:" + page);
+		Log.debug(logger,"onPageIn.page:",page);
 		if(page.getStoreId()!=storeId){
 			logger.error("onPageIn Error.page.getStoreId():"+page.getStoreId()+" storeId:"+storeId,new Exception());
 		}
@@ -674,17 +675,17 @@ public class Store extends PoolBase {
 				freeGettingPage();
 				gettingPage=puttingPage;
 				buffer=BuffersUtil.concatenate(buffer, nextBuffer);
-//				logger.debug("//puttingPageとgettingPageが隣接している場合、両方からbufferをとってコンカチ");
+//				Log.debug(logger,"//puttingPageとgettingPageが隣接している場合、両方からbufferをとってコンカチ");
 			}
 		}
 		if(buffer==null){
-//			logger.debug("//buffer がnullでした");
+//			Log.debug(logger,"//buffer がnullでした");
 			return false;
 		}
 		getLength+=BuffersUtil.remaining(buffer);
 		//gettingPageとputtingPageが同じ場合は、PUTGETで同一のPAGEを見ている状態
 		if(gettingPage!=puttingPage){
-//			logger.debug("//gettingPage!=puttingPage:"+getLength);
+//			Log.debug(logger,"//gettingPage!=puttingPage:",getLength);
 			freeGettingPage();
 			if(puttingPage!=null && puttingPage.getPageId()==nextPageId){
 				//次ページが、puttingPageの場合,上で既にチェック済み？いらない気がする
@@ -710,7 +711,7 @@ public class Store extends PoolBase {
 	
 	//isEndは使用していない
 	public synchronized void doneCallback(boolean isEnd,boolean onBufferReturn,BufferGetter orgBuferGetter,Object orgUserContext) {
-		logger.debug("doneCallback:"+this + ":onBufferReturn:"+onBufferReturn + ":isOnAsyncBufferRequest:"+isOnAsyncBufferRequest);
+		Log.debug(logger,"doneCallback:",this,":onBufferReturn:",onBufferReturn,":isOnAsyncBufferRequest:",isOnAsyncBufferRequest);
 		if(isOnAsyncBufferClose){//呼び出し中にclose要求があった
 			isOnAsyncBufferRequest=false;
 			isOnAsyncBufferClose=false;
@@ -761,7 +762,7 @@ public class Store extends PoolBase {
 	private LinkedList<StoreCallback> callbackQueue=new LinkedList<StoreCallback>();
 	private boolean isCallbackProcessing=false;
 	void callbackQueue(StoreCallback storeCallback){
-		logger.debug("callbackQueue sid:"+getPoolId());
+		Log.debug(logger,"callbackQueue sid:",getStoreId());
 		synchronized(callbackQueue){
 			callbackQueue.addLast(storeCallback);
 		}
@@ -769,11 +770,11 @@ public class Store extends PoolBase {
 	}
 	
 	void callback(){
-		logger.debug("callback sid:"+getPoolId());
+		Log.debug(logger,"callback sid:",getStoreId());
 		StoreCallback storeCallback=null;
 		synchronized(callbackQueue){
 			if(isCallbackProcessing || callbackQueue.size()<=0){
-				logger.debug("callback loopout sid:"+getPoolId());
+				Log.debug(logger,"callback loopout sid:",getPoolId());
 				return;
 			}
 			isCallbackProcessing=true;
@@ -782,7 +783,7 @@ public class Store extends PoolBase {
 		while(true){
 			storeCallback.callback();
 			boolean rc=storeCallback.unref(true);
-			logger.debug("callback sid:"+getPoolId()+":"+rc);
+			Log.debug(logger,"callback sid:",getPoolId(),":",rc);
 			synchronized(callbackQueue){
 				if(callbackQueue.size()<=0){
 					isCallbackProcessing=false;
@@ -821,20 +822,5 @@ public class Store extends PoolBase {
 	}
 	public int getOnBufferFailureCount() {
 		return onBufferFailureCount;
-	}
-	
-	@Override
-	public void ref() {
-		super.ref();
-	}
-	@Override
-	public boolean unref() {
-		return super.unref();
-	}
-	public boolean checkRef(){
-		if( getRef()>0 ){
-			return true;
-		}
-		return false;
 	}
 }

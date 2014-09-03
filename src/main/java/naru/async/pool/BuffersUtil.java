@@ -14,6 +14,8 @@ import java.util.List;
 
 //import naru.util.DigestUtil;
 
+import naru.async.Log;
+
 import org.apache.log4j.Logger;
 
 public class BuffersUtil {
@@ -64,7 +66,7 @@ public class BuffersUtil {
 
 	public static ByteBuffer[] newByteBufferArray(int count) {
 		if(count>=24){
-			logger.debug("newByteBufferArray:"+count,new Throwable());
+			Log.debug(logger,"newByteBufferArray:",count,new Throwable());
 		}
 		return (ByteBuffer[]) PoolManager.getArrayInstance(ByteBuffer.class,count);
 	}
@@ -453,7 +455,7 @@ public class BuffersUtil {
 			logger.error("hexDump error." +data.length +":"+pos +":" +length);
 			return;
 		}
-		logger.debug(title);
+		Log.debug(logger,title);
 		long base=0;
 		StringBuffer buffer = new StringBuffer(74);
 		for (int i = pos; i < (pos+length); i += 16) {
@@ -477,7 +479,7 @@ public class BuffersUtil {
 					buffer.append('.');
 				}
 			}
-			logger.debug(buffer.toString());
+			Log.debug(logger,buffer.toString());
 			buffer.setLength(0);
 			base += chars_read;
 		}

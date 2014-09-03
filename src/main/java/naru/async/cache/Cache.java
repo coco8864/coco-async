@@ -10,6 +10,7 @@ import org.apache.log4j.Logger;
 
 import naru.async.AsyncBuffer;
 import naru.async.BufferGetter;
+import naru.async.Log;
 import naru.async.Timer;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
@@ -282,7 +283,7 @@ public class Cache extends PoolBase implements AsyncBuffer,Timer{
 			return true;
 		}
 		if(inAsyncRead){//callback‚©‚çasyncRead‚ªŒÄ‚Î‚ê‚½A‚±‚ÌŒÄ‚Ño‚µ‚Í„§‚µ‚È‚¢,ˆ—‚ª–³ˆÓ–¡‚É’x‚­‚È‚é
-			logger.debug("asyncBuffer isAsyncRead true",new Throwable());
+			Log.debug(logger,"asyncBuffer isAsyncRead true",new Throwable());
 			TimerManager.setTimeout(0, this, new Object[]{bufferGetter,offset,userContext});
 			return false;
 		}

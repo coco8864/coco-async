@@ -5,6 +5,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 import naru.async.ChannelHandler;
+import naru.async.Log;
 import naru.async.core.ChannelContext;
 
 import org.apache.log4j.Logger;
@@ -67,7 +68,7 @@ public class ReferenceLife extends WeakReference {
 			if(o instanceof PoolBase){
 				referentId=((PoolBase)o).getPoolId();
 			}else if(o!=null){
-				referentId=o.hashCode();
+				referentId=0;//o.hashCode();
 			}else{
 				referentId=0;
 			}
@@ -111,7 +112,7 @@ public class ReferenceLife extends WeakReference {
 	
 	public void info(boolean isDetail){
 		if(isDetail){
-			logger.debug("referent:"+get() +":refCount:"+getRef()+":getInstance date:"+fomatLogDate(new Date(timeOfGet))+":thread:"+threadNameOfGet,stackOfGet);
+			Log.debug(logger,"referent:",get(),":refCount:",getRef(),":getInstance date:",fomatLogDate(new Date(timeOfGet)),":thread:",threadNameOfGet,stackOfGet);
 			if(pool.getPoolClass()==ChannelHandler.class){
 				ChannelHandler handler=(ChannelHandler) get();
 				if(handler!=null){
@@ -124,7 +125,7 @@ public class ReferenceLife extends WeakReference {
 				}
 			}
 		}else{
-			logger.debug("referent:"+get() +":refCount:"+getRef()+":getInstance date:"+fomatLogDate(new Date(timeOfGet))+":thread:"+threadNameOfGet/*,stackOfGet*/);
+			Log.debug(logger,"referent:",get(),":refCount:",getRef(),":getInstance date:",fomatLogDate(new Date(timeOfGet)),":thread:",threadNameOfGet/*,stackOfGet*/);
 		}
 	}
 	
