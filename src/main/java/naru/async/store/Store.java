@@ -782,14 +782,13 @@ public class Store extends PoolBase {
 		}
 		while(true){
 			storeCallback.callback();
-			boolean rc=storeCallback.unref(true);
-			Log.debug(logger,"callback sid:",getPoolId(),":",rc);
+			storeCallback.unref(true);
 			synchronized(callbackQueue){
 				if(callbackQueue.size()<=0){
 					isCallbackProcessing=false;
 					break;
 				}
-				storeCallback=callbackQueue.remove(0);
+				storeCallback=callbackQueue.removeFirst();
 			}
 		}
 	}

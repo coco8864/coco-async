@@ -471,7 +471,6 @@ public class StoreManager {
 		}
 		
 		public boolean service(Object req) {
-			//•¡”worker‚ª‚¢‚½ê‡Aput‡‚Écallback‚³‚ê‚È‚¢‰Â”\«‚ª‚ ‚éB
 			Store store=(Store)req;
 			store.callback();
 			storeStastics.countCallback();
