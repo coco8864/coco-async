@@ -11,6 +11,7 @@ import org.apache.log4j.Logger;
 
 import naru.async.Log;
 import naru.async.Timer;
+import naru.async.pool.LocalPoolManager;
 import naru.queuelet.Queuelet;
 import naru.queuelet.QueueletContext;
 
@@ -33,7 +34,6 @@ public class TimerManager implements Queuelet,Runnable{
 	public void init(QueueletContext context, Map param) {
 		logger.info("TimerManager init");
 		timerManager=this;
-//		System.out.println("init timerManager.run:"+timerManager.run +":this:" + this+":timerManager:"+timerManager);
 		queueletContext=context;
 		String timerIntervalString=(String)param.get("timerInterval");
 		if(timerIntervalString!=null){
@@ -50,8 +50,8 @@ public class TimerManager implements Queuelet,Runnable{
 			return true;
 		}
 		TimerEntry entry=(TimerEntry)req;
-//		System.out.println("service:" +Thread.currentThread().getName()+":timerId:"+entry.getPoolId()+":this:"+this);
 		entry.callback();//‚±‚Ì’†‚Å—áŠO‚ðcatch‚µ‚Ä‚¢‚é‚Ì‚Å•K‚¸•œ‹A‚·‚é
+		LocalPoolManager.refresh();
 		return true;
 	}
 
