@@ -6,6 +6,7 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 
 import naru.async.Log;
+import naru.async.pool.LocalPoolManager;
 import naru.queuelet.Queuelet;
 import naru.queuelet.QueueletContext;
 
@@ -101,6 +102,7 @@ public class IOManager implements Queuelet {
 		}finally{
 			//IO‚ªŠ®—¹‚·‚é‚Ü‚ÅChannelContext‚ªÄ—˜—p‚³‚ê‚È‚¢‚æ‚¤‚É‚·‚é
 			channelIO.getContext().unref();
+			LocalPoolManager.refresh();
 		}
 	}
 	

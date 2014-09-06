@@ -18,6 +18,7 @@ import org.apache.log4j.Logger;
 import naru.async.BufferGetter;
 import naru.async.Log;
 import naru.async.Timer;
+import naru.async.pool.LocalPoolManager;
 import naru.async.timer.TimerManager;
 import naru.queuelet.Queuelet;
 import naru.queuelet.QueueletContext;
@@ -474,6 +475,7 @@ public class StoreManager {
 			Store store=(Store)req;
 			store.callback();
 			storeStastics.countCallback();
+			LocalPoolManager.refresh();
 			return false;
 		}
 		
@@ -546,6 +548,7 @@ public class StoreManager {
 				page.onPageIn();
 				storeStastics.countPageIn(size);
 			}
+			LocalPoolManager.refresh();
 			return false;
 		}
 	}
@@ -670,6 +673,7 @@ public class StoreManager {
 				page.onPageOut();
 				storeStastics.countPageOut(size);
 			}
+			LocalPoolManager.refresh();
 			return false;
 		}
 	}

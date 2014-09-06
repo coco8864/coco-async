@@ -52,6 +52,22 @@ public class PoolManager implements Queuelet,Timer{
 	private List<Class> delayRecycleClasses=new ArrayList<Class>();
 	private LinkedList delayRecycleArray=new LinkedList();
 	
+	static void setupLocalPoolManager(LocalPoolManager localPoolManager){
+		synchronized(instance.byteBufferPoolMap){
+			for(Integer length:instance.byteBufferPoolMap.keySet()){
+				Pool pool=instance.byteBufferPoolMap.get(length);
+			}
+		}
+		synchronized(instance.arrayPoolMap){
+			for(Class clazz:instance.arrayPoolMap.keySet()){
+				Map<Integer,Pool> pools=instance.arrayPoolMap.get(clazz);
+				for(Integer length:pools.keySet()){
+					Pool pool=instance.byteBufferPoolMap.get(length);
+				}
+			}
+		}
+	}
+	
 	private static void setupPool(Pool pool,int limit){
 		long poolCount=pool.getPoolCount();
 		pool.setLimit(limit);
