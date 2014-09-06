@@ -48,6 +48,39 @@ public class Pool {
 		}
 		return null;
 	}
+	
+	private void batchPoolArray(LinkedList objs){
+		ReferenceLife life=null;
+		for(Object obj:objs){
+			life = poolLifesMap.get(obj);
+			if(life.unref()){//ê≥èÌÇ…äJï˙Ç≈Ç´ÇΩèÍçápoolÇ…ñﬂÇ∑
+				poolInstance(obj);
+			}
+		}
+		objs.clear();
+	}
+	private void batchPoolByteBuffer(LinkedList objs){
+		for(Object obj:objs){
+			ByteBuffer buffer=(ByteBuffer)obj;
+			byte[] array=buffer.array();
+			ByteArrayLife byteArrayLife=getByteArrayLife(array);
+			if(byteArrayLife==null){//poolä«óùäO
+				continue;
+			}
+			byteArrayLife.poolByteBuffer(buffer);
+		}
+		objs.clear();
+	}
+	
+	void batchPool(LinkedList objs){
+		if(type==TYPE_ARRAY){
+			batchPoolArray(objs);
+		}else if(type==TYPE_BYTE_BUFFER){
+			batchPoolByteBuffer(objs);
+		}else{
+			logger.error("fail to batchPool type:"+type);
+		}
+	}
 
 	private LinkedList poolStack = new LinkedList();// poolé¿ëÃ
 	private static Object[] NO_ARGS = new Object[0];
