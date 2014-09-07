@@ -6,7 +6,12 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 
+import naru.async.Log;
+
+import org.apache.log4j.Logger;
+
 public class LocalPoolManager {
+	private static Logger logger=Logger.getLogger(LocalPoolManager.class);
 	private static ThreadLocal<LocalPoolManager> localPool=new ThreadLocal<LocalPoolManager>();
 	private class LocalPool{
 		public LocalPool(Pool pool) {
@@ -21,8 +26,12 @@ public class LocalPoolManager {
 		int max;
 		int total;
 		void beat(){
+			Log.debug(logger, "LocalPool beat.getCount:",getCount,":poolCount:",poolCount,":hit:",hit,":max:",max);
 			pool.batchPool(usedPool);
-			pool.batchFill(freePool,max);
+			pool.batchGet(freePool,max);
+			if(max<getCount){
+				max=getCount;
+			}
 			hit=getCount=poolCount=0;
 		}
 	}
@@ -124,6 +133,7 @@ public class LocalPoolManager {
 	private int beatCount=0;
 	
 	private LocalPoolManager(){
+		Log.debug(logger, "LocalPoolManager");
 		threadName=Thread.currentThread().getName();
 		PoolManager.setupLocalPoolManager(this);
 	}
@@ -145,6 +155,7 @@ public class LocalPoolManager {
 	
 	private void beat(){
 		beatCount++;
+		Log.debug(logger, "beat.beatCount",beatCount);
 		for(Integer bufferlength:byteBufferPoolMap.keySet()){
 			LocalPool pool=byteBufferPoolMap.get(bufferlength);
 			pool.beat();

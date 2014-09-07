@@ -324,6 +324,10 @@ public class PoolManager implements Queuelet,Timer{
 			}
 			return obj;
 		}
+		Object result=LocalPoolManager.getArrayInstance(clazz,size);
+		if(result!=null){
+			return result;
+		}
 		Pool pool=getArrayPool(clazz,size);
 		if(pool==null){
 			pool=addArrayPool(clazz, size);
@@ -368,6 +372,9 @@ public class PoolManager implements Queuelet,Timer{
 		Class clazz=objs.getClass();
 		int arraySize=Array.getLength(objs);
 		if(arraySize==0){
+			return;
+		}
+		if( LocalPoolManager.poolArrayInstance(objs) ){
 			return;
 		}
 		Pool pool=getArrayPool(clazz.getComponentType(), arraySize);
@@ -714,16 +721,16 @@ public class PoolManager implements Queuelet,Timer{
 		if(instance==null||instance.debug){//testé¿çsÇÃèÍçá
 			return ByteBuffer.allocate(bufferSize);
 		}
-		pool=instance.byteBufferPoolMap.get(actualBufferSize);
-//		}
-		if(pool==null){
-			pool=addBufferPool(actualBufferSize);
+		ByteBuffer buffer=LocalPoolManager.getBufferInstance(actualBufferSize);
+		if(buffer==null){
+			pool=instance.byteBufferPoolMap.get(actualBufferSize);
+//			}
+			if(pool==null){
+				pool=addBufferPool(actualBufferSize);
+			}
+			buffer=(ByteBuffer)pool.getInstance();
 		}
-		ByteBuffer buffer=(ByteBuffer)pool.getInstance();
 		buffer.limit(bufferSize);
-//		if(bufferSize==defaultBufferSize){
-//			logger.info("getBufferInstance:"+buffer.array(),new Exception());
-//		}
 		return buffer;
 	}
 	
@@ -810,6 +817,9 @@ public class PoolManager implements Queuelet,Timer{
 			return;
 		}
 		if(buffer==null||buffer==ZERO_BUFFER){
+			return;
+		}
+		if(LocalPoolManager.poolBufferInstance(buffer)){
 			return;
 		}
 		byte[] array=buffer.array();
