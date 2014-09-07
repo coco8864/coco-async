@@ -59,6 +59,7 @@ public class Pool {
 		}
 		objs.clear();
 	}
+	
 	private void batchPoolByteBuffer(LinkedList objs){
 		for(Object obj:objs){
 			ByteBuffer buffer=(ByteBuffer)obj;
@@ -79,6 +80,13 @@ public class Pool {
 			batchPoolByteBuffer(objs);
 		}else{
 			logger.error("fail to batchPool type:"+type);
+		}
+	}
+	
+	void batchGet(LinkedList objs,int max){
+		for(int i=objs.size();i<max;i++){
+			ByteBuffer buffer=(ByteBuffer)getInstance();
+			objs.add(buffer);
 		}
 	}
 
