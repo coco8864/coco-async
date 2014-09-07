@@ -155,7 +155,7 @@ public class LocalPoolManager {
 	
 	private void beat(){
 		beatCount++;
-		Log.debug(logger, "beat.beatCount",beatCount);
+		Log.debug(logger, "beat.beatCount:",beatCount);
 		for(Integer bufferlength:byteBufferPoolMap.keySet()){
 			LocalPool pool=byteBufferPoolMap.get(bufferlength);
 			pool.beat();
