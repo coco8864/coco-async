@@ -112,6 +112,17 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		}
 	}
 	
+	//TODO direct write or not
+	private void queueOrDirectWrite(){
+		//doIo();
+		IOManager.enqueue(this);
+	}
+	
+	private void queueOrDirectClose(){
+		//doIo();
+		IOManager.enqueue(this);
+	}
+	
 	public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
 		Log.debug(logger,"onBuffer.cid:",context.getPoolId(),":state:",state);
 		long length=BuffersUtil.remaining(buffers);
@@ -119,12 +130,16 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 			for(ByteBuffer buffer:buffers){
 				workBuffer.add(buffer);
 			}
-			if(currentBufferLength==0){
+			if(currentBufferLength==0){//もともとバッファが空だった場合
 				if(isIo()==false){
-					IOManager.enqueue(this);
+					currentBufferLength+=length;
+					queueOrDirectWrite();
+				}else{
+					currentBufferLength+=length;
 				}
+			}else{
+				currentBufferLength+=length;
 			}
-			currentBufferLength+=length;
 			if(currentBufferLength<bufferMinLimit){
 				store.asyncBuffer(this, store);
 			}
@@ -150,11 +165,13 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	
 	private long executeWrite(ByteBuffer[] prepareBuffers) throws IOException {
 		GatheringByteChannel channel=(GatheringByteChannel)this.channel;
-		long length=channel.write(prepareBuffers);
-		Log.debug(logger,"##executeWrite length:",length,":cid:",context.getPoolId());
-		if(logger.isDebugEnabled()){
-			Log.debug(logger,"executeWrite.",length,":cid:",context.getPoolId(),":channel:",channel);
+		long length;
+		if(prepareBuffers.length==1){
+			length=channel.write(prepareBuffers[0]);
+		}else{
+			length=channel.write(prepareBuffers);
 		}
+		Log.debug(logger,"##executeWrite length:",length,":cid:",context.getPoolId());
 		return length;
 	}
 	
@@ -216,7 +233,10 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 					totalWriteLength+=writeLength;
 					orderOperator.doneWrite(totalWriteLength);
 				}
-				if(isAsyncClose&&(store.getPutBufferLength()==totalWriteLength)){
+				
+				if(isAsyncClose&&state==State.prepare){//accept contextのclose
+					isAllClose=true;
+				}else if(isAsyncClose&&(store.getPutBufferLength()==totalWriteLength)){
 					isHalfClose=true;
 				}else if(!isAsyncClose&&state==State.close){
 					isAllClose=true;
@@ -305,17 +325,21 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 			return false;
 		}
 		if(state==State.prepare){//accept or connect
+			/*
 			state=State.close;
 			if(store!=null){
 				store.close(this,null);
 			}
+			*/
+			isAsyncClose=true;
+			queueOrDirectClose();
 			return true;
 		}
 		boolean isIoBefore=isIo();
 		isAsyncClose=true;
 		boolean isIoAfter=isIo();
 		if(!isIoBefore&&isIoAfter){
-			IOManager.enqueue(this);
+			queueOrDirectClose();
 		}
 		return true;
 	}

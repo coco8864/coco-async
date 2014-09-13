@@ -72,6 +72,7 @@ public class ReferenceLife extends WeakReference {
 			}else{
 				referentId=0;
 			}
+			//TODO getName()ÇÕèdÇ¢
 			threadNameOfGet=Thread.currentThread().getName();
 			countOfGet++;
 		}
@@ -99,6 +100,7 @@ public class ReferenceLife extends WeakReference {
 			if(logger.isDebugEnabled()){
 				stackOfPool=new Throwable();
 			}
+			//TODO getName()ÇÕèdÇ¢
 			threadNameOfPool=Thread.currentThread().getName();
 			countOfPool++;
 			return true;//pool this

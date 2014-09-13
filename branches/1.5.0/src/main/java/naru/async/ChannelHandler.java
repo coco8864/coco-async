@@ -95,11 +95,11 @@ public abstract class ChannelHandler extends Context{
 			throw new IllegalArgumentException("illegal handlerClass");
 		}
 		ChannelHandler handler=(ChannelHandler)PoolManager.getInstance(AcceptHandler.class);
-		if( handler.asyncAccept(acceptHandlerClass, address, backlog, isBlockOutOfList,blackList,whiteList,userContext) ){
-			return handler;
+		if(!handler.asyncAccept(acceptHandlerClass, address, backlog, isBlockOutOfList,blackList,whiteList,userContext)){
+			handler.unref(true);
+			return null;
 		}
-		handler.unref(true);
-		return null;
+		return handler;
 	}
 	
 	public static ChannelHandler connect(Class handlerClass,InetSocketAddress address,long timeout,Object userContext){
@@ -153,6 +153,10 @@ public abstract class ChannelHandler extends Context{
 			return;
 		}
 		context.endowAttribute(name, value);
+	}
+	
+	public long getAcceptTime(){
+		return context.getAcceptTime();
 	}
 	
 	public String getRemoteIp(){

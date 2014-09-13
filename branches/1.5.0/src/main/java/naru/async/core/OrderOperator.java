@@ -1,6 +1,7 @@
 package naru.async.core;
 
 import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -11,6 +12,7 @@ import naru.async.Log;
 import naru.async.core.Order.OrderType;
 import naru.async.core.SelectOperator.State;
 import naru.async.pool.BuffersUtil;
+import naru.async.pool.PoolManager;
 
 import org.apache.log4j.Logger;
 /**
@@ -71,9 +73,8 @@ public class OrderOperator {
 		callbackOrders.add(order);
 		Log.debug(logger,"queueCallback cid:",context.getPoolId(),":size:",callbackOrders.size(),":",order.getOrderType());
 		if(order.getOrderType()==OrderType.non){
-			logger.error("!!!",new Exception());
-		}
-		if(inCallback==false){
+			logger.error("order type is non.error",new Exception());
+		}else if(inCallback==false){
 			inCallback=true;
 			DispatchManager.enqueue(this);
 		}
@@ -112,6 +113,17 @@ public class OrderOperator {
 		return order;
 	}
 	
+	private void acceptSecuence(Order order){
+		//ユーザオブジェクトを獲得する
+		long acceptTime=(Long)order.getAttribute(ChannelContext.ACCEPT_TIME);
+		SocketChannel socketChannel=(SocketChannel)order.getAttribute(ChannelContext.SOCKET_CHANNEL);
+		ChannelHandler handler=(ChannelHandler)PoolManager.getInstance(context.getAcceptClass());
+		ChannelContext acceptContext=ChannelContext.socketChannelCreate(handler, socketChannel,acceptTime);
+		acceptContext.getSelectOperator().readable();
+		Object userAcceptContext=context.getAcceptUserContext();
+		acceptContext.accepted(userAcceptContext);
+	}
+	
 	/**
 	 * dispatch workerから呼び出される、多重では走行しない
 	 */
@@ -122,13 +134,16 @@ public class OrderOperator {
 		try{
 			while(true){
 				order=popOrder();
-				Log.debug(logger,"callback cid:",context.getPoolId(),":order:",order);
 				if(order==null){
 					break;
 				}
+				Log.debug(logger,"callback cid:",context.getPoolId(),":orderType:",order.getOrderType());
 				if(order.isFinish()){
 					isFinishCallback=true;
 					finishHandler=order.getHandler();
+				}
+				if(order.getOrderType()==OrderType.select){
+					acceptSecuence(order);
 				}
 				try{
 					order.callback(stastics);

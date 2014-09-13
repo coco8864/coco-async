@@ -1,7 +1,6 @@
 package naru.async.core;
 
 import java.io.IOException;
-import java.net.Socket;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
@@ -15,10 +14,8 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 
-import naru.async.ChannelHandler;
 import naru.async.Log;
 import naru.async.core.SelectOperator.State;
-import naru.async.pool.PoolManager;
 
 public class SelectorHandler implements Runnable {
 	static private Logger logger=Logger.getLogger(SelectorHandler.class);
@@ -47,12 +44,45 @@ public class SelectorHandler implements Runnable {
 		return stastics;
 	}
 	
+	private static class AcceptRunner implements Runnable{
+		private SelectorHandler handler;
+		private ChannelContext context;
+		AcceptRunner(SelectorHandler handler,ChannelContext context){
+			this.handler=handler;
+			this.context=context;
+		}
+		public void run() {
+			logger.info("accept thread start");
+			handler.accept(context);
+			logger.info("accept thread end");
+			context.unref();
+		}
+		private void start(){
+			ServerSocketChannel serverSocketChannel=(ServerSocketChannel)context.getChannel();
+			try {
+				serverSocketChannel.configureBlocking(true);
+			} catch (IOException e) {
+			}
+			Thread thread=new Thread(this);
+			try {
+				thread.setName("accept-"+serverSocketChannel.getLocalAddress());
+			} catch (IOException e) {
+				logger.warn("getLocalAddress error",e);
+			}
+			thread.start();
+		}
+	}
+	
 	public void queueSelect(ChannelContext context){
 		Log.debug(logger,"queueSelect.cid:",context.getPoolId());
+		stastics.inQueue();
 		synchronized(contexts){
-			stastics.inQueue();
-			context.ref();
-			contexts.add(context);
+			context.ref();//select cycleにいる間は参照を持つ
+			if(context.getSelectOperator().isAccepting()&&IOManager.isAcceptThread()){
+				(new AcceptRunner(this,context)).start();
+			}else{
+				contexts.add(context);
+			}
 		}
 		wakeup();
 	}
@@ -112,41 +142,39 @@ public class SelectorHandler implements Runnable {
 				Log.debug(logger,"selectAdd fail to add.cid:",context.getPoolId());
 				//nextContexts.add(context);
 			}
-			context.unref();
 		}
 		//for(ChannelContext context:nextContexts){
 		//	queueSelect(context);
 		//}
 		return timeoutTime;
 	}
-	
-	private void accept(ChannelContext context,ServerSocketChannel serverSocketChannel){
+
+	private void accept(ChannelContext context){
+		while(acceptInternal(context)){
+		}
+	}
+
+	private boolean acceptInternal(ChannelContext context){
+		ServerSocketChannel serverSocketChannel=(ServerSocketChannel)context.getChannel();
 		SocketChannel socketChannel;
 		try {
 			socketChannel = serverSocketChannel.accept();
 			if(socketChannel==null){
-				return;
+				return false;
 			}
-			Socket socket=socketChannel.socket();
-			if( !context.acceptable(socket) ){
+			socketChannel.configureBlocking(false);
+			if( !context.acceptable(socketChannel) ){
 				Log.debug(logger,"refuse socketChannel:",socketChannel);
-				socket.close();//接続拒否
+				socketChannel.close();//接続拒否
 				stastics.acceptRefuse();
-				return;
+				return true;
 			}
 			Log.debug(logger,"isAcceptable socketChannel:",socketChannel);
 		} catch (IOException e) {
 			logger.error("fail to accept.",e);
-			return;
+			return false;
 		}
-		//ユーザオブジェクトを獲得する
-		ChannelHandler handler=(ChannelHandler)PoolManager.getInstance(context.getAcceptClass());
-		ChannelContext acceptContext=ChannelContext.socketChannelCreate(handler, socketChannel);
-		Object userAcceptContext=context.getAcceptUserContext();
-		acceptContext.accepted(userAcceptContext);
-		stastics.read();
-		//acceptContext.getSelectOperator().queueSelect(State.selectReading);
-		acceptContext.getSelectOperator().readable();
+		return true;
 	}
 	
 	private boolean dispatch(SelectionKey key,ChannelContext context){
@@ -163,23 +191,19 @@ public class SelectorHandler implements Runnable {
 			context.getSelectOperator().readable();
 			return true;
 		}else if(key.isAcceptable()){
-			SelectableChannel selectableChannel=key.channel();
-			ServerSocketChannel serverSocketChannel =(ServerSocketChannel) selectableChannel;
-			accept(context, serverSocketChannel);
+			accept(context);
 		}
 		return false;
 	}
 	
 	private long checkOutContext(Set<SelectionKey> selectedKeys,SelectionKey key,ChannelContext context,long timeoutTime,Set<ChannelContext> selectOut){
 		if(!key.isValid()||!context.isSelectionKey()){
-			context.ref();
 			selectOut.add(context);
 			return timeoutTime;
 		}else if(selectedKeys.contains(key)){
 			Log.debug(logger,"checkOutContext selectedKeys cid:",context.getPoolId());
 			if(dispatch(key, context)){
 				//dispatchに成功したなら、selectを続ける必要なし
-				context.ref();
 				selectOut.add(context);
 				return timeoutTime;
 			}
@@ -193,7 +217,6 @@ public class SelectorHandler implements Runnable {
 			Log.debug(logger,"after select getNextSelectWakeUp.cid:",context.getPoolId(),":",(timeoutTime-System.currentTimeMillis()));
 		}else{//参加させられなかった。
 			Log.debug(logger,"checkOutContext fail to add.cid:",context.getPoolId());
-			context.ref();
 			selectOut.add(context);
 		}
 		return timeoutTime;
@@ -255,7 +278,6 @@ public class SelectorHandler implements Runnable {
 			stastics.loop();
 			int selectCount=0;
 			lastWakeup=System.currentTimeMillis();
-//			logger.info("select in.this:"+this+":interval:"+interval);
 			Set<SelectionKey> keys=selector.keys();
 			stastics.setSelectCount(keys.size());
 			if(interval>0){
@@ -280,8 +302,8 @@ public class SelectorHandler implements Runnable {
 				ChannelContext out=outItr.next();
 				if(!selectIn.contains(out)){
 					out.cancelSelect();
+					out.unref();
 				}
-				out.unref();
 				outItr.remove();
 			}
 			selectIn.clear();

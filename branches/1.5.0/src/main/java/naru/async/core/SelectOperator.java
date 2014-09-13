@@ -175,6 +175,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 				}
 			}else{
 				if(buffer!=null){
+					Log.debug(logger,"store.putBuffer.cid:",context.getPoolId());
 					store.putBuffer(BuffersUtil.toByteBufferArray(buffer));
 				}
 				queueSelect(State.selectReading);
@@ -290,5 +291,8 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 	
 	boolean isClose(){
 		return (state==State.close);
+	}
+	boolean isAccepting(){
+		return (state==State.accepting);
 	}
 }

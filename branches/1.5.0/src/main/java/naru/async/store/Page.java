@@ -347,6 +347,7 @@ public class Page extends PoolBase{
 		free(isPageFile,false);
 	}
 	
+	private Throwable whenFree=new Throwable("dummy");
 	/**
 	 * 
 	 * @param isPageFileÅ@pageFileè„Ç‡ñ¢égópÇ…Ç∑ÇÈÇ©î€Ç©
@@ -366,15 +367,19 @@ public class Page extends PoolBase{
 		}
 		isLastBufferWrite=false;
 		if(isPageFile){
+			if(logger.isDebugEnabled()){
+				Throwable whenFree=new Throwable();
+			}
 			synchronized(pageFile){
-				//Ç±Ç±Ç≈PageÇ™ÇΩÇ‹ÇËÇ∑Ç¨ÇÈ
-//				Log.debug(logger,"$$$2 in:",pageId);
 				Page prevPage=freePages.put(pageId,this);
-//				logger.warn("pageFile in.pageId:"+pageId,new Exception());
 				if(prevPage!=null){
 					logger.error("duplicate free Page.pageId:"+pageId,new Exception());
+					logger.error("last free",this.whenFree);
 					freePages.remove(pageId);
 				}
+			}
+			if(logger.isDebugEnabled()){
+				this.whenFree=whenFree;
 			}
 			//TODO
 			if(isSaveFree){

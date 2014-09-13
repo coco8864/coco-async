@@ -7,10 +7,10 @@ import org.apache.log4j.Logger;
 import naru.async.ChannelHandler;
 import naru.async.ChannelStastics;
 import naru.async.Log;
-import naru.async.pool.PoolBase;
+import naru.async.pool.Context;
 import naru.async.pool.PoolManager;
 
-public class Order extends PoolBase{
+public class Order extends Context{
 	private static Logger logger=Logger.getLogger(Order.class);
 	
 	enum OrderType{
@@ -209,7 +209,7 @@ public class Order extends PoolBase{
 	}
 	
 	public void callback(ChannelStastics ststics){
-		Log.debug(logger,"callback.",orderType,":",handler);
+		Log.debug(logger,"callback.cid:",handler.getChannelId(),"orderType:",orderType);
 		if(handler==null){
 			logger.error("Illegal order.this:"+this,new Exception());
 			return;
