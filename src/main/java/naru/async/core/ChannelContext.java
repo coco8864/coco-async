@@ -5,6 +5,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.channels.CancelledKeyException;
 import java.nio.channels.ClosedChannelException;
@@ -25,7 +26,6 @@ import naru.async.core.Order.OrderType;
 import naru.async.core.SelectOperator.State;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.Context;
-import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
 
 public class ChannelContext extends Context{
@@ -89,9 +89,18 @@ public class ChannelContext extends Context{
 		return writeOperator;
 	}
 	
+	private long acceptTime;
 	private SelectableChannel channel;
 	private Socket socket;
 	private ServerSocket serverSocket;
+	
+	SelectableChannel getChannel(){
+		return channel;
+	}
+	
+	public long getAcceptTime(){
+		return acceptTime;
+	}
 	
 	void closeSocket(){
 		Log.debug(logger,"closeSocket cid:",getPoolId());
@@ -102,8 +111,10 @@ public class ChannelContext extends Context{
 		try {
 			if(socket!=null){
 				socket.close();
+				socket=null;
 			}else if(serverSocket!=null){
 				serverSocket.close();
+				serverSocket=null;
 			}
 		} catch (IOException e) {
 		}
@@ -116,6 +127,7 @@ public class ChannelContext extends Context{
 				socket.shutdownOutput();
 			}else if(serverSocket!=null){
 				serverSocket.close();
+				serverSocket=null;
 			}
 		} catch (IOException e) {
 		}
@@ -170,8 +182,10 @@ public class ChannelContext extends Context{
 		context.socket=null;
 		return context;
 	}
-	static ChannelContext socketChannelCreate(ChannelHandler handler,SocketChannel channel){
+	
+	static ChannelContext socketChannelCreate(ChannelHandler handler,SocketChannel channel,long acceptTime){
 		ChannelContext context=create(handler,channel,false);
+		context.acceptTime=acceptTime;
 		context.socket=channel.socket();
 		InetAddress inetAddress=context.socket.getInetAddress();
 		context.remotePort=context.socket.getPort();
@@ -184,6 +198,18 @@ public class ChannelContext extends Context{
 			context.localIp=inetAddress.getHostAddress();
 		}
 		context.serverSocket=null;
+		try {
+			context.socket.setTcpNoDelay(IOManager.isTcpNoDelay());
+			int soLingerTime=IOManager.getSoLingerTime();
+			if(soLingerTime>0){
+				context.socket.setSoLinger(true, soLingerTime);
+			}else{
+				context.socket.setSoLinger(false, 0);
+			}
+			context.socket.setReuseAddress(IOManager.isReuseAddress());
+		} catch (SocketException e) {
+			logger.warn("fail to TCP_NODELAY",e);
+		}
 		return context;
 	}
 	
@@ -196,15 +222,15 @@ public class ChannelContext extends Context{
 				//connectが完了しちゃった
 			}
 		} catch (IOException e) {
-			logger.error("fail to connect",e);
+			logger.error("fail to open",e);
 			return null;
 		}
-		return socketChannelCreate(handler, channel);
+		return socketChannelCreate(handler, channel,0);
 	}
 	
 	private int acceptingSelect(long now){
 		if(orderOperator.isCloseOrder()){
-			selectOperator.queueIo(State.closing);
+			//selectOperator.queueIo(State.closing);
 			return 0;
 		}
 		return SelectionKey.OP_ACCEPT;
@@ -212,7 +238,7 @@ public class ChannelContext extends Context{
 	
 	private int connectingSelect(long now){
 		if(orderOperator.isCloseOrder()){
-			selectOperator.queueIo(State.closing);
+			//selectOperator.queueIo(State.closing);
 			return 0;
 		}
 		long time=orderOperator.checkConnectTimeout(now);
@@ -306,7 +332,6 @@ public class ChannelContext extends Context{
 		}
 		try {
 			if(selectionKey==null){
-				channel.configureBlocking(false);
 				try {
 					selectionKey=selector.register(channel, ops,this);
 				} catch (CancelledKeyException e) {
@@ -318,9 +343,6 @@ public class ChannelContext extends Context{
 				selectionKey.interestOps(ops);
 			}
 		} catch (ClosedChannelException e) {
-			failureEnd();
-			return false;
-		} catch (IOException e) {
 			failureEnd();
 			return false;
 		}
@@ -495,7 +517,12 @@ public class ChannelContext extends Context{
 		return matcher.matches();
 	}
 	
-	boolean acceptable(Socket socket){
+	public static final String ACCEPT_TIME="acceptTime";
+	public static final String SOCKET_CHANNEL=SocketChannel.class.getName();
+	
+	/* このメソッドは、select中に呼ばれるので時間がかからないように */
+	boolean acceptable(SocketChannel socketChannel){
+		Socket socket=socketChannel.socket();
 		String clietnIp=socket.getInetAddress().getHostAddress();
 		if(isBlockOutOfList){//whiteListに載ってない、けどbackListに載ってなければ許可
 			if( !matchPattern(whiteList,clietnIp) ){
@@ -512,13 +539,29 @@ public class ChannelContext extends Context{
 			}
 		}
 		Order order=Order.create(handler, OrderType.select, acceptUserContext);
+		order.setAttribute(ACCEPT_TIME, System.currentTimeMillis());
+		order.setAttribute(SOCKET_CHANNEL, socketChannel);
 		orderOperator.queueCallback(order);
 		return true;
 	}
 	
-	public void accepted(Object userContext){
+	/* accepted orderはいったん保留して、次回selectするときに通知する */
+	//TODO need or not
+	/*
+	private Order resvAcceptedOrder=null;
+	void doAcceptedIfNeed(){
+		if(resvAcceptedOrder==null){
+			return;
+		}
+		orderOperator.queueCallback(resvAcceptedOrder);
+		resvAcceptedOrder=null;
+	}
+	*/
+	
+	void accepted(Object userContext){
 		Order order=Order.create(handler, OrderType.accept, null);
 		order.setUserCountexts(new Object[]{this,userContext});
+		//resvAcceptedOrder=order;
 		orderOperator.queueCallback(order);
 	}
 	

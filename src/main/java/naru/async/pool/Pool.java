@@ -85,8 +85,8 @@ public class Pool {
 	
 	void batchGet(LinkedList objs,int max){
 		for(int i=objs.size();i<max;i++){
-			ByteBuffer buffer=(ByteBuffer)getInstance();
-			objs.add(buffer);
+			Object obj=getInstance();
+			objs.add(obj);
 		}
 	}
 

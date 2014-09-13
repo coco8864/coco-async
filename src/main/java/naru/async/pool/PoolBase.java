@@ -32,14 +32,7 @@ public class PoolBase {
 	 * pool動作のチェックをしない
 	 */
 	public boolean unref(){
-		Pool pool=life.getPool();
-		if(pool==null){
-			return true;
-		}
-		if( life.unref() ){
-			pool.poolInstance(this);
-		}
-		return true;
+		return unref(false);
 	}
 	
 	/**
@@ -50,6 +43,13 @@ public class PoolBase {
 	 * @param isPool poolに返却すべき(true)/不明(false)
 	 */
 	public boolean unref(boolean isPool){
+		if(LocalPoolManager.poolBaseUnref(this, isPool)){
+			return isPool;
+		}
+		return unref2(isPool);
+	}
+	
+	boolean unref2(boolean isPool){
 		Pool pool=life.getPool();
 		if(pool==null){
 			//pool管理されていない
@@ -61,10 +61,6 @@ public class PoolBase {
 		}
 		boolean result=true;
 		if( life.unref() ){
-//			if(!isPool){
-//				logger.error("unref(false) but poolInstance",new Throwable());
-//				result=false;
-//			}
 			pool.poolInstance(this);
 		}else if(isPool){
 			logger.error("unref(treu) but not poolInstance",new Throwable());

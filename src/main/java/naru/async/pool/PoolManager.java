@@ -364,7 +364,6 @@ public class PoolManager implements Queuelet,Timer{
 		}
 	}
 	
-	
 	public static void poolArrayInstance(Object objs){
 		if(instance==null){//test�̏ꍇ
 			return;

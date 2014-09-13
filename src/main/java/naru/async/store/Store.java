@@ -488,8 +488,31 @@ public class Store extends PoolBase {
 	
 	//PUT‚Ìê‡ABufferGetter‚ğÀ‘•‚·‚é‚Ì‚ª–Ê“|‚Èê‡‚ª‚ ‚éB
 	private static DmmyGetter dmmyGetter=new DmmyGetter();
+	public void putBuffer(ByteBuffer[] buffers){
+		boolean doCallback=false;
+		synchronized(this){
+			if(kind==Kind.PUTGET && putLength==getLength && bufferGetter!=null){
+				long thisPutLength=BuffersUtil.remaining(buffers);
+				putBufferCount++;
+				putBufferLength+=thisPutLength;
+				getLength+=thisPutLength;
+				putLength+=thisPutLength;
+				StoreCallback storeCallback=(StoreCallback)PoolManager.getInstance(StoreCallback.class);
+				storeCallback.asyncBuffer(this,bufferGetter,userContext,buffers);
+				bufferGetter=null;
+			}else{
+				putBufferInternal(buffers);
+			}
+			if(callbackQueue.size()!=0){
+				doCallback=true;
+			}
+		}
+		if(doCallback){
+			callback();
+		}
+	}
 	
-	public synchronized void putBuffer(ByteBuffer[] buffers){
+	private void putBufferInternal(ByteBuffer[] buffers){
 		Log.debug(logger,"putBuffer.sid:",getStoreId());
 		if(isCloseReceived()){
 			logger.error("putBuffer aleady close");
@@ -509,7 +532,6 @@ public class Store extends PoolBase {
 		long thisPutLength=BuffersUtil.remaining(buffers);
 		putBufferCount++;
 		putBufferLength+=thisPutLength;
-		
 		putLength+=thisPutLength;
 		if(puttingPage.putBuffer(buffers)){
 			//puttingPage‚É‹l‚ß‚ß‚½ê‡

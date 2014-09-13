@@ -37,6 +37,7 @@ public class LocalPoolManager {
 	}
 	private Map<Integer,LocalPool> byteBufferPoolMap=new HashMap<Integer,LocalPool>();
 	private Map<Class,Map<Integer,LocalPool>> arrayPoolMap=new HashMap<Class,Map<Integer,LocalPool>>();
+	private LinkedList<PoolBase> unrefObjPool=new LinkedList<PoolBase>();
 	
 	private static LocalPoolManager get(){
 		LocalPoolManager ppt=localPool.get();
@@ -48,6 +49,8 @@ public class LocalPoolManager {
 	}
 	
 	public static void refresh(){
+		//TODO need or not
+		//Thread.yield();
 		LocalPoolManager manager=get();
 		manager.beat();
 	}
@@ -66,7 +69,7 @@ public class LocalPoolManager {
 			return null;
 		}
 		localPool.hit++;
-		return (ByteBuffer)localPool.freePool.getFirst();
+		return (ByteBuffer)localPool.freePool.removeFirst();
 	}
 	
 	public static boolean poolBufferInstance(ByteBuffer buffer) {
@@ -81,6 +84,19 @@ public class LocalPoolManager {
 		}
 		localPool.poolCount++;
 		localPool.usedPool.add(buffer);
+		return true;
+	}
+	
+	public static boolean poolBaseUnref(PoolBase obj,boolean isPool) {
+		LocalPoolManager manager=localPool.get();
+		if(manager==null){
+			return false;
+		}
+		if(isPool){//TODO use isPool
+			manager.unrefObjPool.add(obj);
+		}else{
+			manager.unrefObjPool.add(obj);
+		}
 		return true;
 	}
 	
@@ -107,7 +123,7 @@ public class LocalPoolManager {
 			return null;
 		}
 		localPool.hit++;
-		return localPool.freePool.getFirst();
+		return localPool.freePool.removeFirst();
 	}
 	
 	public static boolean poolArrayInstance(Object objs){
@@ -155,7 +171,7 @@ public class LocalPoolManager {
 	
 	private void beat(){
 		beatCount++;
-		Log.debug(logger, "beat.beatCount:",beatCount);
+		Log.debug(logger, "beat.beatCount:",beatCount,":unrefObjPool.size():"+unrefObjPool.size());
 		for(Integer bufferlength:byteBufferPoolMap.keySet()){
 			LocalPool pool=byteBufferPoolMap.get(bufferlength);
 			pool.beat();
@@ -166,6 +182,11 @@ public class LocalPoolManager {
 				LocalPool pool=pools.get(size);
 				pool.beat();
 			}
+		}
+		while(!unrefObjPool.isEmpty()){
+			PoolBase obj=unrefObjPool.removeFirst();
+			obj.unref2(false);
+			
 		}
 	}
 }

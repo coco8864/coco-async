@@ -12,16 +12,37 @@ import naru.queuelet.QueueletContext;
 
 public class IOManager implements Queuelet {
 	private static Logger logger=Logger.getLogger(IOManager.class);
-	private static QueueletContext queueletContext;
-	private static SelectorHandler selectors[];
-	private static SelectorStastics stastics[];
+	private static IOManager instance;
+	private QueueletContext queueletContext;
+	private SelectorHandler selectors[];
+	private SelectorStastics stastics[];
+	private boolean isTcpNoDelay=true;
+	private int soLingerTime=-1;
+	private boolean isReuseAddress=true;
+	private boolean isAcceptThread=true;//acceptêÍópÇÃthreadÇãNÇ±Ç∑Ç©î€Ç©
+	
+	static boolean isTcpNoDelay(){
+		return instance.isTcpNoDelay;
+	}
+	
+	static int getSoLingerTime(){
+		return instance.soLingerTime;
+	}
+
+	static boolean isReuseAddress(){
+		return instance.isReuseAddress;
+	}
+	
+	static boolean isAcceptThread(){
+		return instance.isAcceptThread;
+	}
 	
 	public static SelectorHandler getSelectorContext(ChannelContext context){
-		int index=(int)(context.getPoolId()%selectors.length);
-		return selectors[index];
+		int index=(int)(context.getPoolId()%instance.selectors.length);
+		return instance.selectors[index];
 	}
 	public static SelectorStastics[] getSelectorStasticses(){
-		return stastics;
+		return instance.stastics;
 	}
 	
 	/**
@@ -38,7 +59,7 @@ public class IOManager implements Queuelet {
 			ctx.ref();
 			Log.debug(logger,"enqueue.cid:",ctx.getPoolId(),":type:",req);
 		}
-		queueletContext.enque(req);
+		instance.queueletContext.enque(req);
 	}
 	
 	private static String STOP_REQUEST="stop";
@@ -50,7 +71,8 @@ public class IOManager implements Queuelet {
 	 * @see naru.quelet.Quelet#init()
 	 */
 	public void init(QueueletContext context,Map param) {
-		this.queueletContext=context;
+		instance=this;
+		queueletContext=context;
 		String selectorCountParam=(String)param.get("selectorCount");
 		int selectorCount=4;
 		if(selectorCountParam!=null){
@@ -75,6 +97,20 @@ public class IOManager implements Queuelet {
 			logger.error("fail to new SelectorContext.",e);
 			context.finish();
 		}
+		
+		isTcpNoDelay=!"false".equalsIgnoreCase((String)param.get("isTcpNoDelay"));
+		isReuseAddress=!"false".equalsIgnoreCase((String)param.get("isReuseAddress"));
+		isAcceptThread=!"false".equalsIgnoreCase((String)param.get("isAcceptThread"));
+		this.soLingerTime=-1;
+		String soLingerTime=(String)param.get("soLingerTime");
+		if(soLingerTime!=null){
+			this.soLingerTime=Integer.parseInt(soLingerTime);
+		}
+		logger.info("isTcpNoDelay:"+isTcpNoDelay);
+		logger.info("soLingerTime:"+this.soLingerTime);
+		logger.info("isReuseAddress:"+isReuseAddress);
+		logger.info("isAcceptThread:"+isAcceptThread);
+		
 	}
 
 	/* (îÒ Javadoc)

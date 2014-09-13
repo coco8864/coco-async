@@ -4,6 +4,7 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 
+import naru.async.pool.LocalPoolManager;
 import naru.queuelet.Queuelet;
 import naru.queuelet.QueueletContext;
 
@@ -36,6 +37,7 @@ public class DispatchManager implements Queuelet {
 	public boolean service(Object req) {
 		OrderOperator orderOperator=(OrderOperator)req;
 		orderOperator.callback();
+		LocalPoolManager.refresh();
 		return true;
 	}
 }
