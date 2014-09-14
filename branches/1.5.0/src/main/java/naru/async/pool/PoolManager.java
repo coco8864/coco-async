@@ -6,10 +6,12 @@ import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 
@@ -43,6 +45,7 @@ public class PoolManager implements Queuelet,Timer{
 	private static QueueletContext queueletContext;
 	private static int defaultBufferSize=16384;
 	
+	private Set<LocalPoolManager> localPoolManagers=new HashSet<LocalPoolManager>();
 	private Map<Class,Pool> classPoolMap=new HashMap<Class,Pool>();
 	private Map<Integer,Pool> byteBufferPoolMap=new HashMap<Integer,Pool>();
 	private Map<Class,Map<Integer,Pool>> arrayPoolMap=new HashMap<Class,Map<Integer,Pool>>();
@@ -132,12 +135,12 @@ public class PoolManager implements Queuelet,Timer{
 		return instance.byteBufferPoolMap.get(size);
 	}
 	
-	/* setupBufferPoolÇ…ïœçX
-	public static void createBufferPool(int size,int limit){
-		Pool pool=addBufferPool(size);
-		pool.setLimit(limit);
+	
+	public static void addLocalPoolManager(LocalPoolManager localPoolManager) {
+		synchronized(instance.localPoolManagers){
+			instance.localPoolManagers.add(localPoolManager);
+		}
 	}
-	*/
 	
 	///
 	public static Pool getClassPool(Class clazz) {
@@ -619,10 +622,20 @@ public class PoolManager implements Queuelet,Timer{
 		poolInstance(req);
 		return true;
 	}
+	
+	private void termLocalPoolManager(){
+		Iterator<LocalPoolManager> itr=localPoolManagers.iterator();
+		while(itr.hasNext()){
+			LocalPoolManager localPoolManager=itr.next();
+			localPoolManager.term();
+			itr.remove();
+		}
+	}
 
 	private boolean isStop=false;
 	public void term() {
 		TimerManager.clearInterval(interval);
+		termLocalPoolManager();
 		//cacheÇèIóπÇ≥ÇπÇÈ
 		BufferCache.getInstance().term();
 		FileCache.getInstance().term();

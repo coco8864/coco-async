@@ -530,7 +530,7 @@ public class ChannelContext extends Context{
 					return false;
 				}
 			}
-		}else{//blackListに載ってたら無条件で許否、whiteListに載ってないのも許否
+		}else{//blackListに載ってたら無条件で拒否、whiteListに載ってないのも拒否
 			if( matchPattern(blackList,clietnIp) ){
 				return false;
 			}
@@ -545,23 +545,9 @@ public class ChannelContext extends Context{
 		return true;
 	}
 	
-	/* accepted orderはいったん保留して、次回selectするときに通知する */
-	//TODO need or not
-	/*
-	private Order resvAcceptedOrder=null;
-	void doAcceptedIfNeed(){
-		if(resvAcceptedOrder==null){
-			return;
-		}
-		orderOperator.queueCallback(resvAcceptedOrder);
-		resvAcceptedOrder=null;
-	}
-	*/
-	
 	void accepted(Object userContext){
 		Order order=Order.create(handler, OrderType.accept, null);
 		order.setUserCountexts(new Object[]{this,userContext});
-		//resvAcceptedOrder=order;
 		orderOperator.queueCallback(order);
 	}
 	
