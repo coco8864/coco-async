@@ -46,10 +46,10 @@ public class PoolBase {
 		if(LocalPoolManager.poolBaseUnref(this, isPool)){
 			return isPool;
 		}
-		return unref2(isPool);
+		return unrefInternal(isPool);
 	}
 	
-	boolean unref2(boolean isPool){
+	boolean unrefInternal(boolean isPool){
 		Pool pool=life.getPool();
 		if(pool==null){
 			//poolŠÇ—‚³‚ê‚Ä‚¢‚È‚¢

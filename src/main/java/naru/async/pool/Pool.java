@@ -121,6 +121,10 @@ public class Pool {
 	private long gcCount;// GCされたオブジェクト数,ByteBufferは、arrayをリサイクル
 	private long maxUseCount;
 	
+	String getDispname(){
+		return dispName;
+	}
+	
 	private long getUseCount(){
 		return sequence-(poolBackCount+gcCount);
 	}	
