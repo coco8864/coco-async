@@ -73,10 +73,24 @@ public class Pool {
 		objs.clear();
 	}
 	
+	private void batchPoolClass(LinkedList objs){
+		for(Object obj:objs){
+			if(obj instanceof PoolBase){
+				((PoolBase)obj).unrefInternal(true);
+			}else{
+				poolInstance(obj);
+			}
+		}
+		objs.clear();
+	}
+	
+	
 	void batchPool(LinkedList objs){
 		if(type==TYPE_ARRAY){
 			batchPoolArray(objs);
 		}else if(type==TYPE_BYTE_BUFFER){
+			batchPoolByteBuffer(objs);
+		}else if(type==TYPE_POOL_BASE){
 			batchPoolByteBuffer(objs);
 		}else{
 			logger.error("fail to batchPool type:"+type);
