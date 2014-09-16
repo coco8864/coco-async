@@ -71,6 +71,13 @@ public class PoolManager implements Queuelet,Timer{
 				}
 			}
 		}
+		synchronized(instance.classPoolMap){
+			for(Class clazz:instance.classPoolMap.keySet()){
+				Pool pool=instance.classPoolMap.get(clazz);
+				localPoolManager.registerClassPool(pool, clazz);
+			}
+		}
+		
 	}
 	
 	private static void setupPool(Pool pool,int limit){
@@ -402,7 +409,11 @@ public class PoolManager implements Queuelet,Timer{
 				logger.error("fail to getInstance.className:"+clazz.getName());
 				throw new RuntimeException("fail to getInstance.className:"+clazz.getName());
 			}
-    	}
+		}
+		Object result=LocalPoolManager.getInstance(clazz);
+		if(result!=null){
+			return result;
+		}
 		Pool pool=(Pool)instance.classPoolMap.get(clazz);
 		if(pool==null){
 			pool=addClassPool(clazz);

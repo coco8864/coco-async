@@ -44,6 +44,7 @@ public class LocalPoolManager {
 	}
 	private Map<Integer,LocalPool> byteBufferPoolMap=new HashMap<Integer,LocalPool>();
 	private Map<Class,Map<Integer,LocalPool>> arrayPoolMap=new HashMap<Class,Map<Integer,LocalPool>>();
+	private Map<Class,LocalPool> classPoolMap=new HashMap<Class,LocalPool>();
 	private LinkedList<PoolBase> unrefObjPool=new LinkedList<PoolBase>();
 	
 	private static LocalPoolManager get(){
@@ -62,6 +63,25 @@ public class LocalPoolManager {
 		LocalPoolManager manager=get();
 		manager.beat();
 	}
+	
+	public static Object getInstance(Class clazz) {
+		LocalPoolManager manager=localPool.get();
+		if(manager==null){
+			return null;
+		}
+		LocalPool localPool=manager.classPoolMap.get(clazz);
+		if(localPool==null){
+			return null;
+		}
+		localPool.getCount++;
+		localPool.total++;
+		if(localPool.freePool.size()==0){
+			return null;
+		}
+		localPool.hit++;
+		return localPool.freePool.removeFirst();
+	}
+	
 	
 	public static ByteBuffer getBufferInstance(int bufferSize) {
 		LocalPoolManager manager=localPool.get();
@@ -128,6 +148,7 @@ public class LocalPoolManager {
 			return null;
 		}
 		localPool.getCount++;
+		localPool.total++;
 		if(localPool.freePool.size()==0){
 			return null;
 		}
@@ -180,6 +201,11 @@ public class LocalPoolManager {
 		m.put(size, localPool);
 	}
 	
+	void registerClassPool(Pool pool,Class clazz){
+		LocalPool localPool=new LocalPool(pool);
+		classPoolMap.put(clazz, localPool);
+	}
+	
 	private void beat(){
 		beatCount++;
 		Log.debug(logger, "beat.beatCount:",beatCount,":unrefObjPool.size():"+unrefObjPool.size());
@@ -194,6 +220,11 @@ public class LocalPoolManager {
 				pool.beat();
 			}
 		}
+		for(Class clazz:classPoolMap.keySet()){
+			LocalPool pool=classPoolMap.get(clazz);
+			pool.beat();
+		}
+		
 		while(!unrefObjPool.isEmpty()){
 			PoolBase obj=unrefObjPool.removeFirst();
 			obj.unrefInternal(false);
@@ -214,6 +245,11 @@ public class LocalPoolManager {
 				pool.term();
 			}
 		}
+		for(Class clazz:classPoolMap.keySet()){
+			LocalPool pool=classPoolMap.get(clazz);
+			pool.term();
+		}
+		
 		while(!unrefObjPool.isEmpty()){
 			PoolBase obj=unrefObjPool.removeFirst();
 			obj.unrefInternal(false);
