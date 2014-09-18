@@ -16,6 +16,7 @@ import org.apache.log4j.Logger;
 
 import naru.async.Log;
 import naru.async.core.SelectOperator.State;
+import naru.async.pool.LocalPoolManager;
 
 public class SelectorHandler implements Runnable {
 	static private Logger logger=Logger.getLogger(SelectorHandler.class);
@@ -53,6 +54,7 @@ public class SelectorHandler implements Runnable {
 		}
 		public void run() {
 			logger.info("accept thread start");
+			LocalPoolManager.setClassPoolMax(Order.class,1024);
 			handler.accept(context);
 			logger.info("accept thread end");
 			context.unref();
@@ -151,6 +153,7 @@ public class SelectorHandler implements Runnable {
 
 	private void accept(ChannelContext context){
 		while(acceptInternal(context)){
+			LocalPoolManager.checkClassPool(Order.class);
 		}
 	}
 
@@ -162,14 +165,13 @@ public class SelectorHandler implements Runnable {
 			if(socketChannel==null){
 				return false;
 			}
-			socketChannel.configureBlocking(false);
 			if( !context.acceptable(socketChannel) ){
 				Log.debug(logger,"refuse socketChannel:",socketChannel);
 				socketChannel.close();//ê⁄ë±ãëî€
 				stastics.acceptRefuse();
 				return true;
 			}
-			Log.debug(logger,"isAcceptable socketChannel:",socketChannel);
+			Log.debug(logger,"acceptInternal:",socketChannel);
 		} catch (IOException e) {
 			logger.error("fail to accept.",e);
 			return false;
