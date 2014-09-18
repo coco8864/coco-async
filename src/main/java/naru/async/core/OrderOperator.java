@@ -1,5 +1,6 @@
 package naru.async.core;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
@@ -80,7 +81,7 @@ public class OrderOperator {
 		}
 	}
 	
-	synchronized boolean checkAndCallbackFinish(){
+	boolean checkAndCallbackFinish(){
 		Log.debug(logger,"checkAndCallbackFinish.cid:",context.getPoolId());
 		if(isFinished){
 			return false;
@@ -119,6 +120,12 @@ public class OrderOperator {
 		SocketChannel socketChannel=(SocketChannel)order.getAttribute(ChannelContext.SOCKET_CHANNEL);
 		ChannelHandler handler=(ChannelHandler)PoolManager.getInstance(context.getAcceptClass());
 		ChannelContext acceptContext=ChannelContext.socketChannelCreate(handler, socketChannel,acceptTime);
+		try {
+			socketChannel.configureBlocking(false);
+		} catch (IOException e) {
+			logger.warn("fail to configureBlocking(false)",e);
+		}
+		acceptContext.setupSocketOpt();
 		acceptContext.getSelectOperator().readable();
 		Object userAcceptContext=context.getAcceptUserContext();
 		acceptContext.accepted(userAcceptContext);
@@ -155,12 +162,14 @@ public class OrderOperator {
 			}
 		}finally{
 			Log.debug(logger,"callback isFinishCallback=true.cid:",context.getPoolId());
-			synchronized(context){
-				if(isFinishCallback){
+			if(isFinishCallback){
+				synchronized(context){
 					finishHandler.unref();
 					context.setHandler(null);
 					context.unref();
-				}else if(orderCount()==0){
+				}
+			}else if(orderCount()==0){
+				synchronized(context){
 					checkAndCallbackFinish();
 				}
 			}

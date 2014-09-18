@@ -91,7 +91,7 @@ public class Pool {
 		}else if(type==TYPE_BYTE_BUFFER){
 			batchPoolByteBuffer(objs);
 		}else if(type==TYPE_POOL_BASE){
-			batchPoolByteBuffer(objs);
+			batchPoolClass(objs);
 		}else{
 			logger.error("fail to batchPool type:"+type);
 		}

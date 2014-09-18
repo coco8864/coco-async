@@ -203,6 +203,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 			if(failure!=null){
 				orderOperator.failure(failure);
 			}else{
+				context.setupSocketOpt();
 				orderOperator.doneConnect();
 				queueSelect(State.selectReading);
 			}

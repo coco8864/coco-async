@@ -2,7 +2,6 @@ package naru.async.pool;
 
 import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
@@ -28,7 +27,6 @@ public class LocalPoolManager {
 		int max;
 		int total;
 		void beat(){
-			//Log.debug(logger, "LocalPool beat.getCount:",getCount,":poolCount:",poolCount,":hit:",hit,":max:",max);
 			pool.batchPool(usedPool);
 			pool.batchGet(freePool,max);
 			if(max<getCount){
@@ -37,7 +35,9 @@ public class LocalPoolManager {
 			hit=getCount=poolCount=0;
 		}
 		void term(){
-			Log.debug(logger,pool.getDispname()+":total:" +total +":max:"+max);
+			if(max!=0){
+				logger.info(pool.getDispname()+":total:" +total +":max:"+max);
+			}
 			pool.batchPool(freePool);
 			pool.batchPool(usedPool);
 		}
@@ -48,6 +48,9 @@ public class LocalPoolManager {
 	private LinkedList<PoolBase> unrefObjPool=new LinkedList<PoolBase>();
 	
 	private static LocalPoolManager get(){
+		//if(true){
+		//	return null;
+		//}
 		LocalPoolManager localPoolManager=localPool.get();
 		if(localPoolManager==null){
 			localPoolManager=new LocalPoolManager();
@@ -55,6 +58,21 @@ public class LocalPoolManager {
 			PoolManager.addLocalPoolManager(localPoolManager);
 		}
 		return localPoolManager;
+	}
+	
+	public static void setClassPoolMax(Class clazz,int max){
+		LocalPoolManager manager=get();
+		LocalPool localPool=manager.classPoolMap.get(clazz);
+		localPool.max=max;
+		localPool.beat();
+	}
+	
+	public static void checkClassPool(Class clazz){
+		LocalPoolManager manager=get();
+		LocalPool localPool=manager.classPoolMap.get(clazz);
+		if(localPool.max==localPool.getCount){
+			localPool.beat();
+		}
 	}
 	
 	public static void refresh(){
@@ -233,7 +251,7 @@ public class LocalPoolManager {
 	}
 	
 	void term(){
-		logger.info("LocalPoolManager term["+threadName+"]isAlive:"+thread.isAlive()+":beatCount:"+beatCount+":last:"+new Date(lastRefresh));
+		logger.info("LocalPoolManager term["+threadName+"]isAlive:"+thread.isAlive()+":beatCount:"+beatCount+":last:"+(lastRefresh-System.currentTimeMillis()));
 		for(Integer bufferlength:byteBufferPoolMap.keySet()){
 			LocalPool pool=byteBufferPoolMap.get(bufferlength);
 			pool.term();

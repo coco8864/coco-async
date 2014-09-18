@@ -166,17 +166,19 @@ public class ChannelContext extends Context{
 	public static ChannelContext serverChannelCreate(ChannelHandler handler,InetSocketAddress address,int backlog){
 		/* context‚ðì‚é */
 		ServerSocketChannel serverSocketChannel;
+		ServerSocket serverSocket;
 		try {
 			serverSocketChannel = ServerSocketChannel.open();
-			serverSocketChannel.configureBlocking(false);
+			serverSocket=serverSocketChannel.socket();
+			serverSocket.setReuseAddress(IOManager.isReuseAddress());
 			serverSocketChannel.socket().bind(address,backlog);
+			serverSocketChannel.configureBlocking(false);
 		} catch (IOException e) {
 			logger.error("failt to asyncAccept.",e);
 			return null;
 		}
-		
 		ChannelContext context=create(handler,serverSocketChannel,true);
-		context.serverSocket=serverSocketChannel.socket();
+		context.serverSocket=serverSocket;
 		context.localIp=context.remoteIp=null;
 		context.localPort=context.remotePort=-1;
 		context.socket=null;
@@ -198,19 +200,21 @@ public class ChannelContext extends Context{
 			context.localIp=inetAddress.getHostAddress();
 		}
 		context.serverSocket=null;
+		return context;
+	}
+	
+	void setupSocketOpt(){
 		try {
-			context.socket.setTcpNoDelay(IOManager.isTcpNoDelay());
+			socket.setTcpNoDelay(IOManager.isTcpNoDelay());
 			int soLingerTime=IOManager.getSoLingerTime();
 			if(soLingerTime>0){
-				context.socket.setSoLinger(true, soLingerTime);
+				socket.setSoLinger(true, soLingerTime);
 			}else{
-				context.socket.setSoLinger(false, 0);
+				socket.setSoLinger(false, 0);
 			}
-			context.socket.setReuseAddress(IOManager.isReuseAddress());
 		} catch (SocketException e) {
-			logger.warn("fail to TCP_NODELAY",e);
+			logger.warn("fail to setTcpNoDelay or setSoLinger",e);
 		}
-		return context;
 	}
 	
 	public static ChannelContext socketChannelCreate(ChannelHandler handler,InetSocketAddress address){
@@ -221,6 +225,7 @@ public class ChannelContext extends Context{
 			if(channel.connect(address)){
 				//connect‚ªŠ®—¹‚µ‚¿‚á‚Á‚½
 			}
+			channel.configureBlocking(false);			
 		} catch (IOException e) {
 			logger.error("fail to open",e);
 			return null;
