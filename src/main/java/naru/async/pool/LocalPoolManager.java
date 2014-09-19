@@ -13,35 +13,6 @@ import org.apache.log4j.Logger;
 public class LocalPoolManager {
 	private static Logger logger=Logger.getLogger(LocalPoolManager.class);
 	private static ThreadLocal<LocalPoolManager> localPool=new ThreadLocal<LocalPoolManager>();
-	
-	private class LocalPool{
-		public LocalPool(Pool pool) {
-			this.pool=pool;
-		}
-		Pool pool;
-		LinkedList<Object> freePool=new LinkedList<Object>();
-		LinkedList<Object> usedPool=new LinkedList<Object>();
-		int getCount;
-		int poolCount;
-		int hit;
-		int max;
-		int total;
-		void beat(){
-			pool.batchPool(usedPool);
-			pool.batchGet(freePool,max);
-			if(max<getCount){
-				max=getCount;
-			}
-			hit=getCount=poolCount=0;
-		}
-		void term(){
-			if(max!=0){
-				logger.info(pool.getDispname()+":total:" +total +":max:"+max);
-			}
-			pool.batchPool(freePool);
-			pool.batchPool(usedPool);
-		}
-	}
 	private Map<Integer,LocalPool> byteBufferPoolMap=new HashMap<Integer,LocalPool>();
 	private Map<Class,Map<Integer,LocalPool>> arrayPoolMap=new HashMap<Class,Map<Integer,LocalPool>>();
 	private Map<Class,LocalPool> classPoolMap=new HashMap<Class,LocalPool>();
@@ -60,19 +31,10 @@ public class LocalPoolManager {
 		return localPoolManager;
 	}
 	
-	public static void setClassPoolMax(Class clazz,int max){
+	public static void setupChargeClassPool(Class clazz,int max){
 		LocalPoolManager manager=get();
 		LocalPool localPool=manager.classPoolMap.get(clazz);
-		localPool.max=max;
-		localPool.beat();
-	}
-	
-	public static void checkClassPool(Class clazz){
-		LocalPoolManager manager=get();
-		LocalPool localPool=manager.classPoolMap.get(clazz);
-		if(localPool.max==localPool.getCount){
-			localPool.beat();
-		}
+		localPool.setupChargePool(max);
 	}
 	
 	public static void refresh(){
@@ -91,13 +53,7 @@ public class LocalPoolManager {
 		if(localPool==null){
 			return null;
 		}
-		localPool.getCount++;
-		localPool.total++;
-		if(localPool.freePool.size()==0){
-			return null;
-		}
-		localPool.hit++;
-		return localPool.freePool.removeFirst();
+		return localPool.get();
 	}
 	
 	
@@ -110,13 +66,7 @@ public class LocalPoolManager {
 		if(localPool==null){
 			return null;
 		}
-		localPool.getCount++;
-		localPool.total++;
-		if(localPool.freePool.size()==0){
-			return null;
-		}
-		localPool.hit++;
-		return (ByteBuffer)localPool.freePool.removeFirst();
+		return (ByteBuffer)localPool.get();
 	}
 	
 	public static boolean poolBufferInstance(ByteBuffer buffer) {
@@ -165,13 +115,7 @@ public class LocalPoolManager {
 		if(localPool==null){
 			return null;
 		}
-		localPool.getCount++;
-		localPool.total++;
-		if(localPool.freePool.size()==0){
-			return null;
-		}
-		localPool.hit++;
-		return localPool.freePool.removeFirst();
+		return localPool.get();
 	}
 	
 	public static boolean poolArrayInstance(Object objs){

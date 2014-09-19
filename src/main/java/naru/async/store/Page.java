@@ -401,6 +401,15 @@ public class Page extends PoolBase{
 		this.buffer[this.buffer.length-1]=newLastBuffer;
 	}
 	
+	public ByteBuffer peekOnlyBuffer(){
+		int len=this.buffer.length;
+		if(len!=1){
+			return null;
+		}
+		return this.buffer[0];
+	}
+	
+	
 	//¬‚³‚·‚¬‚éBuffer‚ğ”rœ‚·‚é
 	/*
 	private void checkLastBuffer(){
