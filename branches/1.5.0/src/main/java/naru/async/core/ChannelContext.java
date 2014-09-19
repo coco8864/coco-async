@@ -205,7 +205,7 @@ public class ChannelContext extends Context{
 	
 	void setupSocketOpt(){
 		try {
-			socket.setTcpNoDelay(IOManager.isTcpNoDelay());
+			socket.setTcpNoDelay(IOManager.tcpNoDelay());
 			int soLingerTime=IOManager.getSoLingerTime();
 			if(soLingerTime>0){
 				socket.setSoLinger(true, soLingerTime);

@@ -80,7 +80,7 @@ public class SelectorHandler implements Runnable {
 		stastics.inQueue();
 		synchronized(contexts){
 			context.ref();//select cycle‚É‚¢‚éŠÔ‚ÍQÆ‚ğ‚Â
-			if(context.getSelectOperator().isAccepting()&&IOManager.isAcceptThread()){
+			if(context.getSelectOperator().isAccepting()&&IOManager.useAcceptThread()){
 				(new AcceptRunner(this,context)).start();
 			}else{
 				contexts.add(context);

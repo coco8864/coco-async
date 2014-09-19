@@ -19,9 +19,9 @@ public class LocalPoolManager {
 	private LinkedList<PoolBase> unrefObjPool=new LinkedList<PoolBase>();
 	
 	private static LocalPoolManager get(){
-		//if(true){
-		//	return null;
-		//}
+		if(!PoolManager.useLocalPool()){
+			return null;
+		}
 		LocalPoolManager localPoolManager=localPool.get();
 		if(localPoolManager==null){
 			localPoolManager=new LocalPoolManager();
@@ -33,6 +33,9 @@ public class LocalPoolManager {
 	
 	public static void setupChargeClassPool(Class clazz,int max){
 		LocalPoolManager manager=get();
+		if(manager==null){
+			return;
+		}
 		LocalPool localPool=manager.classPoolMap.get(clazz);
 		localPool.setupChargePool(max);
 	}
