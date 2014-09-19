@@ -52,8 +52,8 @@ public class PoolManager implements Queuelet,Timer{
 	private Map<Class,Object> array0PoolMap=new HashMap<Class,Object>();
 
     private ReferenceQueue referenceQueue = new ReferenceQueue();
-	private List<Class> delayRecycleClasses=new ArrayList<Class>();
-	private LinkedList delayRecycleArray=new LinkedList();
+//	private List<Class> delayRecycleClasses=new ArrayList<Class>();
+//	private LinkedList delayRecycleArray=new LinkedList();
 	
 	static void setupLocalPoolManager(LocalPoolManager localPoolManager){
 		synchronized(instance.byteBufferPoolMap){
@@ -142,6 +142,9 @@ public class PoolManager implements Queuelet,Timer{
 		return instance.byteBufferPoolMap.get(size);
 	}
 	
+	public static boolean useLocalPool(){
+		return instance.useLocalPool;
+	}
 	
 	public static void addLocalPoolManager(LocalPoolManager localPoolManager) {
 		synchronized(instance.localPoolManagers){
@@ -178,23 +181,6 @@ public class PoolManager implements Queuelet,Timer{
     	instance.dumpPool();
     }
     
-    public static void addDerayRecycle(Object obj){
-    	synchronized(instance.delayRecycleArray){
-    		instance.delayRecycleArray.add(obj);
-    	}
-    }
-    
-    private static boolean isDelayRecycleClass(Class clazz){
-    	Iterator<Class> itr=instance.delayRecycleClasses.iterator();
-    	while(itr.hasNext()){
-    		Class baseClass=itr.next();
-    		if(baseClass.isAssignableFrom(clazz)){
-    			return true;
-    		}
-    	}
-    	return false;
-    }
-    
 	private static void delayRecycleObject(Object obj){
 		Pool pool=null;
 		if(obj instanceof PoolBase){
@@ -208,29 +194,6 @@ public class PoolManager implements Queuelet,Timer{
 		}
 	}
     
-	private static void delayRecycleObjects(Object checkObj){
-		List list=new ArrayList();
-		synchronized(instance.delayRecycleArray){
-			Iterator itr=instance.delayRecycleArray.iterator();
-			while(itr.hasNext()){
-				Object obj=itr.next();
-				itr.remove();
-				if(obj==checkObj){//自分自身を番兵として入れる
-					break;
-				}
-				list.add(obj);
-			}
-		}
-		Iterator itr=list.iterator();
-		while(itr.hasNext()){
-			Object obj=itr.next();
-			itr.remove();
-			delayRecycleObject(obj);
-		}
-		if(checkObj==null && instance.delayRecycleArray.size()>0){
-			delayRecycleObjects(checkObj);
-		}
-	}
     
 	private static Pool addArrayPool(Class clazz,int size){
 		try {
@@ -250,7 +213,7 @@ public class PoolManager implements Queuelet,Timer{
 				}
 				Pool pool=new Pool(
 						clazz,size,
-						1,ARRAY_MAX_POOL_COUNT,1,false);
+						1,ARRAY_MAX_POOL_COUNT,1);
 				m.put(size, pool);
 				return pool;
 			}
@@ -271,7 +234,7 @@ public class PoolManager implements Queuelet,Timer{
 			Pool pool=new Pool(
 				clazz.getConstructor(NO_TYPES),isExtendsPoolBase,
 				recycleMethodName,
-				1,-1,1,isDelayRecycleClass(clazz));
+				1,-1,1);
 			synchronized(instance.classPoolMap){
 				instance.classPoolMap.put(clazz, pool);
 			}
@@ -457,8 +420,7 @@ public class PoolManager implements Queuelet,Timer{
 	}
 	
 	private long recycleInterval=60000;
-//	private long watchIntervalCount=1;
-//	private long timerId;
+	private boolean useLocalPool=true;
 	private Object interval;
 	
 	private String[] getArgs(Map param,String poolName){
@@ -525,11 +487,11 @@ public class PoolManager implements Queuelet,Timer{
 			Pool pool=new Pool(
 					poolClass.getConstructor(NO_TYPES),isExtendsPoolBase,
 					recycleMethodName,
-					initial,limit,increment,isDelayRecycleClass(poolClass));
+					initial,limit,increment);
 			classPoolMap.put(poolClass, pool);
 		}else{
 			int arrayLength=Integer.parseInt(arrayLengthParam);
-			Pool pool=new Pool(poolClass,arrayLength,initial,limit,increment,false);
+			Pool pool=new Pool(poolClass,arrayLength,initial,limit,increment);
 			Map<Integer,Pool> m=arrayPoolMap.get(poolClass);
 			if(m==null){
 				m=new HashMap<Integer,Pool>();
@@ -574,25 +536,11 @@ public class PoolManager implements Queuelet,Timer{
 		PoolManager.instance=this;
 		PoolManager.queueletContext=context;
 		try {
-			//遅延回収クラスを取得（クラス名としたのは、継承がある場合一括して設定できるメリットを選択）
-			String delayRecycleClassesNames=(String)param.get("delayRecycleClasses");
-			if(delayRecycleClassesNames!=null){
-				String[] delayRecycleClassesNameArray=delayRecycleClassesNames.split(",");
-				for(int i=0;i<delayRecycleClassesNameArray.length;i++){
-					Class clazz=Class.forName(delayRecycleClassesNameArray[i]);
-					delayRecycleClasses.add(clazz);
-				}
-			}
-			
-//			String watchIntervalCountString=(String)param.get("watchIntervalCount");
-//			if(watchIntervalCountString!=null){
-//				watchIntervalCount=Long.parseLong(watchIntervalCountString);
-//			}
-			
 			String recycleIntervalString=(String)param.get("recycleInterval");
 			if(recycleIntervalString!=null){
 				recycleInterval=Long.parseLong(recycleIntervalString);
 			}
+			useLocalPool=!"false".equalsIgnoreCase((String)param.get("useLocalPool"));
 			String poolNames=(String)param.get("poolNames");
 			if(poolNames!=null){
 				String[] poolNameArray=poolNames.split(",");
@@ -625,7 +573,6 @@ public class PoolManager implements Queuelet,Timer{
 			context.finish();
 			return;
 		}
-		addDerayRecycle(delayRecycleArray);//最初の番兵を登録
 		interval=TimerManager.setInterval(recycleInterval, this, "PoolManagerTimer");
 	}
 
@@ -661,7 +608,6 @@ public class PoolManager implements Queuelet,Timer{
 		logger.info("===PoolManager term start===");
 //		Page.saveFreePage(0);
 		onTimer(null);
-		delayRecycleObjects(null);
 		/* ByteBufferPoolの開放 */
 		Object[] pools=byteBufferPoolMap.values().toArray();
 		for(int i=0;i<pools.length;i++){
@@ -703,23 +649,14 @@ public class PoolManager implements Queuelet,Timer{
 	public void onTimer(Object userContext) {
 		Log.debug(logger,"PoolManager onTimer.interval:",interval);
 		timerCount++;
-		try{
-			delayRecycleObjects(delayRecycleArray);//遅延回収の実行
-			/* ByteBufferがGCされた場合は、ArrayLifeに保存されているbyte[]を再利用する */
-			/* その他のオブジェクトは警告を出力するだけ */
-			while(true){
-				ReferenceLife life=(ReferenceLife) referenceQueue.poll();
-				if(life==null){
-					break;
-				}
-				life.gcInstance();
+		/* ByteBufferがGCされた場合は、ArrayLifeに保存されているbyte[]を再利用する */
+		/* その他のオブジェクトは警告を出力するだけ */
+		while(true){
+			ReferenceLife life=(ReferenceLife) referenceQueue.poll();
+			if(life==null){
+				break;
 			}
-//			if(timerCount%watchIntervalCount==0){
-//				dumpPool();
-//				ChannelContext.dumpChannelContexts();
-//			}
-		}finally{
-			addDerayRecycle(delayRecycleArray);//時間毎に番兵を登録
+			life.gcInstance();
 		}
 	}
 	
@@ -734,10 +671,6 @@ public class PoolManager implements Queuelet,Timer{
 	public static int getDefaultBufferSize(){
 		return defaultBufferSize;
 	}
-	
-//	public static void setDefaultBufferSize(int defaultBufferSize){
-//		PoolManager.defaultBufferSize=defaultBufferSize;
-//	}
 	
 	private boolean debug=false;
 	

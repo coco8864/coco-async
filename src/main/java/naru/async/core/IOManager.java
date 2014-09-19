@@ -16,25 +16,25 @@ public class IOManager implements Queuelet {
 	private QueueletContext queueletContext;
 	private SelectorHandler selectors[];
 	private SelectorStastics stastics[];
-	private boolean isTcpNoDelay=true;
+	private boolean tcpNoDelay=true;
 	private int soLingerTime=-1;
-	private boolean isReuseAddress=true;
-	private boolean isAcceptThread=true;//accept専用のthreadを起こすか否か
+	private boolean reuseAddress=true;
+	private boolean useAcceptThread=true;//accept専用のthreadを起こすか否か
 	
-	static boolean isTcpNoDelay(){
-		return instance.isTcpNoDelay;
+	static boolean tcpNoDelay(){
+		return instance.tcpNoDelay;
 	}
 	
 	static int getSoLingerTime(){
 		return instance.soLingerTime;
 	}
 
-	static boolean isReuseAddress(){
-		return instance.isReuseAddress;
+	static boolean reuseAddress(){
+		return instance.reuseAddress;
 	}
 	
-	static boolean isAcceptThread(){
-		return instance.isAcceptThread;
+	static boolean useAcceptThread(){
+		return instance.useAcceptThread;
 	}
 	
 	public static SelectorHandler getSelectorContext(ChannelContext context){
@@ -98,18 +98,18 @@ public class IOManager implements Queuelet {
 			context.finish();
 		}
 		
-		isTcpNoDelay=!"false".equalsIgnoreCase((String)param.get("isTcpNoDelay"));
-		isReuseAddress=!"false".equalsIgnoreCase((String)param.get("isReuseAddress"));
-		isAcceptThread=!"false".equalsIgnoreCase((String)param.get("isAcceptThread"));
+		tcpNoDelay=!"false".equalsIgnoreCase((String)param.get("tcpNoDelay"));
+		reuseAddress=!"false".equalsIgnoreCase((String)param.get("reuseAddress"));
+		useAcceptThread=!"false".equalsIgnoreCase((String)param.get("useAcceptThread"));
 		this.soLingerTime=-1;
 		String soLingerTime=(String)param.get("soLingerTime");
 		if(soLingerTime!=null){
 			this.soLingerTime=Integer.parseInt(soLingerTime);
 		}
-		logger.info("isTcpNoDelay:"+isTcpNoDelay);
+		logger.info("tcpNoDelay:"+tcpNoDelay);
 		logger.info("soLingerTime:"+this.soLingerTime);
-		logger.info("isReuseAddress:"+isReuseAddress);
-		logger.info("isAcceptThread:"+isAcceptThread);
+		logger.info("reuseAddress:"+reuseAddress);
+		logger.info("useAcceptThread:"+useAcceptThread);
 		
 	}
 

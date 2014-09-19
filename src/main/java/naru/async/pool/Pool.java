@@ -143,7 +143,7 @@ public class Pool {
 		return sequence-(poolBackCount+gcCount);
 	}	
 
-	private boolean isDelayRecycle = false;// 遅延recycle
+	//private boolean isDelayRecycle = false;// 遅延recycle
 
 	public synchronized ByteArrayLife getByteArrayLife(byte[] array) {
 		return byteArrayLifes.get(array);
@@ -187,25 +187,23 @@ public class Pool {
 	}
 
 	/* 配列オブジェクトClassに使用 */
-	public Pool(Class memberClass, int length, int min, int max, int expansion,
-			boolean isDelayRecycle) throws ClassNotFoundException,
+	public Pool(Class memberClass, int length, int min, int max, int expansion) throws ClassNotFoundException,
 			SecurityException, NoSuchMethodException, IllegalArgumentException,
 			IllegalAccessException, InvocationTargetException,
 			InstantiationException {
 		this(null, null, memberClass, NO_ARGS, TYPE_ARRAY, length, null, min,
-				max, expansion, isDelayRecycle);
+				max, expansion);
 	}
 
 	/* PoolBaseをextendsしたClass,パラメタなしのconstractorを持つClassに使用 */
 	public Pool(Constructor poolClassConstructor, boolean isExtendsPoolBase,
-			String recycleMethodName, int min, int max, int expansion,
-			boolean isDelayRecycle) throws ClassNotFoundException,
+			String recycleMethodName, int min, int max, int expansion) throws ClassNotFoundException,
 			SecurityException, NoSuchMethodException, IllegalArgumentException,
 			IllegalAccessException, InvocationTargetException,
 			InstantiationException {
 		this(poolClassConstructor, null, null, NO_ARGS,
 				isExtendsPoolBase ? TYPE_POOL_BASE : TYPE_GENERAL, 0,
-				recycleMethodName, min, max, expansion, isDelayRecycle);
+				recycleMethodName, min, max, expansion);
 	}
 
 	/* ByteBufferに使用 */
@@ -216,14 +214,13 @@ public class Pool {
 			IllegalAccessException, InvocationTargetException,
 			InstantiationException {
 		this(null, factoryMethod, null, instantiateArgs, TYPE_BYTE_BUFFER, 0,
-				recycleMethodName, min, max, increment, false);
+				recycleMethodName, min, max, increment);
 	}
 
 	private Pool(Constructor poolClassConstructor, Method factoryMethod,
 			Class poolClass, Object[] instantiateArgs, int type,
 			int length,// 配列の場合の配列数
-			String recycleMethodName, int initial, int limit, int increment,
-			boolean isDelayRecycle) throws ClassNotFoundException,
+			String recycleMethodName, int initial, int limit, int increment) throws ClassNotFoundException,
 			SecurityException, NoSuchMethodException, IllegalArgumentException,
 			IllegalAccessException, InvocationTargetException,
 			InstantiationException {
@@ -265,7 +262,6 @@ public class Pool {
 		}
 		this.increment = increment;
 		addInstance(this.initial);
-		this.isDelayRecycle = isDelayRecycle;
 		this.maxUseCount=0;
 		
 		//for debug
@@ -588,10 +584,6 @@ public class Pool {
 
 	public void poolInstance(Object obj) {
 		callInactivate(obj);
-		if (isDelayRecycle) {// 遅延recycleする場合
-			PoolManager.addDerayRecycle(obj);
-			return;
-		}
 		recycleInstance(obj);
 	}
 	
