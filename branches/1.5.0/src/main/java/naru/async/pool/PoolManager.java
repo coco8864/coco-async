@@ -630,6 +630,13 @@ public class PoolManager implements Queuelet,Timer{
 	}
 
 	public boolean service(Object req) {
+		if(req instanceof LocalPool){
+			LocalPool localPool=(LocalPool)req;
+			synchronized(localPool){
+				
+			}
+		}
+		
 		poolInstance(req);
 		return true;
 	}
@@ -777,11 +784,7 @@ public class PoolManager implements Queuelet,Timer{
 			return newBuffer;
 		}
 		
-		Pool pool=null;
-//		synchronized(instance.byteBufferPoolMap){
-			pool=instance.byteBufferPoolMap.get(length);
-//		}
-//		if(true){
+		Pool pool=instance.byteBufferPoolMap.get(length);
 		if(pool==null){//poolä«óùäO
 			return buffer.duplicate();
 		}

@@ -54,7 +54,7 @@ public class SelectorHandler implements Runnable {
 		}
 		public void run() {
 			logger.info("accept thread start");
-			LocalPoolManager.setClassPoolMax(Order.class,1024);
+			LocalPoolManager.setupChargeClassPool(Order.class,1024);
 			handler.accept(context);
 			logger.info("accept thread end");
 			context.unref();
@@ -153,7 +153,6 @@ public class SelectorHandler implements Runnable {
 
 	private void accept(ChannelContext context){
 		while(acceptInternal(context)){
-			LocalPoolManager.checkClassPool(Order.class);
 		}
 	}
 
