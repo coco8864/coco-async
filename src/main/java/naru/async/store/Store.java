@@ -338,7 +338,11 @@ public class Store extends PoolBase {
 	 * GETモードを途中でcloseしたい場合に使用
 	 */
 	public synchronized void close(){
-		close(false);
+		if(kind==Kind.PUT){
+			close(true);
+		}else{
+			close(false);
+		}
 	}
 
 	/**

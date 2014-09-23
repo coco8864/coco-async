@@ -170,7 +170,7 @@ public class ChannelContext extends Context{
 		try {
 			serverSocketChannel = ServerSocketChannel.open();
 			serverSocket=serverSocketChannel.socket();
-			serverSocket.setReuseAddress(IOManager.isReuseAddress());
+			serverSocket.setReuseAddress(IOManager.reuseAddress());
 			serverSocketChannel.socket().bind(address,backlog);
 			serverSocketChannel.configureBlocking(false);
 		} catch (IOException e) {
