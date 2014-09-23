@@ -77,6 +77,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 	}
 	
 	public boolean onBuffer(ByteBuffer[] buffers, Object userContext) {
+		Log.debug(logger, "onBuffer.cid:",context.getPoolId());
 		long length=BuffersUtil.remaining(buffers);
 		synchronized(context){
 			currentBufferLength+=length;
@@ -275,6 +276,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		workBuffer.clear();
 		totalCallbackLength+=currentBufferLength;
 		currentBufferLength=0;
+		store.asyncBuffer(this, store);
 		order.setBuffers(bufs);
 		orderOperator.queueCallback(order);
 		return true;
