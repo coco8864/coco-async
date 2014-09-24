@@ -137,6 +137,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		long length=0;
 		boolean isEos=false;
 		Throwable failure=null;
+		boolean readable=false;
 		try {
 			//http://docs.oracle.com/javase/jp/6/api/java/nio/channels/ReadableByteChannel.html#read(java.nio.ByteBuffer)
 			//EOS(End Of Stream)=-1 0はEOSじゃない
@@ -144,6 +145,9 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 			Log.debug(logger,"##executeRead length:",length,":cid:",context.getPoolId());
 			if(length>0){
 				buffer.flip();
+				if(buffer.hasRemaining()==false){
+					readable=true;//用意したバッファを全部つかちゃったって事はまだreadable
+				}
 			}else if(length==0){
 				PoolManager.poolBufferInstance(buffer);
 				buffer=null;
@@ -174,12 +178,16 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 					writeOperator.onReadEos();
 					closed();
 				}
+				return false;
 			}else{
 				if(buffer!=null){
 					Log.debug(logger,"store.putBuffer.cid:",context.getPoolId());
 					store.putBuffer(BuffersUtil.toByteBufferArray(buffer));
 				}
-				queueSelect(State.selectReading);
+				if(readable==false){
+					queueSelect(State.selectReading);
+					return false;
+				}
 			}
 		}
 		return true;
@@ -234,7 +242,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		}else if(isConnect){
 			finishConnect();
 		}else if(isRead){
-			executeRead();
+			while(executeRead()){};
 		}
 	}
 
