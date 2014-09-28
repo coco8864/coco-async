@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,33 +51,6 @@ public class PoolManager implements Queuelet,Timer{
 	private Map<Class,Object> array0PoolMap=new HashMap<Class,Object>();
 
     private ReferenceQueue referenceQueue = new ReferenceQueue();
-//	private List<Class> delayRecycleClasses=new ArrayList<Class>();
-//	private LinkedList delayRecycleArray=new LinkedList();
-	
-	static void setupLocalPoolManager(LocalPoolManager localPoolManager){
-		synchronized(instance.byteBufferPoolMap){
-			for(Integer bufferlength:instance.byteBufferPoolMap.keySet()){
-				Pool pool=instance.byteBufferPoolMap.get(bufferlength);
-				localPoolManager.registerByteBufferPool(pool, bufferlength);
-			}
-		}
-		synchronized(instance.arrayPoolMap){
-			for(Class clazz:instance.arrayPoolMap.keySet()){
-				Map<Integer,Pool> pools=instance.arrayPoolMap.get(clazz);
-				for(Integer size:pools.keySet()){
-					Pool pool=pools.get(size);
-					localPoolManager.registerArrayPool(pool, clazz, size);
-				}
-			}
-		}
-		synchronized(instance.classPoolMap){
-			for(Class clazz:instance.classPoolMap.keySet()){
-				Pool pool=instance.classPoolMap.get(clazz);
-				localPoolManager.registerClassPool(pool, clazz);
-			}
-		}
-		
-	}
 	
 	private static void setupPool(Pool pool,int limit){
 		long poolCount=pool.getPoolCount();
@@ -579,11 +551,9 @@ public class PoolManager implements Queuelet,Timer{
 	public boolean service(Object req) {
 		if(req instanceof LocalPool){
 			LocalPool localPool=(LocalPool)req;
-			synchronized(localPool){
-				
-			}
+			localPool.charge();
+			return true;
 		}
-		
 		poolInstance(req);
 		return true;
 	}
@@ -623,6 +593,11 @@ public class PoolManager implements Queuelet,Timer{
 	}
 
 	private void dumpPool(boolean isDetail){
+		Iterator<LocalPoolManager> itr=localPoolManagers.iterator();
+		while(itr.hasNext()){
+			LocalPoolManager localPoolManager=itr.next();
+			localPoolManager.info();
+		}
 		Object[] pools=classPoolMap.values().toArray();
 		for(int i=0;i<pools.length;i++){
 			Pool pool=(Pool)pools[i];

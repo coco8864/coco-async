@@ -9,61 +9,108 @@ public class LocalPool {
 	public LocalPool(Pool pool) {
 		this.pool=pool;
 	}
-	Pool pool;
-	LinkedList<Object> freePool=new LinkedList<Object>();
-	LinkedList<Object> freeRsvPool=new LinkedList<Object>();
-	LinkedList<Object> usedPool=new LinkedList<Object>();
-	boolean isChargePool;
-	int getCount;
-	int poolCount;
-	int hit;
-	int max;
-	int total;
-	void beat(){
-		pool.batchPool(usedPool);
-		pool.batchGet(freePool,max);
+	private Pool pool;
+	private LinkedList<Object> freePool=new LinkedList<Object>();
+	private LinkedList<Object> spareFreePool=new LinkedList<Object>();
+	private LinkedList<Object> usedPool=new LinkedList<Object>();
+	private LinkedList<Object> spareUsedPool=new LinkedList<Object>();
+	private boolean isAutoCharge=false;
+	private boolean isCharge=true;
+	private int getCount;
+	private int poolCount;
+	private int max;
+	private int hit;
+	private int total;
+	void pause(){
+		if(getCount==0&&poolCount==0){
+			return;
+		}
 		if(max<getCount){
 			max=getCount;
 		}
-		hit=getCount=poolCount=0;
+		getCount=poolCount=0;
+		synchronized(this){
+			while(isCharge==false){
+				//try {
+				//	wait();
+				//} catch (InterruptedException e) {
+				//}
+				pool.batchPool(spareUsedPool);
+				pool.batchGet(spareFreePool,max);
+				isCharge=true;
+			}
+			LinkedList<Object> tmp=spareFreePool;
+			spareFreePool=freePool;
+			freePool=tmp;
+			tmp=spareUsedPool;
+			spareUsedPool=usedPool;
+			usedPool=tmp;
+			//pool.batchPool(spareUsedPool);
+			//pool.batchGet(spareFreePool,max);
+			//isCharge=true;
+			isCharge=false;
+			PoolManager.enqueuePool(this);
+		}
 	}
 	void term(){
 		if(max!=0){
-			logger.info(pool.getDispname()+":total:" +total +":max:"+max);
+			logger.info(pool.getDispname()+":total:" +total +":hit:"+hit+":max:"+max);
 		}
 		pool.batchPool(freePool);
-		pool.batchPool(freeRsvPool);
+		pool.batchPool(spareFreePool);
 		pool.batchPool(usedPool);
+		pool.batchPool(spareUsedPool);
+	}
+	
+	void pool(Object obj){
+		poolCount++;
+		usedPool.add(obj);
 	}
 	
 	Object get(){
 		getCount++;
 		total++;
 		if(freePool.size()==0){
-			if(!isChargePool){
+			if(!isAutoCharge){
 				return null;
 			}
 			synchronized(this){
-				if(freeRsvPool.size()==0){
+				if(spareFreePool.size()==0){
 					return null;
 				}
-				LinkedList<Object> tmp=freeRsvPool;
-				freeRsvPool=freePool;
+				LinkedList<Object> tmp=spareFreePool;
+				spareFreePool=freePool;
 				freePool=tmp;
+				isCharge=false;
 				PoolManager.enqueuePool(this);
 			}
+			logger.info(pool.getDispname()+":autoCharge request");
 		}
 		hit++;
 		return freePool.removeFirst();
 	}
 	
-	synchronized void chargeRsvPool(){
-		pool.batchGet(freeRsvPool,max);
+	synchronized void charge(){
+		if(isCharge){
+			return;
+		}
+//		logger.info(pool.getDispname()+":charge");
+		pool.batchPool(spareUsedPool);
+		pool.batchGet(spareFreePool,max);
+		isCharge=true;
+		notify();
 	}
-	public void setupChargePool(int max) {
+	
+	public void setupAutoChargePool(int max) {
 		this.max=max;
-		isChargePool=true;
+		isAutoCharge=true;
 		pool.batchGet(freePool,max);
-		pool.batchGet(freeRsvPool,max);
+		pool.batchGet(spareFreePool,max);
+	}
+	
+	public void info() {
+		if(max!=0){
+			logger.info(pool.getDispname()+":total:" +total +":hit:"+hit+":max:"+max);
+		}
 	}
 }
