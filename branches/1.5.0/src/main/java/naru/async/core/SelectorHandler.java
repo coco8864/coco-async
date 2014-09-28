@@ -20,6 +20,8 @@ import naru.async.pool.LocalPoolManager;
 
 public class SelectorHandler implements Runnable {
 	static private Logger logger=Logger.getLogger(SelectorHandler.class);
+	private static int SELECT_THREAD_ORDER_COUNT=4096;
+	
 	private int id;
 	
 	private long selectInterval;
@@ -54,8 +56,8 @@ public class SelectorHandler implements Runnable {
 		}
 		public void run() {
 			logger.info("accept thread start");
-			LocalPoolManager.setupChargeClassPool(Order.class,1024);
 			handler.accept(context);
+			LocalPoolManager.end();
 			logger.info("accept thread end");
 			context.unref();
 		}
@@ -153,6 +155,7 @@ public class SelectorHandler implements Runnable {
 
 	private void accept(ChannelContext context){
 		while(acceptInternal(context)){
+			LocalPoolManager.refresh();
 		}
 	}
 
@@ -328,6 +331,7 @@ public class SelectorHandler implements Runnable {
 		} catch (Throwable e) {
 			logger.error("SelectorContext listener Throwable end.",e);
 		}
+		LocalPoolManager.end();
 	}
 	
 	public void start(int index){

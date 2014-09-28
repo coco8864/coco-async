@@ -13,6 +13,9 @@ import org.apache.log4j.Logger;
 public class LocalPoolManager {
 	private static Logger logger=Logger.getLogger(LocalPoolManager.class);
 	private static ThreadLocal<LocalPoolManager> localPool=new ThreadLocal<LocalPoolManager>();
+	private static int PAUSE_INTERVAL_COUNT=1024;
+	private static int PAUSE_INTERVAL_TIME=1000;
+	
 	private Map<Integer,LocalPool> byteBufferPoolMap=new HashMap<Integer,LocalPool>();
 	private Map<Class,Map<Integer,LocalPool>> arrayPoolMap=new HashMap<Class,Map<Integer,LocalPool>>();
 	private Map<Class,LocalPool> classPoolMap=new HashMap<Class,LocalPool>();
@@ -28,24 +31,26 @@ public class LocalPoolManager {
 			localPool.set(localPoolManager);
 			PoolManager.addLocalPoolManager(localPoolManager);
 		}
+		localPoolManager.refCount++;
 		return localPoolManager;
-	}
-	
-	public static void setupChargeClassPool(Class clazz,int max){
-		LocalPoolManager manager=get();
-		if(manager==null){
-			return;
-		}
-		LocalPool localPool=manager.classPoolMap.get(clazz);
-		localPool.setupChargePool(max);
 	}
 	
 	public static void refresh(){
 		//TODO need or not
 		//Thread.yield();
 		LocalPoolManager manager=get();
-		manager.beat();
+		manager.pause();
 	}
+	
+	public static void end(){
+		LocalPoolManager manager=localPool.get();
+		if(manager==null){
+			return;
+		}
+		manager.term();
+		localPool.remove();
+	}
+	
 	
 	public static Object getInstance(Class clazz) {
 		LocalPoolManager manager=localPool.get();
@@ -54,11 +59,14 @@ public class LocalPoolManager {
 		}
 		LocalPool localPool=manager.classPoolMap.get(clazz);
 		if(localPool==null){
-			return null;
+			Pool pool=PoolManager.getClassPool(clazz);
+			if(pool==null){
+				return null;
+			}
+			localPool=manager.registerClassPool(pool, clazz);
 		}
 		return localPool.get();
 	}
-	
 	
 	public static ByteBuffer getBufferInstance(int bufferSize) {
 		LocalPoolManager manager=localPool.get();
@@ -67,7 +75,11 @@ public class LocalPoolManager {
 		}
 		LocalPool localPool=manager.byteBufferPoolMap.get(bufferSize);
 		if(localPool==null){
-			return null;
+			Pool pool=PoolManager.getBufferPool(bufferSize);
+			if(pool==null){
+				return null;
+			}
+			localPool=manager.registerByteBufferPool(pool,bufferSize);
 		}
 		return (ByteBuffer)localPool.get();
 	}
@@ -82,8 +94,7 @@ public class LocalPoolManager {
 		if(localPool==null){
 			return false;
 		}
-		localPool.poolCount++;
-		localPool.usedPool.add(buffer);
+		localPool.pool(buffer);
 		return true;
 	}
 	
@@ -116,7 +127,11 @@ public class LocalPoolManager {
 		}
 		LocalPool localPool=manager.getArrayPool(clazz, size);
 		if(localPool==null){
-			return null;
+			Pool pool=PoolManager.getArrayPool(clazz, size);
+			if(pool==null){
+				return null;
+			}
+			localPool=manager.registerArrayPool(pool,clazz, size);
 		}
 		return localPool.get();
 	}
@@ -135,28 +150,28 @@ public class LocalPoolManager {
 		if(localPool==null){
 			return false;
 		}
-		localPool.poolCount++;
-		localPool.usedPool.add(objs);
+		localPool.pool(objs);
 		return true;
 	}
 	private String threadName;
 	private Thread thread;
-	private long lastRefresh;
-	private int beatCount=0;
+	private long lastPause;
+	private int pauseCount=0;
+	private int refCount=0;/* beatä‘Ç≈éQè∆ÇµÇΩâÒêî */
 	
 	private LocalPoolManager(){
 		Log.debug(logger, "LocalPoolManager");
 		thread=Thread.currentThread();
 		threadName=Thread.currentThread().getName();
-		PoolManager.setupLocalPoolManager(this);
 	}
 	
-	void registerByteBufferPool(Pool pool,int bufferlength){
+	private LocalPool registerByteBufferPool(Pool pool,int bufferlength){
 		LocalPool localPool=new LocalPool(pool);
 		byteBufferPoolMap.put(bufferlength, localPool);
+		return localPool;
 	}
 	
-	void registerArrayPool(Pool pool,Class clazz,int size){
+	private LocalPool registerArrayPool(Pool pool,Class clazz,int size){
 		LocalPool localPool=new LocalPool(pool);
 		Map<Integer,LocalPool> m=arrayPoolMap.get(clazz);
 		if(m==null){
@@ -164,41 +179,47 @@ public class LocalPoolManager {
 			arrayPoolMap.put(clazz, m);
 		}
 		m.put(size, localPool);
+		return localPool;
 	}
 	
-	void registerClassPool(Pool pool,Class clazz){
+	private LocalPool registerClassPool(Pool pool,Class clazz){
 		LocalPool localPool=new LocalPool(pool);
 		classPoolMap.put(clazz, localPool);
+		return localPool;
 	}
 	
-	private void beat(){
-		beatCount++;
-		Log.debug(logger, "beat.beatCount:",beatCount,":unrefObjPool.size():"+unrefObjPool.size());
+	private void pause(){
+		long now=System.currentTimeMillis();
+		if(refCount<PAUSE_INTERVAL_COUNT&&(now-lastPause)<PAUSE_INTERVAL_TIME){
+			return;
+		}
+		Log.debug(logger, "pause.beatCount:",pauseCount,":unrefObjPool.size():"+unrefObjPool.size());
 		for(Integer bufferlength:byteBufferPoolMap.keySet()){
 			LocalPool pool=byteBufferPoolMap.get(bufferlength);
-			pool.beat();
+			pool.pause();
 		}
 		for(Class clazz:arrayPoolMap.keySet()){
 			Map<Integer,LocalPool> pools=arrayPoolMap.get(clazz);
 			for(Integer size:pools.keySet()){
 				LocalPool pool=pools.get(size);
-				pool.beat();
+				pool.pause();
 			}
 		}
 		for(Class clazz:classPoolMap.keySet()){
 			LocalPool pool=classPoolMap.get(clazz);
-			pool.beat();
+			pool.pause();
 		}
-		
 		while(!unrefObjPool.isEmpty()){
 			PoolBase obj=unrefObjPool.removeFirst();
 			obj.unrefInternal(false);
 		}
-		lastRefresh=System.currentTimeMillis();
+		pauseCount++;
+		lastPause=System.currentTimeMillis();
+		refCount=0;
 	}
 	
 	void term(){
-		logger.info("LocalPoolManager term["+threadName+"]isAlive:"+thread.isAlive()+":beatCount:"+beatCount+":last:"+(lastRefresh-System.currentTimeMillis()));
+		logger.info("LocalPoolManager term["+threadName+"]isAlive:"+thread.isAlive()+":beatCount:"+pauseCount+":last:"+(lastPause-System.currentTimeMillis()));
 		for(Integer bufferlength:byteBufferPoolMap.keySet()){
 			LocalPool pool=byteBufferPoolMap.get(bufferlength);
 			pool.term();
@@ -219,5 +240,26 @@ public class LocalPoolManager {
 			PoolBase obj=unrefObjPool.removeFirst();
 			obj.unrefInternal(false);
 		}
+		logger.info("LocalPoolManager term["+threadName+"]end");
+	}
+
+	public void info() {
+		logger.info("LocalPoolManager info["+threadName+"]isAlive:"+thread.isAlive()+":beatCount:"+pauseCount+":last:"+(lastPause-System.currentTimeMillis()));
+		for(Integer bufferlength:byteBufferPoolMap.keySet()){
+			LocalPool pool=byteBufferPoolMap.get(bufferlength);
+			pool.info();
+		}
+		for(Class clazz:arrayPoolMap.keySet()){
+			Map<Integer,LocalPool> pools=arrayPoolMap.get(clazz);
+			for(Integer size:pools.keySet()){
+				LocalPool pool=pools.get(size);
+				pool.info();
+			}
+		}
+		for(Class clazz:classPoolMap.keySet()){
+			LocalPool pool=classPoolMap.get(clazz);
+			pool.info();
+		}
+		logger.info("LocalPoolManager info["+threadName+"]end");
 	}
 }
