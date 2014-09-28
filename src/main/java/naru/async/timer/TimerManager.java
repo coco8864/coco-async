@@ -11,7 +11,7 @@ import org.apache.log4j.Logger;
 
 import naru.async.Log;
 import naru.async.Timer;
-import naru.async.pool.LocalPoolManager;
+//import naru.async.pool.LocalPoolManager;
 import naru.queuelet.Queuelet;
 import naru.queuelet.QueueletContext;
 
@@ -51,7 +51,7 @@ public class TimerManager implements Queuelet,Runnable{
 		}
 		TimerEntry entry=(TimerEntry)req;
 		entry.callback();//‚±‚Ì’†‚Å—áŠO‚ðcatch‚µ‚Ä‚¢‚é‚Ì‚Å•K‚¸•œ‹A‚·‚é
-		LocalPoolManager.refresh();
+//		LocalPoolManager.refresh();
 		return true;
 	}
 

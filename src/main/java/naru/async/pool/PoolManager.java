@@ -553,6 +553,9 @@ public class PoolManager implements Queuelet,Timer{
 			LocalPool localPool=(LocalPool)req;
 			localPool.charge();
 			return true;
+		}if(req instanceof LocalPoolManager){
+			LocalPoolManager localPoolManager=(LocalPoolManager)req;
+			localPoolManager.charge();
 		}
 		poolInstance(req);
 		return true;

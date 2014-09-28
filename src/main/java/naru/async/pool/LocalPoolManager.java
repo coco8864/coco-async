@@ -20,6 +20,7 @@ public class LocalPoolManager {
 	private Map<Class,Map<Integer,LocalPool>> arrayPoolMap=new HashMap<Class,Map<Integer,LocalPool>>();
 	private Map<Class,LocalPool> classPoolMap=new HashMap<Class,LocalPool>();
 	private LinkedList<PoolBase> unrefObjPool=new LinkedList<PoolBase>();
+	private LinkedList<PoolBase> spareUnrefObjPool=new LinkedList<PoolBase>();
 	
 	private static LocalPoolManager get(){
 		if(!PoolManager.useLocalPool()){
@@ -209,6 +210,14 @@ public class LocalPoolManager {
 			LocalPool pool=classPoolMap.get(clazz);
 			pool.pause();
 		}
+		synchronized(this){
+			if(spareUnrefObjPool.size()==0){
+				LinkedList<PoolBase> tmp=spareUnrefObjPool;
+				spareUnrefObjPool=unrefObjPool;
+				unrefObjPool=tmp;
+				PoolManager.enqueuePool(this);
+			}
+		}
 		while(!unrefObjPool.isEmpty()){
 			PoolBase obj=unrefObjPool.removeFirst();
 			obj.unrefInternal(false);
@@ -216,6 +225,13 @@ public class LocalPoolManager {
 		pauseCount++;
 		lastPause=System.currentTimeMillis();
 		refCount=0;
+	}
+	
+	synchronized void charge(){
+		while(!spareUnrefObjPool.isEmpty()){
+			PoolBase obj=spareUnrefObjPool.removeFirst();
+			obj.unrefInternal(false);
+		}
 	}
 	
 	void term(){
@@ -235,7 +251,6 @@ public class LocalPoolManager {
 			LocalPool pool=classPoolMap.get(clazz);
 			pool.term();
 		}
-		
 		while(!unrefObjPool.isEmpty()){
 			PoolBase obj=unrefObjPool.removeFirst();
 			obj.unrefInternal(false);
@@ -260,6 +275,7 @@ public class LocalPoolManager {
 			LocalPool pool=classPoolMap.get(clazz);
 			pool.info();
 		}
+		logger.info("unrefObjPool.size:"+unrefObjPool.size());
 		logger.info("LocalPoolManager info["+threadName+"]end");
 	}
 }

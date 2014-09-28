@@ -20,10 +20,7 @@ import naru.async.pool.LocalPoolManager;
 
 public class SelectorHandler implements Runnable {
 	static private Logger logger=Logger.getLogger(SelectorHandler.class);
-	private static int SELECT_THREAD_ORDER_COUNT=4096;
-	
 	private int id;
-	
 	private long selectInterval;
 	private SelectorStastics stastics;
 	private Selector selector;
@@ -261,7 +258,6 @@ public class SelectorHandler implements Runnable {
 			long now=System.currentTimeMillis();
 			if( (lastWakeup-now)<MIN_INTERVAL_TIME ){
 				minCount++;
-//				System.out.println("minCount:"+minCount);
 				if(minCount>=MIN_INTERVAL_COUNT){
 					try {
 						stastics.sleep();
@@ -319,6 +315,7 @@ public class SelectorHandler implements Runnable {
 				selector.close();
 				break;
 			}
+			LocalPoolManager.refresh();
 		}
 	}
 	
@@ -331,7 +328,6 @@ public class SelectorHandler implements Runnable {
 		} catch (Throwable e) {
 			logger.error("SelectorContext listener Throwable end.",e);
 		}
-		LocalPoolManager.end();
 	}
 	
 	public void start(int index){
