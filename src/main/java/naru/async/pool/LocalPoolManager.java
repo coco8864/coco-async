@@ -13,7 +13,7 @@ import org.apache.log4j.Logger;
 public class LocalPoolManager {
 	private static Logger logger=Logger.getLogger(LocalPoolManager.class);
 	private static ThreadLocal<LocalPoolManager> localPool=new ThreadLocal<LocalPoolManager>();
-	private static int PAUSE_INTERVAL_COUNT=1024;
+	private static int PAUSE_INTERVAL_COUNT=128;
 	private static int PAUSE_INTERVAL_TIME=1000;
 	
 	private Map<Integer,LocalPool> byteBufferPoolMap=new HashMap<Integer,LocalPool>();
@@ -51,6 +51,23 @@ public class LocalPoolManager {
 		manager.term();
 		localPool.remove();
 	}
+	
+	public static void setAutoCharge(Class clazz,int max){
+		LocalPoolManager manager=localPool.get();
+		if(manager==null){
+			return;
+		}
+		LocalPool localPool=manager.classPoolMap.get(clazz);
+		if(localPool==null){
+			Pool pool=PoolManager.getClassPool(clazz);
+			if(pool==null){
+				return;
+			}
+			localPool=manager.registerClassPool(pool, clazz);
+		}
+		localPool.setupAutoChargePool(max);
+	}
+	
 	
 	
 	public static Object getInstance(Class clazz) {
@@ -194,7 +211,7 @@ public class LocalPoolManager {
 		if(refCount<PAUSE_INTERVAL_COUNT&&(now-lastPause)<PAUSE_INTERVAL_TIME){
 			return;
 		}
-		Log.debug(logger, "pause.beatCount:",pauseCount,":unrefObjPool.size():"+unrefObjPool.size());
+		Log.debug(logger, "pause.beatCount:",pauseCount,":unrefObjPool.size():",unrefObjPool.size());
 		for(Integer bufferlength:byteBufferPoolMap.keySet()){
 			LocalPool pool=byteBufferPoolMap.get(bufferlength);
 			pool.pause();
