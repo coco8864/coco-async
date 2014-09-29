@@ -53,6 +53,7 @@ public class SelectorHandler implements Runnable {
 		}
 		public void run() {
 			logger.info("accept thread start");
+			LocalPoolManager.setAutoCharge(Order.class, 1024);
 			handler.accept(context);
 			LocalPoolManager.end();
 			logger.info("accept thread end");
@@ -152,7 +153,7 @@ public class SelectorHandler implements Runnable {
 
 	private void accept(ChannelContext context){
 		while(acceptInternal(context)){
-			LocalPoolManager.refresh();
+//			LocalPoolManager.refresh();
 		}
 	}
 
