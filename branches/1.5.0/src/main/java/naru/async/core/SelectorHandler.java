@@ -53,7 +53,7 @@ public class SelectorHandler implements Runnable {
 		}
 		public void run() {
 			logger.info("accept thread start");
-			LocalPoolManager.setAutoCharge(Order.class, 1024);
+			LocalPoolManager.refresh();//AcceptThreadÇÕÅAOrderÇè¡îÔÇ∑ÇÈÇÃÇ›Ç≈garbageÇÕèoÇ≥Ç»Ç¢
 			handler.accept(context);
 			LocalPoolManager.end();
 			logger.info("accept thread end");
@@ -112,6 +112,7 @@ public class SelectorHandler implements Runnable {
 	 * @return
 	 */
 	private void closeAll(){
+		logger.info("closeAll");
 		Iterator itr=selector.keys().iterator();
 		while(itr.hasNext()){
 			SelectionKey key=(SelectionKey)itr.next();
@@ -121,6 +122,7 @@ public class SelectorHandler implements Runnable {
 			ChannelContext context=(ChannelContext)key.attachment();
 			context.getSelectOperator().queueIo(State.closing);
 			context.cancelSelect();
+			context.unref();
 		}
 	}
 	

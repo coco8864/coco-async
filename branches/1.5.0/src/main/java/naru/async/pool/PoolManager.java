@@ -118,6 +118,10 @@ public class PoolManager implements Queuelet,Timer{
 		return instance.useLocalPool;
 	}
 	
+	public static int getLocalPoolInterval(){
+		return instance.localPoolInterval;
+	}
+	
 	public static void addLocalPoolManager(LocalPoolManager localPoolManager) {
 		synchronized(instance.localPoolManagers){
 			instance.localPoolManagers.add(localPoolManager);
@@ -308,17 +312,20 @@ public class PoolManager implements Queuelet,Timer{
 			logger.error("checkArrayInstance refcount is 0."+clazz.getName()+":length:"+arraySize +":"+objs +":"+life.get(),new Exception());
 		}
 	}
-	
 	public static void poolArrayInstance(Object objs){
+		poolArrayInstance(objs,true);
+	}
+	
+	static void poolArrayInstance(Object objs,boolean useLocalPool){
 		if(instance==null){//test�̏ꍇ
+			return;
+		}
+		if( useLocalPool && LocalPoolManager.poolArrayInstance(objs) ){
 			return;
 		}
 		Class clazz=objs.getClass();
 		int arraySize=Array.getLength(objs);
 		if(arraySize==0){
-			return;
-		}
-		if( LocalPoolManager.poolArrayInstance(objs) ){
 			return;
 		}
 		Pool pool=getArrayPool(clazz.getComponentType(), arraySize);
@@ -393,6 +400,7 @@ public class PoolManager implements Queuelet,Timer{
 	
 	private long recycleInterval=60000;
 	private boolean useLocalPool=true;
+	private int localPoolInterval=1000;
 	private Object interval;
 	
 	private String[] getArgs(Map param,String poolName){
@@ -513,6 +521,14 @@ public class PoolManager implements Queuelet,Timer{
 				recycleInterval=Long.parseLong(recycleIntervalString);
 			}
 			useLocalPool=!"false".equalsIgnoreCase((String)param.get("useLocalPool"));
+			
+			String localPoolIntervalString=(String)param.get("localPoolInterval");
+			if(localPoolIntervalString!=null){
+				localPoolInterval=Integer.parseInt(localPoolIntervalString);
+			}
+			logger.info("useLocalPool:"+useLocalPool);
+			logger.info("localPoolInterval:"+localPoolInterval);
+			
 			String poolNames=(String)param.get("poolNames");
 			if(poolNames!=null){
 				String[] poolNameArray=poolNames.split(",");
@@ -555,7 +571,7 @@ public class PoolManager implements Queuelet,Timer{
 			return true;
 		}if(req instanceof LocalPoolManager){
 			LocalPoolManager localPoolManager=(LocalPoolManager)req;
-			localPoolManager.charge();
+			localPoolManager.recycle();
 			return true;
 		}
 		poolInstance(req);
@@ -751,13 +767,17 @@ public class PoolManager implements Queuelet,Timer{
 	}
 	
 	public static void poolBufferInstance(ByteBuffer buffer) {
+		poolBufferInstance(buffer,true);
+	}
+	
+	static void poolBufferInstance(ByteBuffer buffer,boolean useLocalPool) {
 		if(instance==null||instance.debug){//test�̏ꍇ
 			return;
 		}
 		if(buffer==null||buffer==ZERO_BUFFER){
 			return;
 		}
-		if(LocalPoolManager.poolBufferInstance(buffer)){
+		if(useLocalPool && LocalPoolManager.poolBufferInstance(buffer)){
 			return;
 		}
 		byte[] array=buffer.array();

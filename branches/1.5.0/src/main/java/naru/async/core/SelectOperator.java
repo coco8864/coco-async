@@ -170,7 +170,8 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 				closed();
 				return false;
 			}else if(isEos){
-				if(orderOperator.isReadOrder()&&totalCallbackLength!=store.getPutBufferLength()){
+				if(orderOperator.isReadOrder()&&(totalCallbackLength+currentBufferLength)!=store.getPutBufferLength()){
+					/* readOrderÇ™Ç†ÇËÇ‹ÇæStoreÇ©ÇÁí ímÇ≥ÇÍÇƒÇ¢Ç»Ç¢bufferÇ™Ç†ÇÈèÍçá */
 					Log.debug(logger,"closeSuspend.cid:",context.getPoolId(),":totalCallbackLength:",totalCallbackLength,":store.getPutBufferLength():",store.getPutBufferLength());
 					state=State.closeSuspend;
 				}else{
@@ -223,6 +224,7 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		context.closeSocket();
 		synchronized(context){
 			orderOperator.doneClose(false);
+			writeOperator.onReadEos();
 			closed();
 		}
 	}
@@ -232,11 +234,11 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 		boolean isConnect;
 		boolean isRead;
 		boolean isClose;
-		synchronized(context){
+		//synchronized(context){
 			isConnect=(state==State.connecting);
 			isRead=(state==State.reading);
 			isClose=(state==State.closing);
-		}
+		//}
 		if(isClose){
 			forceClose();
 		}else if(isConnect){
@@ -277,7 +279,9 @@ public class SelectOperator implements BufferGetter,ChannelIO{
 	
 	boolean asyncRead(Order order){
 		if(currentBufferLength==0){
-			context.getSelector().wakeup();
+			if(this.state==State.selectReading){
+				context.getSelector().wakeup();
+			}
 			return false;
 		}
 		ByteBuffer[] bufs=BuffersUtil.toByteBufferArray(workBuffer);

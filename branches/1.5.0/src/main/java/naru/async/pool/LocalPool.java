@@ -2,115 +2,78 @@ package naru.async.pool;
 
 import java.util.LinkedList;
 
+import naru.async.Log;
+
 import org.apache.log4j.Logger;
 
+/*
+ * sample timeに来る獲得要求数をカウント maxとしてpool数にする
+ */
 public class LocalPool {
 	private static Logger logger=Logger.getLogger(LocalPool.class);
+	//private static int SAMPLE_TIME=1000;
 	public LocalPool(Pool pool) {
 		this.pool=pool;
+		this.max=1;
+		charge();
+		//PoolManager.enqueuePool(this);
 	}
 	private Pool pool;
 	private LinkedList<Object> freePool=new LinkedList<Object>();
 	private LinkedList<Object> spareFreePool=new LinkedList<Object>();
-	private LinkedList<Object> usedPool=new LinkedList<Object>();
-	private LinkedList<Object> spareUsedPool=new LinkedList<Object>();
-	private boolean isAutoCharge=false;
-	private boolean isCharge=true;
-	private int getCount;
-	private int poolCount;
+	private long sampleStartTime=0;
+	private long maxTime=0;
+	private int getCount=0;
+	private int chargeCount=0;
 	private int max;
-	private int hit;
-	private int total;
-	void pause(){
-		if(getCount==0&&poolCount==0){
-			return;
-		}
-		if(max<getCount){
-			max=getCount;
-		}
-		getCount=poolCount=0;
-		synchronized(this){
-			while(isCharge==false){
-				//try {
-				//	wait();
-				//} catch (InterruptedException e) {
-				//}
-				pool.batchPool(spareUsedPool);
-				pool.batchGet(spareFreePool,max);
-				isCharge=true;
-			}
-			LinkedList<Object> tmp=spareFreePool;
-			spareFreePool=freePool;
-			freePool=tmp;
-			tmp=spareUsedPool;
-			spareUsedPool=usedPool;
-			usedPool=tmp;
-			//pool.batchPool(spareUsedPool);
-			//pool.batchGet(spareFreePool,max);
-			//isCharge=true;
-			isCharge=false;
-			PoolManager.enqueuePool(this);
-		}
-	}
+	private int miss=0;
+	private int total=0;
+	
 	void term(){
 		if(max!=0){
-			logger.info(pool.getDispname()+":total:" +total +":hit:"+hit+":max:"+max);
+			logger.info(pool.getDispname()+":total:" +total +":miss:"+miss+":chargeCount:"+chargeCount+":max:"+max);
 		}
 		pool.batchPool(freePool);
 		pool.batchPool(spareFreePool);
-		pool.batchPool(usedPool);
-		pool.batchPool(spareUsedPool);
-	}
-	
-	void pool(Object obj){
-		poolCount++;
-		usedPool.add(obj);
 	}
 	
 	Object get(){
+		long now=System.currentTimeMillis();
+		if(now>(sampleStartTime+PoolManager.getLocalPoolInterval())){
+			getCount=0;
+			sampleStartTime=now;
+		}else{
+			if(getCount>max){
+				max=getCount;
+				maxTime=sampleStartTime;
+			}
+		}
 		getCount++;
 		total++;
 		if(freePool.size()==0){
-			if(!isAutoCharge){
-				return null;
-			}
 			synchronized(this){
 				if(spareFreePool.size()==0){
+					miss++;
 					return null;
 				}
+				chargeCount++;
 				LinkedList<Object> tmp=spareFreePool;
 				spareFreePool=freePool;
 				freePool=tmp;
-				isCharge=false;
 				PoolManager.enqueuePool(this);
 			}
-			logger.info(pool.getDispname()+":autoCharge request");
 		}
-		hit++;
 		return freePool.removeFirst();
 	}
 	
 	synchronized void charge(){
-		if(isCharge){
-			return;
-		}
 //		logger.info(pool.getDispname()+":charge");
-		pool.batchPool(spareUsedPool);
-		pool.batchGet(spareFreePool,max);
-		isCharge=true;
-		notify();
-	}
-	
-	public void setupAutoChargePool(int max) {
-		this.max=max;
-		isAutoCharge=true;
-		pool.batchGet(freePool,max);
-		pool.batchGet(spareFreePool,max);
+		pool.charge(spareFreePool,max);
 	}
 	
 	public void info() {
 		if(max!=0){
-			logger.info(pool.getDispname()+":total:" +total +":hit:"+hit+":max:"+max);
+			logger.info(pool.getDispname()+":total:" +total+":chargeCount:" +chargeCount +":miss:"+miss+":max:"+max);
 		}
 	}
 }
