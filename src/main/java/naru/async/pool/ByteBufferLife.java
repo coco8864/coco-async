@@ -10,19 +10,26 @@ public class ByteBufferLife extends ReferenceLife {
 	static class SearchKey extends ByteBufferLife{
 		private ByteBufferLife hit;//åüçıåãâ 
 		private ByteBuffer byteBuffer;
+		private int hashCode;
 		SearchKey(){
 			super(null, null);
 		}
 		public void setByteBuffer(ByteBuffer byteBuffer) {
 			this.byteBuffer = byteBuffer;
+			//this.hashCode=System.identityHashCode(byteBuffer);
+			if(byteBuffer!=null){
+				this.hashCode=byteBuffer.array().hashCode();
+			}else{
+				this.hashCode=0;
+			}
 			this.hit=null;
 		}
 		public ByteBufferLife getHit() {
 			return hit;
 		}
-		@Override
+		//@Override
 		public int hashCode() {
-			return System.identityHashCode(byteBuffer);
+			return hashCode;
 		}
 		@Override
 		public boolean equals(Object obj) {
@@ -41,7 +48,12 @@ public class ByteBufferLife extends ReferenceLife {
 	
 	public ByteBufferLife(Object referent,ByteArrayLife arrayLife) {
 		super(referent);
-		this.hashCode=System.identityHashCode(referent);
+		//this.hashCode=System.identityHashCode(referent);
+		if(referent!=null){
+			this.hashCode=((ByteBuffer)referent).array().hashCode();
+		}else{
+			this.hashCode=0;
+		}
 		this.arrayLife=arrayLife;
 		//poolÇÕê›íËÇµÇ»Ç¢
 	}

@@ -97,10 +97,12 @@ public class Pool {
 		}
 	}
 	
-	void batchGet(LinkedList objs,int max){
-		for(int i=objs.size();i<max;i++){
-			Object obj=getInstance();
-			objs.add(obj);
+	void charge(LinkedList objs,int max){
+		synchronized(this){
+			for(int i=objs.size();i<max;i++){
+				Object obj=getInstanceInternal();
+				objs.add(obj);
+			}
 		}
 	}
 
@@ -432,7 +434,13 @@ public class Pool {
 				+ poolClass.getName() + ":type:" + type);
 	}
 
-	public synchronized Object getInstance() {
+	public Object getInstance() {
+		synchronized(this){
+			return getInstanceInternal();
+		}
+	}
+	
+	private Object getInstanceInternal() {
 		Object obj = null;
 		if (poolStack.size() > 0) {
 			obj = poolStack.removeFirst();
@@ -492,6 +500,13 @@ public class Pool {
 	}
 
 	private void callRecycle(Object obj) {
+		if(obj instanceof PoolBase){
+			((PoolBase)obj).recycle();
+			return;
+		}else if(obj instanceof ByteBuffer){
+			((ByteBuffer)obj).clear();
+			return;
+		}
 		if (recycleMethod != null) {
 			try {
 				recycleMethod.invoke(obj, NO_ARGS);

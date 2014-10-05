@@ -477,9 +477,7 @@ public class OrderOperator {
 			readOrder.closeOrder();
 			queueCallback(readOrder);
 			readOrder=null;
-			return true;
-		}
-		if(selectOperator.asyncRead(readOrder)){
+		}else if (selectOperator.asyncRead(readOrder)){
 			readOrder=null;
 		}
 		return true;

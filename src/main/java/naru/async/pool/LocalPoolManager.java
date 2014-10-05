@@ -1,6 +1,5 @@
 package naru.async.pool;
 
-import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -13,16 +12,20 @@ import org.apache.log4j.Logger;
 public class LocalPoolManager {
 	private static Logger logger=Logger.getLogger(LocalPoolManager.class);
 	private static ThreadLocal<LocalPoolManager> localPool=new ThreadLocal<LocalPoolManager>();
-	private static int PAUSE_INTERVAL_COUNT=128;
-	private static int PAUSE_INTERVAL_TIME=1000;
+	private static int GARBAGE_LIMIT=128;
 	
 	private Map<Integer,LocalPool> byteBufferPoolMap=new HashMap<Integer,LocalPool>();
 	private Map<Class,Map<Integer,LocalPool>> arrayPoolMap=new HashMap<Class,Map<Integer,LocalPool>>();
 	private Map<Class,LocalPool> classPoolMap=new HashMap<Class,LocalPool>();
+	
 	private LinkedList<PoolBase> unrefObjPool=new LinkedList<PoolBase>();
 	private LinkedList<PoolBase> spareUnrefObjPool=new LinkedList<PoolBase>();
+	private LinkedList<ByteBuffer> freeByteBufferPool=new LinkedList<ByteBuffer>();
+	private LinkedList<ByteBuffer> spareFreeByteBufferPool=new LinkedList<ByteBuffer>();
+	private LinkedList<Object> freeArrayPool=new LinkedList<Object>();
+	private LinkedList<Object> spareFreeArrayPool=new LinkedList<Object>();
 	
-	private static LocalPoolManager get(){
+	private static LocalPoolManager getLocalPoolManager(){
 		if(!PoolManager.useLocalPool()){
 			return null;
 		}
@@ -32,15 +35,29 @@ public class LocalPoolManager {
 			localPool.set(localPoolManager);
 			PoolManager.addLocalPoolManager(localPoolManager);
 		}
-		localPoolManager.refCount++;
 		return localPoolManager;
 	}
 	
 	public static void refresh(){
-		//TODO need or not
-		//Thread.yield();
-		LocalPoolManager manager=get();
-		manager.pause();
+		LocalPoolManager manager=getLocalPoolManager();
+		if(manager==null){
+			return;
+		}
+		if(manager.garbageCount>=GARBAGE_LIMIT){
+			Object tmp=manager.freeArrayPool;
+			manager.freeArrayPool=manager.spareFreeArrayPool;
+			manager.spareFreeArrayPool=(LinkedList<Object>)tmp;
+			
+			tmp=manager.freeByteBufferPool;
+			manager.freeByteBufferPool=manager.spareFreeByteBufferPool;
+			manager.spareFreeByteBufferPool=(LinkedList<ByteBuffer>)tmp;
+			
+			tmp=manager.unrefObjPool;
+			manager.unrefObjPool=manager.spareUnrefObjPool;
+			manager.spareUnrefObjPool=(LinkedList<PoolBase>)tmp;
+			
+			PoolManager.enqueuePool(manager);
+		}
 	}
 	
 	public static void end(){
@@ -52,25 +69,10 @@ public class LocalPoolManager {
 		localPool.remove();
 	}
 	
-	public static void setAutoCharge(Class clazz,int max){
-		LocalPoolManager manager=localPool.get();
-		if(manager==null){
-			return;
-		}
-		LocalPool localPool=manager.classPoolMap.get(clazz);
-		if(localPool==null){
-			Pool pool=PoolManager.getClassPool(clazz);
-			if(pool==null){
-				return;
-			}
-			localPool=manager.registerClassPool(pool, clazz);
-		}
-		localPool.setupAutoChargePool(max);
-	}
-	
-	
-	
 	public static Object getInstance(Class clazz) {
+		//if(true){//TODO xxx
+		//	return null;
+		//}
 		LocalPoolManager manager=localPool.get();
 		if(manager==null){
 			return null;
@@ -87,6 +89,9 @@ public class LocalPoolManager {
 	}
 	
 	public static ByteBuffer getBufferInstance(int bufferSize) {
+		//if(true){//TODO xxx
+		//	return null;
+		//}
 		LocalPoolManager manager=localPool.get();
 		if(manager==null){
 			return null;
@@ -102,33 +107,6 @@ public class LocalPoolManager {
 		return (ByteBuffer)localPool.get();
 	}
 	
-	public static boolean poolBufferInstance(ByteBuffer buffer) {
-		LocalPoolManager manager=localPool.get();
-		if(manager==null){
-			return false;
-		}
-		int bufferSize=buffer.capacity();
-		LocalPool localPool=manager.byteBufferPoolMap.get(bufferSize);
-		if(localPool==null){
-			return false;
-		}
-		localPool.pool(buffer);
-		return true;
-	}
-	
-	public static boolean poolBaseUnref(PoolBase obj,boolean isPool) {
-		LocalPoolManager manager=localPool.get();
-		if(manager==null){
-			return false;
-		}
-		if(isPool){//TODO use isPool
-			manager.unrefObjPool.add(obj);
-		}else{
-			manager.unrefObjPool.add(obj);
-		}
-		return true;
-	}
-	
 	private LocalPool getArrayPool(Class clazz,int size){
 		Map<Integer,LocalPool> am=arrayPoolMap.get(clazz);
 		if(am==null){
@@ -139,6 +117,9 @@ public class LocalPoolManager {
 	}
 	
 	public static Object getArrayInstance(Class clazz,int size){
+		//if(true){//TODO xxx
+		//	return null;
+		//}
 		LocalPoolManager manager=localPool.get();
 		if(manager==null){
 			return null;
@@ -154,28 +135,53 @@ public class LocalPoolManager {
 		return localPool.get();
 	}
 	
-	public static boolean poolArrayInstance(Object objs){
+	public static boolean poolBufferInstance(ByteBuffer buffer) {
+		//if(true){//TODO xxx
+		//	return false;
+		//}
 		LocalPoolManager manager=localPool.get();
 		if(manager==null){
 			return false;
 		}
-		Class clazz=objs.getClass();
-		int arraySize=Array.getLength(objs);
-		if(arraySize==0){
-			return true;
-		}
-		LocalPool localPool=manager.getArrayPool(clazz, arraySize);
-		if(localPool==null){
+		manager.freeByteBufferPool.add(buffer);
+		manager.garbageCount++;
+		return true;
+	}
+	
+	public static boolean poolBaseUnref(PoolBase obj,boolean isPool) {
+		//if(true){//TODO xxx
+		//	return false;
+		//}
+		LocalPoolManager manager=localPool.get();
+		if(manager==null){
 			return false;
 		}
-		localPool.pool(objs);
+		if(isPool){//TODO use isPool
+			manager.unrefObjPool.add(obj);
+		}else{
+			manager.unrefObjPool.add(obj);
+		}
+		manager.garbageCount++;
+		return true;
+	}
+	
+	public static boolean poolArrayInstance(Object objs){
+		//if(true){//TODO xxx
+		//	return false;
+		//}
+		LocalPoolManager manager=localPool.get();
+		if(manager==null){
+			return false;
+		}
+		manager.freeArrayPool.add(objs);
+		manager.garbageCount++;
 		return true;
 	}
 	private String threadName;
 	private Thread thread;
 	private long lastPause;
 	private int pauseCount=0;
-	private int refCount=0;/* beatä‘Ç≈éQè∆ÇµÇΩâÒêî */
+	private int garbageCount=0;
 	
 	private LocalPoolManager(){
 		Log.debug(logger, "LocalPoolManager");
@@ -206,53 +212,36 @@ public class LocalPoolManager {
 		return localPool;
 	}
 	
-	private void pause(){
-		long now=System.currentTimeMillis();
-		if(refCount<PAUSE_INTERVAL_COUNT&&(now-lastPause)<PAUSE_INTERVAL_TIME){
-			return;
-		}
-		Log.debug(logger, "pause.beatCount:",pauseCount,":unrefObjPool.size():",unrefObjPool.size());
-		for(Integer bufferlength:byteBufferPoolMap.keySet()){
-			LocalPool pool=byteBufferPoolMap.get(bufferlength);
-			pool.pause();
-		}
-		for(Class clazz:arrayPoolMap.keySet()){
-			Map<Integer,LocalPool> pools=arrayPoolMap.get(clazz);
-			for(Integer size:pools.keySet()){
-				LocalPool pool=pools.get(size);
-				pool.pause();
-			}
-		}
-		for(Class clazz:classPoolMap.keySet()){
-			LocalPool pool=classPoolMap.get(clazz);
-			pool.pause();
-		}
-		synchronized(this){
-			if(spareUnrefObjPool.size()==0){
-				LinkedList<PoolBase> tmp=spareUnrefObjPool;
-				spareUnrefObjPool=unrefObjPool;
-				unrefObjPool=tmp;
-				PoolManager.enqueuePool(this);
-			}
-		}
-		while(!unrefObjPool.isEmpty()){
-			PoolBase obj=unrefObjPool.removeFirst();
-			obj.unrefInternal(false);
-		}
-		pauseCount++;
-		lastPause=System.currentTimeMillis();
-		refCount=0;
-	}
-	
-	synchronized void charge(){
+	synchronized void recycle(){
 		while(!spareUnrefObjPool.isEmpty()){
 			PoolBase obj=spareUnrefObjPool.removeFirst();
 			obj.unrefInternal(false);
+		}
+		while(!spareFreeArrayPool.isEmpty()){
+			Object objs=spareFreeArrayPool.removeFirst();
+			PoolManager.poolArrayInstance(objs,false);
+		}
+		while(!spareFreeByteBufferPool.isEmpty()){
+			ByteBuffer buffer=spareFreeByteBufferPool.removeFirst();
+			PoolManager.poolBufferInstance(buffer);
 		}
 	}
 	
 	void term(){
 		logger.info("LocalPoolManager term["+threadName+"]isAlive:"+thread.isAlive()+":beatCount:"+pauseCount+":last:"+(lastPause-System.currentTimeMillis()));
+		recycle();
+		while(!unrefObjPool.isEmpty()){
+			PoolBase obj=unrefObjPool.removeFirst();
+			obj.unrefInternal(false);
+		}
+		while(!freeArrayPool.isEmpty()){
+			Object objs=freeArrayPool.removeFirst();
+			PoolManager.poolArrayInstance(objs,false);
+		}
+		while(!freeByteBufferPool.isEmpty()){
+			ByteBuffer buffer=freeByteBufferPool.removeFirst();
+			PoolManager.poolBufferInstance(buffer);
+		}
 		for(Integer bufferlength:byteBufferPoolMap.keySet()){
 			LocalPool pool=byteBufferPoolMap.get(bufferlength);
 			pool.term();
@@ -267,10 +256,6 @@ public class LocalPoolManager {
 		for(Class clazz:classPoolMap.keySet()){
 			LocalPool pool=classPoolMap.get(clazz);
 			pool.term();
-		}
-		while(!unrefObjPool.isEmpty()){
-			PoolBase obj=unrefObjPool.removeFirst();
-			obj.unrefInternal(false);
 		}
 		logger.info("LocalPoolManager term["+threadName+"]end");
 	}

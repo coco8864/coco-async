@@ -209,7 +209,7 @@ public class Order extends Context{
 	}
 	
 	public void callback(ChannelStastics ststics){
-		Log.debug(logger,"callback.cid:",handler.getChannelId(),"orderType:",orderType);
+		Log.debug(logger,"callback.cid:",handler.getChannelId(),":orderType:",orderType);
 		if(handler==null){
 			logger.error("Illegal order.this:"+this,new Exception());
 			return;
