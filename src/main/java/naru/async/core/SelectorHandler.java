@@ -175,7 +175,9 @@ public class SelectorHandler implements Runnable {
 			}
 			Log.debug(logger,"acceptInternal:",socketChannel);
 		} catch (IOException e) {
-			logger.error("fail to accept.",e);
+			if(!context.getSelectOperator().isClose()){
+				logger.error("fail to accept.",e);
+			}
 			return false;
 		}
 		return true;
