@@ -70,9 +70,9 @@ public class LocalPoolManager {
 	}
 	
 	public static Object getInstance(Class clazz) {
-		//if(true){//TODO xxx
-		//	return null;
-		//}
+		if(true){//TODO xxx
+			return null;
+		}
 		LocalPoolManager manager=localPool.get();
 		if(manager==null){
 			return null;
@@ -89,9 +89,9 @@ public class LocalPoolManager {
 	}
 	
 	public static ByteBuffer getBufferInstance(int bufferSize) {
-		//if(true){//TODO xxx
-		//	return null;
-		//}
+		if(true){//TODO xxx
+			return null;
+		}
 		LocalPoolManager manager=localPool.get();
 		if(manager==null){
 			return null;
@@ -117,9 +117,9 @@ public class LocalPoolManager {
 	}
 	
 	public static Object getArrayInstance(Class clazz,int size){
-		//if(true){//TODO xxx
-		//	return null;
-		//}
+		if(true){//TODO xxx
+			return null;
+		}
 		LocalPoolManager manager=localPool.get();
 		if(manager==null){
 			return null;
