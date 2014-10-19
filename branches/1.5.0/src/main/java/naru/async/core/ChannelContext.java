@@ -23,7 +23,7 @@ import naru.async.ChannelHandler;
 import naru.async.ChannelStastics;
 import naru.async.Log;
 import naru.async.core.Order.OrderType;
-import naru.async.core.SelectOperator.State;
+import naru.async.core.ReadOperator.State;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.Context;
 import naru.async.pool.PoolManager;
@@ -69,7 +69,7 @@ public class ChannelContext extends Context{
 	}
 	
 	private ChannelStastics stastics=new ChannelStastics();
-	private SelectOperator selectOperator=new SelectOperator(this);
+	private ReadOperator readOperator=new ReadOperator(this);
 	private WriteOperator writeOperator=new WriteOperator(this);
 	private OrderOperator orderOperator=new OrderOperator(this);
 	
@@ -81,8 +81,8 @@ public class ChannelContext extends Context{
 		return orderOperator;
 	}
 	
-	SelectOperator getSelectOperator(){
-		return selectOperator;
+	ReadOperator getReadOperator(){
+		return readOperator;
 	}
 	
 	WriteOperator getWriteOperator(){
@@ -159,7 +159,7 @@ public class ChannelContext extends Context{
 		context.selector=IOManager.getSelectorContext(context);
 		context.orderOperator.setup();
 		context.writeOperator.setup(channel);
-		context.selectOperator.setup(channel);
+		context.readOperator.setup(channel);
 		return context;
 	}
 	
@@ -249,7 +249,7 @@ public class ChannelContext extends Context{
 		long time=orderOperator.checkConnectTimeout(now);
 		if(time==OrderOperator.CHECK_TIMEOUT){
 			orderOperator.timeout(OrderType.connect);
-			selectOperator.queueIo(State.closing);
+			readOperator.queueIo(State.closing);
 			return 0;
 		}else if(time>0){
 			updateNextSelectWakeUp(time);
@@ -269,7 +269,7 @@ public class ChannelContext extends Context{
 		if(time==OrderOperator.CHECK_TIMEOUT){
 			orderOperator.timeout(OrderType.read);
 			if(writeOperator.isClose()){
-				selectOperator.queueIo(State.closing);
+				readOperator.queueIo(State.closing);
 				return 0;
 			}
 			//read‚Ítimeout‚µ‚Ä‚àˆ—‘±s
@@ -284,7 +284,7 @@ public class ChannelContext extends Context{
 		if(time==OrderOperator.CHECK_TIMEOUT){
 			//write‚ªtimeout‚µ‚½‚çfailure‚Æ‚µ‚Äˆ—
 			orderOperator.timeout(OrderType.write);
-			selectOperator.queueIo(State.closing);
+			readOperator.queueIo(State.closing);
 			return 0;
 		}else if(time>0){
 			ops|=SelectionKey.OP_WRITE;
@@ -307,14 +307,14 @@ public class ChannelContext extends Context{
 	
 	private void failureEnd(){
 		orderOperator.failure(null);
-		selectOperator.queueIo(State.closing);
+		readOperator.queueIo(State.closing);
 	}
 	
 	synchronized boolean select(){
 		long now=System.currentTimeMillis();
 		nextSelectWakeUp=Long.MAX_VALUE;
 		int ops=0;
-		switch(selectOperator.getState()){
+		switch(readOperator.getState()){
 		case accepting:
 			ops=acceptingSelect(now);
 			break;
@@ -338,14 +338,18 @@ public class ChannelContext extends Context{
 		try {
 			if(selectionKey==null){
 				try {
+					Log.debug(logger, "selector.register:cid:",getPoolId(),":ops:",ops);
 					selectionKey=selector.register(channel, ops,this);
 				} catch (CancelledKeyException e) {
-					logger.error("select state error.cid:"+getPoolId()+":"+selectOperator.getState());
+					logger.error("select state error.cid:"+getPoolId()+":"+readOperator.getState());
 					failureEnd();
 					return false;
 				}
 			}else if(selectionKey.interestOps()!=ops){
+				Log.debug(logger, "selectionKey.interestOps:cid:",getPoolId(),":ops:",ops);
 				selectionKey.interestOps(ops);
+				//selectionKey.cancel();
+				//selectionKey=selector.register(channel, ops,this);
 			}
 		} catch (ClosedChannelException e) {
 			failureEnd();
@@ -453,7 +457,7 @@ public class ChannelContext extends Context{
 	}
 
 	public long getTotalReadLength() {
-		return selectOperator.getTotalReadLength();
+		return readOperator.getTotalReadLength();
 	}
 	
 	public long getTotalWriteLength() {
@@ -563,7 +567,7 @@ public class ChannelContext extends Context{
 		context.remotePort=orgContext.remotePort;
 		context.localIp=orgContext.localIp;
 		context.localPort=orgContext.localPort;
-		context.selectOperator.setup(null);
+		context.readOperator.setup(null);
 		context.writeOperator.setup(null);
 		context.orderOperator.setup();
 		return context;

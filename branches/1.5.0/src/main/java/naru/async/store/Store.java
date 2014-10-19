@@ -105,8 +105,23 @@ public class Store extends PoolBase {
 		isOnAsyncBuffer=isOnAsyncBufferRequest=isOnAsyncBufferClose=false;
 		bufferGetter=null;
 		
-		loadingPage=null;
+		if(loadingPage!=null){
+			loadingPage.unref();
+			loadingPage=null;
+		}
+		if(gettingPage!=null){
+			gettingPage.unref();
+			gettingPage=null;
+		}
+		if(puttingPage!=null){
+			puttingPage.unref();
+			puttingPage=null;
+		}
+		for(Page savingPage:savingPages.values()){
+			savingPage.unref();
+		}
 		savingPages.clear();
+		
 //		stastics.recycleStore();
 		putBufferCount=onBufferCount=onBufferEndCount=onBufferFailureCount=0;
 		putBufferLength=onBufferLength=0L;
