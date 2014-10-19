@@ -76,7 +76,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 	
 	private ChannelContext context;
 	private ChannelStastics stastics;
-	private SelectOperator selectOperator;
+	private ReadOperator readOperator;
 	private OrderOperator orderOperator;
 	
 	WriteOperator(ChannelContext context){
@@ -92,7 +92,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 		}
 		this.channel=channel;
 		this.stastics=context.getChannelStastics();
-		this.selectOperator=context.getSelectOperator();
+		this.readOperator=context.getReadOperator();
 		this.orderOperator=context.getOrderOperator();
 		if(channel instanceof SocketChannel){
 			SocketChannel socketChannel=(SocketChannel)channel;
@@ -187,7 +187,7 @@ public class WriteOperator implements BufferGetter,ChannelIO{
 			return false;
 		}
 		if(isAllClose){
-			selectOperator.close();
+			readOperator.close();
 			orderOperator.doneClose(false);
 			closed();
 			return false;

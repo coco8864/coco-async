@@ -15,7 +15,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import naru.async.Log;
-import naru.async.core.SelectOperator.State;
+import naru.async.core.ReadOperator.State;
 import naru.async.pool.LocalPoolManager;
 
 public class SelectorHandler implements Runnable {
@@ -54,7 +54,9 @@ public class SelectorHandler implements Runnable {
 		public void run() {
 			logger.info("accept thread start");
 			LocalPoolManager.refresh();//AcceptThreadは、Orderを消費するのみでgarbageは出さない
-			handler.accept(context);
+			while(!context.getReadOperator().isClose()){
+				handler.accept(context);
+			}
 			LocalPoolManager.end();
 			logger.info("accept thread end");
 			context.unref();
@@ -80,7 +82,7 @@ public class SelectorHandler implements Runnable {
 		stastics.inQueue();
 		synchronized(contexts){
 			context.ref();//select cycleにいる間は参照を持つ
-			if(context.getSelectOperator().isAccepting()&&IOManager.useAcceptThread()){
+			if(context.getReadOperator().isAccepting()&&IOManager.useAcceptThread()){
 				(new AcceptRunner(this,context)).start();
 			}else{
 				contexts.add(context);
@@ -120,7 +122,7 @@ public class SelectorHandler implements Runnable {
 				continue;
 			}
 			ChannelContext context=(ChannelContext)key.attachment();
-			context.getSelectOperator().queueIo(State.closing);
+			context.getReadOperator().queueIo(State.closing);
 			context.cancelSelect();
 			context.unref();
 		}
@@ -175,7 +177,7 @@ public class SelectorHandler implements Runnable {
 			}
 			Log.debug(logger,"acceptInternal:",socketChannel);
 		} catch (IOException e) {
-			if(!context.getSelectOperator().isClose()){
+			if(!context.getReadOperator().isClose()){
 				logger.error("fail to accept.",e);
 			}
 			return false;
@@ -188,13 +190,16 @@ public class SelectorHandler implements Runnable {
 			stastics.write();
 			context.getWriteOperator().writable();
 		}
-		if(key.isConnectable()){
+		/* なぜかopsで指定していないconnectableが通知される事がある */
+		if(key.isConnectable() && context.getReadOperator().isSelectConnecting()){
+			//Log.debug(logger, "key.isConnectable():"+context.getReadOperator().getState());
 			stastics.connect();
-			context.getSelectOperator().connectable();
+			context.getReadOperator().connectable();
 			return true;
-		}else if(key.isReadable()){
+		}else if(key.isReadable() /*&& context.getReadOperator().isSelectReading()*/){
+			//Log.debug(logger, "key.isReadable():"+context.getReadOperator().getState());
 			stastics.read();
-			context.getSelectOperator().readable();
+			context.getReadOperator().readable();
 			return true;
 		}else if(key.isAcceptable()){
 			accept(context);
@@ -307,8 +312,8 @@ public class SelectorHandler implements Runnable {
 				ChannelContext out=outItr.next();
 				if(!selectIn.contains(out)){
 					out.cancelSelect();
-					out.unref();
 				}
+				out.unref();
 				outItr.remove();
 			}
 			selectIn.clear();

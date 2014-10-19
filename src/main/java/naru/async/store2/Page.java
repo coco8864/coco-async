@@ -7,6 +7,7 @@ import java.util.List;
 import naru.async.Log;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolBase;
+import naru.async.pool.PoolManager;
 
 import org.apache.log4j.Logger;
 
@@ -15,28 +16,40 @@ public class Page extends PoolBase {
 	private Store store;
 	private long storeId;//ò_óùID
 	private long pageId;//ï®óùà íu
-	private long nextPageId;
+
+	private Page prevPage;
 	private Page nextPage;
-	private long filePosition;
+	private long nextPageId;
+
+	private long pageLength;
+	
 	private int fileId;
-	private long bufferLength;
+	private long filePosition;
+	
 	private List<ByteBuffer> buffers=new ArrayList<ByteBuffer>();
+
+	private long borderLength;
+	
 	@Override
 	public void recycle() {
+		borderLength=PoolManager.getDefaultBufferSize()/2;
 	}
 	
 	public synchronized boolean putBuffer(ByteBuffer[] buffers){
+		if(borderLength>0&&pageLength>=borderLength){
+			return false;
+		}
 		for(ByteBuffer buffer:buffers){
-			bufferLength+=buffer.remaining();
+			pageLength+=buffer.remaining();
 			this.buffers.add(buffer);
 		}
 		return true;
 	}
 	
 	public synchronized ByteBuffer[] getBuffer(){
-		Log.debug(logger,"getBuffer.",this,":",bufferLength);
+		Log.debug(logger,"getBuffer.",this,":",pageLength);
 		ByteBuffer[] buffer=BuffersUtil.toByteBufferArray(buffers);
-		this.bufferLength=0;
+		this.pageLength=0;
 		this.buffers.clear();
 		return buffer;
 	}

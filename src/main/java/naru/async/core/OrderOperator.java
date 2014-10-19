@@ -11,7 +11,7 @@ import naru.async.ChannelHandler;
 import naru.async.ChannelStastics;
 import naru.async.Log;
 import naru.async.core.Order.OrderType;
-import naru.async.core.SelectOperator.State;
+import naru.async.core.ReadOperator.State;
 import naru.async.pool.BuffersUtil;
 import naru.async.pool.PoolManager;
 
@@ -43,7 +43,7 @@ public class OrderOperator {
 	
 	private ChannelContext context;
 	private ChannelStastics stastics;
-	private SelectOperator selectOperator;
+	private ReadOperator readOperator;
 	private WriteOperator writeOperator;
 	private boolean isHalfClose;
 	private boolean isAllClose;
@@ -56,7 +56,7 @@ public class OrderOperator {
 	void setup(){
 		this.stastics=context.getChannelStastics();
 		this.writeOperator=context.getWriteOperator();
-		this.selectOperator=context.getSelectOperator();
+		this.readOperator=context.getReadOperator();
 		acceptOrder=null;
 		connectOrder=null;
 		readOrder=null;
@@ -89,7 +89,7 @@ public class OrderOperator {
 		if(orderCount()!=0){
 			return false;
 		}
-		if(!selectOperator.isClose()){
+		if(!readOperator.isClose()){
 			return false;
 		}
 		if(!writeOperator.isClose()){
@@ -126,7 +126,7 @@ public class OrderOperator {
 			logger.warn("fail to configureBlocking(false)",e);
 		}
 		acceptContext.setupSocketOpt();
-		acceptContext.getSelectOperator().readable();
+		acceptContext.getReadOperator().readable();
 		Object userAcceptContext=context.getAcceptUserContext();
 		acceptContext.accepted(userAcceptContext);
 	}
@@ -384,7 +384,7 @@ public class OrderOperator {
 		}
 		if(isAsyncClose){
 			isHalfClose=true;
-			if(selectOperator.isClose()){
+			if(readOperator.isClose()){
 				return count;
 			}
 			/*Å@ê≥èÌånÇ≈ÇÕÇµÇŒÇÁÇ≠ë“Ç¬Ç∆0í∑éÛêMÇ∑ÇÈÇÕÇ∏,0í∑éÛêMÇàÍíËä˙ä‘ë“Ç¬ */
@@ -445,7 +445,7 @@ public class OrderOperator {
 			return false;
 		}
 		acceptOrder=Order.create(context.getHandler(), OrderType.accept, userContext);
-		selectOperator.queueSelect(State.accepting);
+		readOperator.queueSelect(State.accepting);
 		return true;
 	}
 	
@@ -460,9 +460,9 @@ public class OrderOperator {
 		if(context.isConnected()){//Ç∑Ç≈Ç…connectÇ™ê¨å˜ÇµÇƒÇ¢ÇΩèÍçá
 			queueCallback(connectOrder);
 			connectOrder=null;
-			selectOperator.queueSelect(State.selectReading);
+			readOperator.queueSelect(State.selectReading);
 		}else{
-			selectOperator.queueSelect(State.selectConnecting);
+			readOperator.queueSelect(State.selectConnecting);
 		}
 		return true;
 	}
@@ -477,7 +477,7 @@ public class OrderOperator {
 			readOrder.closeOrder();
 			queueCallback(readOrder);
 			readOrder=null;
-		}else if (selectOperator.asyncRead(readOrder)){
+		}else if (readOperator.asyncRead(readOrder)){
 			readOrder=null;
 		}
 		return true;
