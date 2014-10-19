@@ -4,8 +4,11 @@ import java.nio.ByteBuffer;
 import java.util.LinkedList;
 
 import naru.async.BufferGetter;
+import naru.async.Log;
 import naru.async.pool.PoolBase;
 import naru.async.pool.PoolManager;
+import naru.async.store.StoreCallback;
+import naru.async.store.StoreManager;
 
 public class Store extends PoolBase {
 	class PageInfo{
@@ -50,4 +53,42 @@ public class Store extends PoolBase {
 		//
 	}
 	
+	/**
+	 * callback管理メソッド郡
+	 */
+	//queueされた順番にcallbackする
+	//callback中は重ねてcallbackしない
+	private LinkedList<StoreCallback> callbackQueue=new LinkedList<StoreCallback>();
+	private boolean isCallbackProcessing=false;
+	void callbackQueue(StoreCallback storeCallback){
+		Log.debug(logger,"callbackQueue sid:",getStoreId());
+		synchronized(callbackQueue){
+			callbackQueue.addLast(storeCallback);
+		}
+		//sStoreManager.asyncDispatch(this);//TODO
+	}
+	
+	void callback(){
+		Log.debug(logger,"callback sid:",getStoreId());
+		StoreCallback storeCallback=null;
+		synchronized(callbackQueue){
+			if(isCallbackProcessing || callbackQueue.size()<=0){
+				Log.debug(logger,"callback loopout sid:",getPoolId());
+				return;
+			}
+			isCallbackProcessing=true;
+			storeCallback=callbackQueue.removeFirst();
+		}
+		while(true){
+			storeCallback.callback();
+			storeCallback.unref(true);
+			synchronized(callbackQueue){
+				if(callbackQueue.size()<=0){
+					isCallbackProcessing=false;
+					break;
+				}
+				storeCallback=callbackQueue.removeFirst();
+			}
+		}
+	}
 }
