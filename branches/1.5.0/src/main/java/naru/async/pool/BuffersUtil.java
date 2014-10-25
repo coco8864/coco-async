@@ -21,6 +21,32 @@ import org.apache.log4j.Logger;
 public class BuffersUtil {
 	private static Logger logger = Logger.getLogger(BuffersUtil.class);
 
+	public static boolean copyBuffers(List<ByteBuffer> srcBuffers,ByteBuffer dstBuffer){
+		boolean rc=false;
+		for(ByteBuffer srcBuffer:srcBuffers){
+			if(!srcBuffer.hasRemaining()){
+				continue;
+			}
+			dstBuffer.put(srcBuffer);
+			if(dstBuffer.hasRemaining()){
+				rc=true;
+				break;
+			}
+		}
+		dstBuffer.flip();
+		return rc;
+	}
+	
+	public static boolean copyBuffers(List<ByteBuffer> srcBuffers,List<ByteBuffer> dstBuffers){
+		for(ByteBuffer dstBuffer:dstBuffers){
+			if(copyBuffers(srcBuffers,dstBuffer)){
+				continue;
+			}
+			return false;
+		}
+		return true;
+	}
+
 	public static String toStringFromBuffer(ByteBuffer buffer, String enc) {
 		byte[] array = buffer.array();
 		try {
@@ -65,9 +91,6 @@ public class BuffersUtil {
 	}
 
 	public static ByteBuffer[] newByteBufferArray(int count) {
-		if(count>=24){
-			Log.debug(logger,"newByteBufferArray:",count,new Throwable());
-		}
 		return (ByteBuffer[]) PoolManager.getArrayInstance(ByteBuffer.class,count);
 	}
 
@@ -122,8 +145,7 @@ public class BuffersUtil {
 			if (!buffers[i].hasRemaining()) {
 				continue;// íÜêgÇÃÇ»Ç¢bufferÇdupÇ∑ÇÈïKóvÇÕÇ»Ç¢
 			}
-			ByteBuffer buf = PoolManager.getBufferInstance(buffers[i]
-					.capacity());
+			ByteBuffer buf = PoolManager.getBufferInstance(buffers[i].capacity());
 			buffers[i].mark();
 			buf.put(buffers[i]);
 			buffers[i].reset();
