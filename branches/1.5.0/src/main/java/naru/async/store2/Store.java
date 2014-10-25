@@ -53,6 +53,15 @@ public class Store extends PoolBase {
 		//
 	}
 	
+	public void nextBuffer(){
+	}
+	
+	public void endBuffer(){
+	}
+	
+	public void onPageIn(int pageId,ByteBuffer[] buffers){
+	}
+	
 	/**
 	 * callbackŠÇ—ƒƒ\ƒbƒhŒS
 	 */
