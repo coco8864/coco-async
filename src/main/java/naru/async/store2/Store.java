@@ -19,7 +19,9 @@ public class Store extends PoolBase {
 	private String digest;
 	private LinkedList<PageInfo> pages=new LinkedList<PageInfo>();
 	private LinkedList<ByteBuffer> currentBuffers=new LinkedList<ByteBuffer>();
-	private int currentLength;
+	private long currentLength;
+	private long putLength;
+	private long callbackLength;
 	
 	private BufferGetter bufferGetter;
 	private Object userContext;
