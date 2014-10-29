@@ -21,6 +21,13 @@ import org.apache.log4j.Logger;
 public class BuffersUtil {
 	private static Logger logger = Logger.getLogger(BuffersUtil.class);
 
+	public static void addByteBufferList(List<ByteBuffer> list,ByteBuffer[] buffers){
+		for(ByteBuffer buffer:buffers){
+			list.add(buffer);
+		}
+		PoolManager.poolArrayInstance(buffers);
+	}
+	
 	public static boolean copyBuffers(List<ByteBuffer> srcBuffers,ByteBuffer dstBuffer){
 		boolean rc=false;
 		for(ByteBuffer srcBuffer:srcBuffers){

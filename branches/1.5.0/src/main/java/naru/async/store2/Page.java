@@ -13,6 +13,7 @@ import org.apache.log4j.Logger;
 
 public class Page extends PoolBase {
 	private static Logger logger=Logger.getLogger(Page.class);
+	private static PagePool pagePool=PagePool.getInstance();
 	private Store store;
 	private long storeId;//˜_—ID
 	private long pageId;//•¨—ˆÊ’u
