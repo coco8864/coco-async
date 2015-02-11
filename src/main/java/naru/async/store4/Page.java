@@ -35,6 +35,28 @@ public class Page {
 	private List<ByteBufferLife> byteBufferLifes=new LinkedList<ByteBufferLife>();
 	private Map<ByteBufferLife,ByteBuffer> byteBufferPool=new HashMap<ByteBufferLife,ByteBuffer>();
 	
+	private void setBytes(byte[] bytes){
+		pageManager.changeBytesPage(this.bytes,bytes,this);
+		this.bytes=bytes;
+	}
+	
+	void init(int length){
+		byte[] bytes=new byte[length];
+		init(bytes);
+	}
+	
+	void init(byte[] bytes){
+		ByteBuffer byteBuffer=ByteBuffer.wrap(bytes);
+		init(byteBuffer);
+	}
+	
+	void init(ByteBuffer byteBuffer){
+		setBytes(byteBuffer.array());
+		ByteBufferLife life=new ByteBufferLife(byteBuffer,this);
+		byteBufferLifes.add(life);
+		byteBufferPool.put(life, byteBuffer);
+	}
+	
 	byte[] getBytes(){
 		return bytes;
 	}
@@ -53,7 +75,7 @@ public class Page {
 	synchronized ByteBuffer getBuffer(){
 	}
 	
-	synchronized void poolBuffer(){
+	synchronized void poolBuffer(ByteBuffer buffer){
 	}
 	
 	synchronized  void gcByteBufferLife(ByteBufferLife byteBufferLife) {

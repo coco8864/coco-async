@@ -7,6 +7,8 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BlockingDeque;
+import java.util.concurrent.LinkedBlockingDeque;
 
 import naru.async.pool.LocalPoolManager;
 import naru.async.pool.Pool;
@@ -20,7 +22,51 @@ public class PageManager {
 		return instance;
 	}
 	//Pageに所属するByteBufferがGCされた際に登録されるrefernceQueue
-    private ReferenceQueue pageBufferReferenceQueue = new ReferenceQueue();
+	private ReferenceQueue pageBufferReferenceQueue = new ReferenceQueue();
+	
+	//長さ毎に未使用のByteBufferを持つPage　WRITE modeでpoolされている
+	private Map<Integer,LinkedBlockingDeque<Page>> byteBufferPool=Collections.synchronizedMap(new HashMap<Integer,LinkedBlockingDeque<Page>>());
+	void poolBufferFreePage(Page page){
+		int length=page.getBytes().length;
+		LinkedBlockingDeque<Page> pages=byteBufferPool.get(length);
+		if(pages!=null){
+			pages.addFirst(page);
+		}
+		throw new RuntimeException("poolBufferFreePage length error."+length);
+	}
+	Page getBufferFreePage(int length){
+		LinkedBlockingDeque<Page> pages=byteBufferPool.get(length);
+		if(pages!=null){
+			return pages.pollFirst();
+		}
+		return null;
+	}
+	
+	//pagePool未使用Page　bytesは設定されていない
+	private LinkedBlockingDeque<Page> pagePool=new LinkedBlockingDeque<Page>();
+	void poolFreePage(Page page){
+		pagePool.addFirst(page);
+	}
+	Page getFreePage(){
+		return pagePool.pollFirst();
+	}
+	
+	//使用、未使用、mode関係なく、byte[]からPageが引ける
+	private Map<byte[],Page> bytesPages;//byteBuffer->Page用
+	void changeBytesPage(byte[] oldBytes,byte[] newBytes,Page page){
+		synchronized(bytesPages){
+			if(oldBytes!=null){
+				bytesPages.remove(oldBytes);
+			}
+			if(newBytes!=null){
+				bytesPages.put(newBytes, page);
+			}
+		}
+	}
+	
+	Page getPageByByes(byte[] bytes){
+		return bytesPages.get(bytes);
+	}
 	
 	private Map<Integer,Store> permStores=new HashMap<Integer,Store>();//不揮発Store parmStore.sarファイルに保存
 	private Map<Integer,Page> permPages=new HashMap<Integer,Page>();//不揮発Page parmPage.sarファイルに保存
@@ -29,13 +75,8 @@ public class PageManager {
 	private List<Page> tempSecondCache=new LinkedList<Page>();//すぐ使われる可能性が低い
 	private List<Page> tempOffMemCache=new LinkedList<Page>();//swapoutされている
 	
-	private Map<byte[],Page> arrayPages;//byteBuffer->Page用
 	private Map<Integer,Map<Long,Page>> filePositionPages;
 	
-	//pagePool未使用Page　arrayは設定されていない
-	private List<Page> pagePool=new LinkedList<Page>();
-	//byteBufferPool 未使用ByteBufferのpool ByteBufferは、Pageを持っている
-	private Map<Integer,List<ByteBuffer>> byteBufferPool=new HashMap<Integer,List<ByteBuffer>>();
 	//byteArrayPool 未使用byte[]のpool
 	private Map<Integer,List<byte[]>> byteArrayPool=new HashMap<Integer,List<byte[]>>();
 	
@@ -71,15 +112,27 @@ public class PageManager {
 	 * 以降buffer関連のメソッド,BufferPoolにデリケート
 	 * @return
 	 */
-	public ByteBuffer getBufferInstance() {
-		return getBufferInstance(1024);
+	public ByteBuffer getBuffer() {
+		return getBuffer(1024);
 	}
 	
-	public ByteBuffer getBufferInstance(int bufferSize) {
+	public ByteBuffer getBuffer(int bufferSize) {
 		if(bufferSize==0){
 			return ZERO_BUFFER;
 		}
+		ByteBuffer buffer=null;
 		int actualBufferSize=actualBufferSize(bufferSize);
+		BlockingDeque<Page> pages=byteBufferPool.get(actualBufferSize);
+		if(pages!=null){
+			Page page=pages.pollFirst();
+			if(page!=null){
+				buffer=page.getBuffer();
+				buffer.limit(bufferSize);
+				return buffer;
+			}
+		}
+		
+		
 		Pool pool=null;
 		pool=byteBufferPoolMap.get(actualBufferSize);
 		if(pool==null){
@@ -110,5 +163,4 @@ public class PageManager {
 		byteBufferLifeCounter++;
 		return byteBufferLifeCounter;
 	}
-	
 }

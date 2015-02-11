@@ -15,7 +15,7 @@ public class ByteBufferLife extends WeakReference {
 	private Page page;
 	private int hashCode;
 	
-	public ByteBufferLife(Object referent,Page page) {
+	public ByteBufferLife(ByteBuffer referent,Page page) {
 		super(referent,pageManager.getReferenceQueue());
 		this.hashCode=pageManager.byteBufferLifeCounter();
 		this.page=page;
