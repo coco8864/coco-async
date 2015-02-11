@@ -6,13 +6,15 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import naru.async.BufferGetter;
+
 public class Page {
 	private static PageManager pageManager=PageManager.getInstance();
 	//read mode ,write mode
 	
 	private enum Mode{
 		READ,//File@or Buffer 
-		WRIET,
+		WRITE,
 	}
 	
 	//—LŒø‚Èdata‚ÌŠÝ
@@ -40,21 +42,31 @@ public class Page {
 		this.bytes=bytes;
 	}
 	
-	void init(int length){
+	void setup(int length){
 		byte[] bytes=new byte[length];
-		init(bytes);
+		setup(bytes);
 	}
 	
-	void init(byte[] bytes){
+	void setup(byte[] bytes){
 		ByteBuffer byteBuffer=ByteBuffer.wrap(bytes);
-		init(byteBuffer);
+		setup(byteBuffer);
 	}
 	
-	void init(ByteBuffer byteBuffer){
+	void setup(ByteBuffer byteBuffer){
 		setBytes(byteBuffer.array());
 		ByteBufferLife life=new ByteBufferLife(byteBuffer,this);
 		byteBufferLifes.add(life);
 		byteBufferPool.put(life, byteBuffer);
+		mode=Mode.WRITE;
+		location=Location.BYTES;
+	}
+	
+	void setup(int fileId,long fileOffset,int length){
+		this.fileId=fileId;
+		this.fileOffset=fileOffset;
+		this.length=length;
+		mode=Mode.READ;
+		location=Location.FILE;
 	}
 	
 	byte[] getBytes(){
@@ -72,7 +84,10 @@ public class Page {
 		//GET_MEM->GET_FILE
 	}
 	
-	synchronized ByteBuffer getBuffer(){
+	synchronized ByteBuffer getBuffer(BufferGetter getter){
+		synchronized(byteBufferPool){
+			byteBufferPool.remove(key)
+		}
 	}
 	
 	synchronized void poolBuffer(ByteBuffer buffer){
