@@ -13,7 +13,7 @@ import naru.async.pool.Context;
 
 public abstract class Store extends Context{
 	private static Logger logger=Logger.getLogger(Store.class);
-	protected static PagePool pagePool=PagePool.getInstance();
+	protected static PageManager pageManager=PageManager.getInstance();
 	protected static long borderLength=8192;
 	
 	protected enum State {
@@ -61,6 +61,11 @@ public abstract class Store extends Context{
 		FAILURE,
 	}
 	private LinkedList<CallbackType> callbackQueue=new LinkedList<CallbackType>();
+	private void callbackQueue(CallbackType callbackType){
+		synchronized(callbackQueue){
+			callbackQueue.addLast(callbackType);
+		}
+	}
 	private ByteBuffer[] cbBuffers;
 	private Throwable cbFailure;
 	private boolean isCallbackProcessing=false;
@@ -71,9 +76,7 @@ public abstract class Store extends Context{
 		}
 		this.cbBuffers=BuffersUtil.toByteBufferArray(cbBuffers);
 		callbackLength+=BuffersUtil.remaining(this.cbBuffers);
-		synchronized(callbackQueue){
-			callbackQueue.addLast(CallbackType.BUFFER);
-		}
+		callbackQueue(CallbackType.BUFFER);
 	}
 	
 	protected void queueFailureCallback(Throwable cbFailure){
@@ -81,15 +84,11 @@ public abstract class Store extends Context{
 			logger.error("duplicate cbFailure");
 		}
 		this.cbFailure=cbFailure;
-		synchronized(callbackQueue){
-			callbackQueue.addLast(CallbackType.FAILURE);
-		}
+		callbackQueue(CallbackType.FAILURE);
 	}
 	
 	protected void queueEndCallback(){
-		synchronized(callbackQueue){
-			callbackQueue.addLast(CallbackType.END);
-		}
+		callbackQueue(CallbackType.END);
 	}
 	
 	protected boolean callback(){
