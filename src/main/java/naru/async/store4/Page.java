@@ -16,7 +16,7 @@ public class Page {
 		POOL_WITH_BUFFER,
 		POOL,
 		WRITE,
-		READ,//FileÅ@or Buffer 
+		READ,//Buffer 
 		PAGING_OUT,//èëÇ´çûÇ›íÜ
 		PAGEOUT,
 		PAGING_IN//ì«Ç›çûÇ›íÜ
@@ -41,12 +41,12 @@ public class Page {
 	}
 
 	private int length;//*
-	private byte[] bytes;
 	private int fileId;//*
 	private long fileOffset;//*
+	
+	private byte[] bytes;
 	private List<ByteBufferLife> byteBufferLifes=new LinkedList<ByteBufferLife>();
 	private Map<ByteBufferLife,ByteBuffer> byteBufferPool=new HashMap<ByteBufferLife,ByteBuffer>();
-	private List<PageCallback> callbacks=new ArrayList<PageCallback>();
 	
 	ByteBufferLife getByteBufferLife(ByteBuffer buffer){
 		synchronized(byteBufferLifes){
@@ -65,6 +65,15 @@ public class Page {
 			byteBufferLifes.add(life);
 		}
 	}
+	
+	private int liveBufferCount(){
+		return (byteBufferLifes.size()-byteBufferPool.size());
+	}
+	
+	private void set
+	
+	private List<PageCallback> callbacks=new ArrayList<PageCallback>();
+	
 	
 	private void setBytes(byte[] bytes){
 		pageManager.changeBytesPage(this.bytes,bytes,this);
@@ -102,9 +111,10 @@ public class Page {
 		return bytes;
 	}
 	
-	synchronized void flip(){
+	synchronized void flip(int length){
 		//WRITE->READ
 		stat=Stat.READ;
+		this.length=length;
 	}
 	
 	void pageIn(){
@@ -151,6 +161,7 @@ public class Page {
 		ByteBuffer buffer=ByteBuffer.wrap(bytes);
 		ByteBufferLife life=new ByteBufferLife(buffer,this);
 		putByteBufferLife(life);
+		buffer.position(0).limit(length);
 		return buffer;
 	}
 	
