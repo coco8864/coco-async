@@ -3,8 +3,6 @@ package naru.async.store4;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 
-import naru.async.pool.ReferenceLife;
-
 import org.apache.log4j.Logger;
 
 public class ByteBufferLife extends WeakReference {
@@ -14,6 +12,13 @@ public class ByteBufferLife extends WeakReference {
 
 	private Page page;
 	private int hashCode;
+	//for debug
+	private Throwable stackOfGet;
+	private long timeOfGet;
+	private String threadNameOfGet;
+	private Throwable stackOfPool;
+	private long timeOfPool;
+	private String threadNameOfPool;
 	
 	public ByteBufferLife(ByteBuffer referent,Page page) {
 		super(referent,pageManager.getReferenceQueue());

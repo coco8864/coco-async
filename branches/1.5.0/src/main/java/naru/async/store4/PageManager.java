@@ -18,11 +18,19 @@ public class PageManager {
 	private static final ByteBuffer ZERO_BUFFER=ByteBuffer.allocate(0);
 	private static final int BUFFER_SIZE_UNIT=1024;//バッファーサイズの単位
 	
+	//freeSize,useSize,swapOutSize | totalMaxSize
+	//fileSize,
+	
 	public static PageManager getInstance(){
 		return instance;
 	}
 	//Pageに所属するByteBufferがGCされた際に登録されるrefernceQueue
 	private ReferenceQueue pageBufferReferenceQueue = new ReferenceQueue();
+	
+	//memoryが少なくなるとswapOutされるPage群
+	private LinkedBlockingDeque<Page> pageOutQueue=new LinkedBlockingDeque<Page>();
+	//memoryに余裕がでてくればswapInされるPage群
+	private LinkedBlockingDeque<Page> pageInQueue=new LinkedBlockingDeque<Page>();
 	
 	//長さ毎に未使用のByteBufferを持つPage　WRITE modeでpoolされている
 	private Map<Integer,LinkedBlockingDeque<Page>> byteBufferPool=Collections.synchronizedMap(new HashMap<Integer,LinkedBlockingDeque<Page>>());
@@ -63,20 +71,19 @@ public class PageManager {
 			}
 		}
 	}
-	
 	Page getPageByByes(byte[] bytes){
 		return bytesPages.get(bytes);
 	}
-	
-	private Map<Integer,Store> permStores=new HashMap<Integer,Store>();//不揮発Store parmStore.sarファイルに保存
-	private Map<Integer,Page> permPages=new HashMap<Integer,Page>();//不揮発Page parmPage.sarファイルに保存
-
-	private List<Page> tempFirstCache=new LinkedList<Page>();//すぐ使われる可能性が高い
-	private List<Page> tempSecondCache=new LinkedList<Page>();//すぐ使われる可能性が低い
-	private List<Page> tempOffMemCache=new LinkedList<Page>();//swapoutされている
-	
-	private Map<Integer,Map<Long,Page>> filePositionPages;
-	
+	//使用、未使用、mode関係なく、pageIdからPageが引ける
+	private Map<Integer,Page> idPages;//byteBuffer->Page用
+	void putIdPage(Page page){
+		synchronized(idPages){
+			idPages.put(page.getPageId(), page);
+		}
+	}
+	Page getIdPage(Integer pageId){
+		return idPages.get(pageId);
+	}
 	//byteArrayPool 未使用byte[]のpool
 	private Map<Integer,List<byte[]>> byteArrayPool=new HashMap<Integer,List<byte[]>>();
 	
